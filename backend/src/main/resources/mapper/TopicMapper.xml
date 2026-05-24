@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.personalblog.mapper.TopicMapper">
+
+    <resultMap id="TopicMap" type="com.personalblog.entity.TopicEntity">
+        <id column="id" property="id"/>
+        <result column="title" property="title"/>
+        <result column="excerpt" property="excerpt"/>
+        <result column="tag" property="tag"/>
+        <result column="record_date" property="date"/>
+    </resultMap>
+
+    <select id="selectAll" resultMap="TopicMap">
+        SELECT id, title, excerpt, tag, record_date FROM topics ORDER BY record_date ASC
+    </select>
+
+    <select id="selectById" resultMap="TopicMap">
+        SELECT id, title, excerpt, tag, record_date FROM topics WHERE id = #{id}
+    </select>
+
+    <select id="countById" resultType="int">
+        SELECT COUNT(*) FROM topics WHERE id = #{id}
+    </select>
+
+    <select id="selectByTitleIgnoreCase" resultMap="TopicMap">
+        SELECT id, title, excerpt, tag, record_date FROM topics
+        WHERE LOWER(title) = LOWER(#{title})
+        LIMIT 1
+    </select>
+
+    <insert id="insert">
+        INSERT INTO topics (id, title, excerpt, tag, record_date)
+        VALUES (#{id}, #{title}, #{excerpt}, #{tag}, #{date})
+    </insert>
+</mapper>

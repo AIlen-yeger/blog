@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.personalblog.mapper.ProfileMapper">
+
+    <resultMap id="ProfileMap" type="com.personalblog.entity.ProfileEntity">
+        <id column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="subtitle" property="subtitle"/>
+        <result column="bio" property="bio"/>
+        <result column="focus_json" property="focusJson"/>
+        <result column="avatar_url" property="avatarUrl"/>
+    </resultMap>
+
+    <select id="selectById" resultMap="ProfileMap">
+        SELECT id, name, subtitle, bio, focus_json, avatar_url FROM profile WHERE id = #{id}
+    </select>
+
+    <insert id="insert">
+        INSERT INTO profile (id, name, subtitle, bio, focus_json, avatar_url)
+        VALUES (#{id}, #{name}, #{subtitle}, #{bio}, #{focusJson}, #{avatarUrl})
+    </insert>
+
+    <update id="update">
+        UPDATE profile
+        SET name = #{name},
+            subtitle = #{subtitle},
+            bio = #{bio},
+            focus_json = #{focusJson},
+            avatar_url = #{avatarUrl}
+        WHERE id = #{id}
+    </update>
+</mapper>

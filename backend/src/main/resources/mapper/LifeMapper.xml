@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.personalblog.mapper.LifeMapper">
+
+    <resultMap id="LifeMap" type="com.personalblog.entity.LifeEntity">
+        <id column="id" property="id"/>
+        <result column="title" property="title"/>
+        <result column="excerpt" property="excerpt"/>
+        <result column="tag" property="tag"/>
+        <result column="content" property="content"/>
+        <result column="record_date" property="date"/>
+        <result column="images_json" property="imagesJson"/>
+        <result column="view_count" property="viewCount"/>
+        <result column="pinned" property="pinned"/>
+        <result column="status" property="status"/>
+    </resultMap>
+
+    <sql id="listWhere">
+        <where>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+            <if test="tag != null and tag != ''">
+                AND tag = #{tag}
+            </if>
+            <if test="yearMonth != null and yearMonth != ''">
+                AND record_date LIKE CONCAT(#{yearMonth}, '%')
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (LOWER(title) LIKE CONCAT('%', LOWER(#{keyword}), '%')
+                OR LOWER(excerpt) LIKE CONCAT('%', LOWER(#{keyword}), '%')
+                OR LOWER(content) LIKE CONCAT('%', LOWER(#{keyword}), '%'))
+            </if>
+        </where>
+    </sql>
+
+    <sql id="listOrder">
+        ORDER BY
+        pinned DESC,
+        <choose>
+            <when test="sort == 'date_asc'">record_date ASC</when>
+            <when test="sort == 'title_asc'">title ASC</when>
+            <otherwise>record_date DESC</otherwise>
+        </choose>
+    </sql>
+
+    <select id="selectById" resultMap="LifeMap">
+        SELECT id, title, excerpt, tag, content, record_date, images_json, view_count, pinned, status
+        FROM life_records WHERE id = #{id}
+    </select>
+
+    <select id="countById" resultType="int">
+        SELECT COUNT(*) FROM life_records WHERE id = #{id}
+    </select>
+
+    <select id="countList" resultType="long">
+        SELECT COUNT(*) FROM life_records
+        <include refid="listWhere"/>
+    </select>
+
+    <select id="selectList" resultMap="LifeMap">
+        SELECT id, title, excerpt, tag, content, record_date, images_json, view_count, pinned, status
+        FROM life_records
+        <include refid="listWhere"/>
+        <include refid="listOrder"/>
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="selectTagCounts" resultType="com.personalblog.dto.TagCountDto">
+        SELECT tag, COUNT(*) AS count FROM life_records
+        <where>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+        </where>
+        GROUP BY tag
+        ORDER BY count DESC, tag ASC
+    </select>
+
+    <select id="selectArchiveMonths" resultType="com.personalblog.dto.ArchiveMonthDto">
+        SELECT LEFT(record_date, 7) AS month, COUNT(*) AS count FROM life_records
+        <where>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+            AND record_date IS NOT NULL AND record_date != ''
+        </where>
+        GROUP BY LEFT(record_date, 7)
+        ORDER BY month DESC
+    </select>
+
+    <insert id="insert">
+        INSERT INTO life_records (id, title, excerpt, tag, content, record_date, images_json, view_count, pinned, status)
+        VALUES (#{id}, #{title}, #{excerpt}, #{tag}, #{content}, #{date}, #{imagesJson}, 0, 0, #{status})
+    </insert>
+
+    <update id="update">
+        UPDATE life_records
+        SET title = #{title},
+            excerpt = #{excerpt},
+            tag = #{tag},
+            content = #{content},
+            record_date = #{date},
+            images_json = #{imagesJson},
+            status = #{status}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM life_records WHERE id = #{id}
+    </delete>
+
+    <update id="incrementViewCount">
+        UPDATE life_records SET view_count = view_count + 1 WHERE id = #{id}
+    </update>
+
+    <update id="incrementViewCountBy">
+        UPDATE life_records SET view_count = view_count + #{delta} WHERE id = #{id}
+    </update>
+
+    <select id="selectViewCount" resultType="int">
+        SELECT view_count FROM life_records WHERE id = #{id}
+    </select>
+
+    <update id="clearAllPinned">
+        UPDATE life_records SET pinned = 0
+    </update>
+
+    <update id="updatePinned">
+        UPDATE life_records SET pinned = #{pinned} WHERE id = #{id}
+    </update>
+</mapper>
