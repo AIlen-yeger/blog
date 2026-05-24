@@ -1,0 +1,9 @@
+node_modules
+dist
+*.local
+.DS_Store
+
+# 音乐文件体积大且可能涉及版权，部署时单独上传到 public/music 或 CDN
+public/music/*.mp3
+public/music/*.m4a
+public/music/*.ogg

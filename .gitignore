@@ -1,0 +1,21 @@
+# 通用
+.DS_Store
+*.local
+.env
+.env.*
+
+# 工具文件
+exclude.txt
+
+# 前端
+frontend/node_modules/
+frontend/dist/
+
+# 后端
+backend/target/
+backend/.idea/
+
+# Python
+python/.venv/
+python/__pycache__/
+python/*.pyc

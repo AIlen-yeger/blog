@@ -1,0 +1,69 @@
+:root,
+[data-theme='dark'] {
+  --font-sans: 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    sans-serif;
+
+  --color-bg-dark: #1a1f2e;
+  --color-bg-landing-1: #152238;
+  --color-bg-landing-2: #1e3a5f;
+  --color-bg-landing-3: #2563a8;
+
+  --color-accent: #3b82f6;
+  --color-accent-light: #60a5fa;
+  --color-accent-dark: #2563eb;
+  --color-accent-secondary: #38bdf8;
+  --color-accent-muted: #93c5fd;
+
+  --color-surface: #e6ebe3;
+  --color-surface-card: #f2f4ef;
+  --color-surface-elevated: #fafbf8;
+  --color-sidebar: #4a6f9a;
+
+  --color-text: #2c3340;
+  --color-text-muted: #5c6570;
+  --color-text-on-dark: #d8e4f0;
+
+  --color-draft-bg: #fef3c7;
+  --color-draft-text: #b45309;
+
+  --landing-gap-x: clamp(1.5rem, 8vw, 4rem);
+  --landing-gap-top: clamp(1rem, 3vh, 1.75rem);
+
+  --radius-avatar: 16px;
+  --radius-card: 24px;
+  --shadow-card: 0 8px 28px rgba(30, 45, 60, 0.12);
+  --shadow-avatar: 0 10px 32px rgba(45, 70, 100, 0.15);
+
+  --discover-bar-bg: rgba(255, 255, 255, 0.06);
+  --discover-chip-bg: rgba(255, 255, 255, 0.08);
+  --discover-chip-active: rgba(59, 130, 246, 0.35);
+}
+
+[data-theme='light'] {
+  --color-bg-dark: #eef2f7;
+  --color-bg-landing-1: #dbeafe;
+  --color-bg-landing-2: #bfdbfe;
+  --color-bg-landing-3: #93c5fd;
+
+  --color-accent: #2563eb;
+  --color-accent-light: #3b82f6;
+  --color-accent-dark: #1d4ed8;
+  --color-accent-secondary: #0ea5e9;
+  --color-accent-muted: #60a5fa;
+
+  --color-surface: #ffffff;
+  --color-surface-card: #f8fafc;
+  --color-surface-elevated: #ffffff;
+  --color-sidebar: #3b6ea8;
+
+  --color-text: #1e293b;
+  --color-text-muted: #64748b;
+  --color-text-on-dark: #f1f5f9;
+
+  --shadow-card: 0 6px 20px rgba(15, 23, 42, 0.08);
+  --shadow-avatar: 0 8px 24px rgba(15, 23, 42, 0.1);
+
+  --discover-bar-bg: rgba(255, 255, 255, 0.85);
+  --discover-chip-bg: #f1f5f9;
+  --discover-chip-active: #dbeafe;
+}
