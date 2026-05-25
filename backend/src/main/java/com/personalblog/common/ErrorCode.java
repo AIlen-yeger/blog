@@ -23,7 +23,8 @@ public enum ErrorCode {
     CODE_SEND_TOO_FREQUENT(42901, "验证码发送过于频繁，请稍后再试"),
     CODE_DAILY_LIMIT(42902, "今日验证码发送次数已达上限，请明日再试"),
     MAIL_SEND_FAILED(50001, "验证码邮件发送失败，请稍后重试"),
-    INTERNAL_ERROR(50000, "服务器内部错误");
+    INTERNAL_ERROR(50000, "服务器内部错误"),
+    NOT_SUPPORTED_FOR_NO(500001,"暂不支持开发者以外的用户注册哦！");
 
     private final int code;
     private final String message;

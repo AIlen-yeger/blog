@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Random;
+import java.util.prefs.BackingStoreException;
 
 @Service
 @RequiredArgsConstructor
@@ -31,6 +32,9 @@ public class AuthServiceImpl implements AuthService {
     private final MailService mailService;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+
+    @Value("${developer.email:}")
+    private String developerEmail;
 
     @Value("${app.dev.fixed-verification-code:}")
     private String fixedVerificationCode;
@@ -55,6 +59,10 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public SendCodeResultDto sendRegisterCode(RegisterCodeRequest request) {
         String email = EmailValidator.normalize(request.getEmail());
+
+        if (!email.equals("developerEmail")) throw new BusinessException(ErrorCode.NOT_SUPPORTED_FOR_NO);
+
+
         EmailValidator.validatePassword(request.getPassword());
 
         if (userMapper.countByEmail(email) > 0) {
@@ -68,6 +76,7 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public LoginResultDto verifyRegister(RegisterVerifyRequest request) {
         String email = EmailValidator.normalize(request.getEmail());
+        if (!email.equals("developerEmail")) throw new BusinessException(ErrorCode.NOT_SUPPORTED_FOR_NO);
         EmailValidator.validatePassword(request.getPassword());
 
         RegisterPendingData pending = registerCodeCache.getPending(email);
