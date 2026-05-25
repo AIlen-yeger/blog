@@ -10,12 +10,14 @@ export function resolveMediaUrl(url: string | undefined): string {
     if (import.meta.env.DEV) {
       return `http://localhost:8080${url}`
     }
-    const base = getApiBase().replace(/\/api\/?$/, '')
-    return `${base}${url.replace(/^\/v1/, '')}`
+    // 生产：/v1/uploads/... → /api/uploads/...（Nginx /api → Spring Boot /v1）
+    return `${getApiBase()}${url.replace(/^\/v1/, '')}`
   }
   if (url.startsWith('/uploads/')) {
-    const path = `/v1${url}`
-    return import.meta.env.DEV ? `http://localhost:8080${path}` : path
+    if (import.meta.env.DEV) {
+      return `http://localhost:8080/v1${url}`
+    }
+    return `${getApiBase()}${url}`
   }
   if (url.startsWith('/avatars/')) {
     const base = import.meta.env.BASE_URL.replace(/\/$/, '')

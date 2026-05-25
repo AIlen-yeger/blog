@@ -40,6 +40,13 @@ export const aboutMusicTracks: MusicTrack[] = [
     artist: 'HACHI',
     src: '',
     qqSongId: '301860905'
+  },
+  {
+    id: 'qq-238936765',
+    title: '一週間のうた',
+    artist: 'ヒグチアイ (HiguchiAi)',
+    src: '',
+    qqSongId: '238936765'
   }
 ]
 
