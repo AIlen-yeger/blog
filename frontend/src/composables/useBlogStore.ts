@@ -366,9 +366,10 @@ export function useBlogStore() {
   }
 
   async function saveNote(
-    payload: Omit<NoteItem, 'id' | 'date'> & {
+    payload: Omit<NoteItem, 'id' | 'date' | 'topicId'> & {
       id?: string
       date?: string
+      topicId?: string
       topicTitle?: string
     },
   ) {

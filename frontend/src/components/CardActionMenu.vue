@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 
-const props = withDefaults(
+const { pinned, showPin } = withDefaults(
   defineProps<{
     pinned?: boolean
     showPin?: boolean
