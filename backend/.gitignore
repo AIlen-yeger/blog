@@ -3,7 +3,11 @@ data/
 uploads/
 *.iml
 .idea/
+<<<<<<< HEAD
 
 # 本地私密配置（勿提交）
 src/main/resources/application-local.yml
 application-local.yml
+=======
+src/main/resources/application-local.yml
+>>>>>>> 939f00bbb6450889c0149336e863076b53cce57e
