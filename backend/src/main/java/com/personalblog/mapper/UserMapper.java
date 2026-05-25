@@ -9,6 +9,10 @@ public interface UserMapper {
 
     UserEntity selectByEmail(@Param("email") String email);
 
+    UserEntity selectById(@Param("id") Long id);
+
+    UserEntity selectFirstByRole(@Param("role") String role);
+
     int countByEmail(@Param("email") String email);
 
     int insert(UserEntity user);

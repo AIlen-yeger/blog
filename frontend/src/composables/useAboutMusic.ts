@@ -3,6 +3,8 @@ import type { ParticleTheme, PlayOrderMode } from '@/types/music'
 import {
   aboutMusicTracks,
   defaultParticleTheme,
+  isQqMusicTrack,
+  mergeMusicTracks,
   type MusicTrack,
 } from '@/data/musicTracks'
 import { resolveMusicSrc } from '@/utils/musicSrc'
@@ -28,12 +30,12 @@ function formatTime(sec: number): string {
 async function fetchMusicTracks(): Promise<MusicTrack[]> {
   try {
     const res = await fetch(`/music/manifest.json?t=${Date.now()}`)
-    if (!res.ok) return aboutMusicTracks
+    if (!res.ok) return mergeMusicTracks([])
     const data: unknown = await res.json()
-    if (!Array.isArray(data) || data.length === 0) return aboutMusicTracks
-    return data as MusicTrack[]
+    if (!Array.isArray(data) || data.length === 0) return mergeMusicTracks([])
+    return mergeMusicTracks(data as MusicTrack[])
   } catch {
-    return aboutMusicTracks
+    return mergeMusicTracks([])
   }
 }
 
@@ -72,6 +74,8 @@ const restoreDone = ref(false)
 const pendingSeek = ref(0)
 const pendingResume = ref(false)
 const playOrderMode = ref<PlayOrderMode>('sequential')
+/** QQ 曲目：返回资料页后保持 iframe 挂载以继续播放 */
+const qqBackgroundActive = ref(false)
 /** 随机模式下「上一首」用的历史栈（存曲目下标） */
 const shuffleHistory = ref<number[]>([])
 
@@ -80,6 +84,11 @@ let persistTimer: ReturnType<typeof setTimeout> | null = null
 let tracksInitPromise: Promise<void> | null = null
 
 const currentTrack = computed(() => tracks.value[trackIndex.value] ?? tracks.value[0])
+const isQqTrack = computed(() => isQqMusicTrack(currentTrack.value))
+const embedPlaybackActive = computed(
+  () => isQqTrack.value && (musicMode.value || qqBackgroundActive.value),
+)
+const visualPlaybackActive = computed(() => isPlaying.value || embedPlaybackActive.value)
 const particleTheme = computed<ParticleTheme>(
   () => currentTrack.value?.particleTheme ?? defaultParticleTheme,
 )
@@ -218,8 +227,18 @@ function attachAudioListeners(el: HTMLAudioElement) {
 function loadCurrent() {
   const a = audio.value
   const track = currentTrack.value
-  if (!a || !track) return
+  if (!track) return
   loadError.value = ''
+  if (isQqMusicTrack(track)) {
+    a?.pause()
+    isPlaying.value = false
+    stopMusicLevelMeter()
+    loadedTrackId.value = track.id
+    currentTime.value = 0
+    duration.value = 0
+    return
+  }
+  if (!a) return
   const sameTrack = loadedTrackId.value === track.id && !!a.src
   if (!sameTrack) {
     duration.value = 0
@@ -241,13 +260,15 @@ async function toggleMusicMode() {
 
   if (musicMode.value) {
     musicMode.value = false
+    if (isQqTrack.value) qqBackgroundActive.value = true
     persistPlaybackSoon()
     return
   }
 
   musicMode.value = true
   if (tracks.value.length === 0) {
-    loadError.value = 'public/music/ 中没有找到 mp3，请放入音频后重启 dev'
+    loadError.value =
+      '没有可播放曲目：请在 public/music/ 放入 mp3，或在 musicTracks.ts 配置 qqSongId'
     return
   }
   loadCurrent()
@@ -255,11 +276,19 @@ async function toggleMusicMode() {
 }
 
 async function play() {
-  const a = audio.value
   const track = currentTrack.value
-  if (!a || !track) return
+  if (!track) return
   await ensureTracksLoaded()
   loadError.value = ''
+  if (isQqMusicTrack(track)) {
+    musicMode.value = true
+    qqBackgroundActive.value = true
+    loadCurrent()
+    persistPlaybackSoon()
+    return
+  }
+  const a = audio.value
+  if (!a) return
   if (!a.src) loadCurrent()
   try {
     await waitCanPlay(a)
@@ -290,20 +319,27 @@ function pause() {
 }
 
 function togglePlayPause() {
+  if (isQqTrack.value) {
+    musicMode.value = true
+    loadCurrent()
+    return
+  }
   if (isPlaying.value) pause()
   else void play()
 }
 
 function stopAndReset() {
   const a = audio.value
-  if (!a) return
-  a.pause()
-  a.currentTime = 0
+  if (a) {
+    a.pause()
+    a.currentTime = 0
+  }
   isPlaying.value = false
   currentTime.value = 0
   loadedTrackId.value = null
   pendingSeek.value = 0
   pendingResume.value = false
+  qqBackgroundActive.value = false
   clearMusicPlayback()
   stopMusicLevelMeter()
   shuffleHistory.value = []
@@ -347,6 +383,7 @@ function onAudioPlay() {
 }
 
 function seekByPercent(percent: number) {
+  if (isQqTrack.value) return
   const a = audio.value
   if (!a || !duration.value) return
   a.currentTime = (percent / 100) * duration.value
@@ -370,6 +407,8 @@ function goToTrackIndex(index: number, auto = false) {
   if (tracks.value.length === 0) return
   trackIndex.value = ((index % tracks.value.length) + tracks.value.length) % tracks.value.length
   pendingSeek.value = 0
+  const next = tracks.value[trackIndex.value]
+  if (!isQqMusicTrack(next)) qqBackgroundActive.value = false
   loadCurrent()
   if (auto || isPlaying.value) void play()
   else persistPlaybackSoon()
@@ -439,6 +478,10 @@ export function useAboutMusic() {
     musicMode,
     tracks,
     currentTrack,
+    isQqTrack,
+    qqBackgroundActive,
+    embedPlaybackActive,
+    visualPlaybackActive,
     particleTheme,
     trackIndex,
     isPlaying,

@@ -5,7 +5,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.ILoggerFactory;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -79,8 +78,8 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
         if (!HttpMethod.GET.matches(method)) {
             return false;
         }
-        if ("/profile".equals(servletPath)
-                || "/profile/public".equals(servletPath)
+        if ("/profile/public".equals(servletPath)
+                || servletPath.matches("/profile/users/\\d+")
                 || "/topics".equals(servletPath)
                 || "/timeline".equals(servletPath)
                 || "/search".equals(servletPath)

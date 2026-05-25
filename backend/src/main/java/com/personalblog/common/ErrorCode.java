@@ -17,6 +17,7 @@ public enum ErrorCode {
     FORBIDDEN(40301, "无权限执行此操作"),
     NOTE_NOT_FOUND(40401, "笔记不存在"),
     LIFE_NOT_FOUND(40402, "生活记录不存在"),
+    PROFILE_NOT_FOUND(40404, "资料不存在"),
     /** 登录时邮箱未注册，前端据此进入验证码注册页 */
     ACCOUNT_NOT_REGISTERED(40403, "该邮箱未注册，请完成验证码注册"),
     EMAIL_ALREADY_REGISTERED(40901, "该邮箱已注册"),

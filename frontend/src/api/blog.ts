@@ -51,11 +51,16 @@ export async function fetchPublicProfile(): Promise<ProfileData> {
   try {
     return await get<ProfileData>('/profile/public', { auth: false })
   } catch (e) {
-    if (e instanceof ApiError && (e.code === 404 || e.code === 405)) {
+    if (e instanceof ApiError && (e.code === 40404 || e.code === 404 || e.code === 405)) {
       return get<ProfileData>('/profile', { auth: false })
     }
     throw e
   }
+}
+
+/** 指定用户的公开资料（后续多用户主页） */
+export async function fetchUserProfile(userId: number): Promise<ProfileData> {
+  return get<ProfileData>(`/profile/users/${userId}`, { auth: false })
 }
 
 export async function updateProfileApi(

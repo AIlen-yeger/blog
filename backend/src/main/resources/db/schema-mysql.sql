@@ -11,12 +11,15 @@ CREATE TABLE IF NOT EXISTS users (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS profile (
-    id          BIGINT       PRIMARY KEY,
-    name        VARCHAR(128) NOT NULL,
-    subtitle    VARCHAR(255) NOT NULL DEFAULT '',
-    bio         TEXT,
-    focus_json  TEXT,
-    avatar_url  VARCHAR(512) NOT NULL DEFAULT ''
+    id           BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id      BIGINT       NOT NULL UNIQUE COMMENT '关联 users.id，一人一份资料',
+    name         VARCHAR(128) NOT NULL,
+    subtitle     VARCHAR(255) NOT NULL DEFAULT '',
+    bio          TEXT,
+    focus_json   TEXT,
+    avatar_url   VARCHAR(512) NOT NULL DEFAULT '',
+    site_owner   TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '1=站点着陆页公开展示',
+    CONSTRAINT fk_profile_user FOREIGN KEY (user_id) REFERENCES users (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS topics (

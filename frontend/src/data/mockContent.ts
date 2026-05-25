@@ -68,11 +68,15 @@ export interface SearchResult {
 import { defaultAvatarUrl } from '@/utils/defaultAvatar'
 
 export interface ProfileData {
+  /** 资料所属用户 id（后端返回，便于后续多用户扩展） */
+  userId?: number
   name: string
   subtitle: string
   bio: string
   focus: string[]
   avatarUrl: string
+  /** 是否为站点公开展示的主人资料 */
+  siteOwner?: boolean
 }
 
 export const defaultProfile: ProfileData = {

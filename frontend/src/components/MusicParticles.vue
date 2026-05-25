@@ -17,6 +17,8 @@ const props = withDefaults(
     lyricsFall?: boolean
     lyricLines?: LyricLine[]
     currentTime?: number
+    /** QQ 等外链播放无法读取响度时，用柔和律动驱动粒子 */
+    ambientMotion?: boolean
   }>(),
   {
     active: false,
@@ -24,6 +26,7 @@ const props = withDefaults(
     lyricsFall: true,
     lyricLines: () => [],
     currentTime: 0,
+    ambientMotion: false,
   },
 )
 
@@ -35,6 +38,7 @@ let lyricSpawnTimer = 0
 let reducedMotion = false
 /** 视觉用响度，比原始 musicLevel 变化更慢，减轻闪烁 */
 let smoothLevel = 0
+let ambientPhase = 0
 
 interface Particle {
   x: number
@@ -218,7 +222,10 @@ function tick() {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
 
-  const targetLevel = musicLevel.value
+  const targetLevel = props.ambientMotion
+    ? 0.28 + Math.sin(ambientPhase) * 0.18
+    : musicLevel.value
+  if (props.ambientMotion) ambientPhase += 0.05
   smoothLevel += (targetLevel - smoothLevel) * 0.035
   const level = smoothLevel
   const speedMul = fallSpeedMul(level)

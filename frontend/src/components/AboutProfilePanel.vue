@@ -4,6 +4,7 @@ import type { ProfileData } from '@/data/mockContent'
 import type { ParticleTheme } from '@/types/music'
 import AvatarImage from './AvatarImage.vue'
 import MusicParticles from './MusicParticles.vue'
+import QqMusicEmbed from './QqMusicEmbed.vue'
 import { useAboutMusic } from '@/composables/useAboutMusic'
 import { useMusicLyrics } from '@/composables/useMusicLyrics'
 import { defaultParticleTheme } from '@/data/musicTracks'
@@ -21,6 +22,10 @@ const emit = defineEmits<{
 const {
   musicMode,
   currentTrack,
+  isQqTrack,
+  qqBackgroundActive,
+  embedPlaybackActive,
+  visualPlaybackActive,
   particleTheme: trackParticleTheme,
   isPlaying,
   progressPercent,
@@ -68,14 +73,15 @@ const seasonHint = seasonPhaseLabel(getSeasonPhase())
     class="about-panel"
     :class="{
       'is-music': musicMode,
-      'is-playing-bg': isPlaying && !musicMode,
+      'is-playing-bg': visualPlaybackActive && !musicMode,
     }"
   >
     <div class="about-panel-bg" aria-hidden="true" />
     <MusicParticles
-      :active="isPlaying"
+      :active="visualPlaybackActive"
+      :ambient-motion="embedPlaybackActive && !isPlaying"
       :theme="displayParticleTheme"
-      :lyrics-fall="lyricsFallOn"
+      :lyrics-fall="lyricsFallOn && !isQqTrack"
       :lyric-lines="lyricLines"
       :current-time="currentTime"
     />
@@ -88,14 +94,24 @@ const seasonHint = seasonPhaseLabel(getSeasonPhase())
       <ul class="focus-tags">
         <li v-for="tag in profile.focus" :key="tag">{{ tag }}</li>
       </ul>
+      <button
+        v-if="showEdit"
+        type="button"
+        class="btn-edit-profile btn-edit-profile--identity"
+        @click="emit('edit')"
+      >
+        编辑个人资料
+      </button>
     </div>
 
     <div class="panel-bottom">
-      <Transition name="bottom-fade" mode="out-in">
-        <div v-if="!musicMode" key="profile-actions" class="profile-actions">
-          <div v-if="isPlaying" class="bg-music-bar">
+      <div class="profile-actions" :class="{ 'panel-view--hidden': musicMode }">
+          <div v-if="isPlaying || qqBackgroundActive" class="bg-music-bar">
             <span class="bg-music-title">{{ currentTrack?.title }}</span>
-            <span class="bg-music-meta">{{ currentTrack?.artist }} · 后台播放中</span>
+            <span class="bg-music-meta">
+              {{ currentTrack?.artist }} ·
+              {{ qqBackgroundActive ? 'QQ 音乐后台播放中' : '后台播放中' }}
+            </span>
             <div class="bg-music-actions">
               <button type="button" class="bg-music-btn" title="暂停" @click="togglePlayPause">
                 ⏸
@@ -108,21 +124,21 @@ const seasonHint = seasonPhaseLabel(getSeasonPhase())
               </button>
             </div>
           </div>
-          <button
-            v-if="showEdit"
-            type="button"
-            class="btn-edit-profile"
-            @click="emit('edit')"
-          >
-            编辑个人资料
-          </button>
         </div>
 
-        <div v-else key="music-player" class="music-player">
+        <div class="music-player" :class="{ 'panel-view--hidden': !musicMode }">
           <p class="track-title">{{ currentTrack?.title ?? '未选择曲目' }}</p>
           <p class="track-artist">{{ currentTrack?.artist }}</p>
 
-          <div class="progress-row">
+          <div
+            v-if="isQqTrack && currentTrack?.qqSongId && (musicMode || qqBackgroundActive)"
+            class="qq-embed-host"
+            :class="{ 'qq-embed-host--offscreen': !musicMode }"
+          >
+            <QqMusicEmbed :song-id="currentTrack.qqSongId" />
+          </div>
+
+          <div v-if="!isQqTrack" class="progress-row">
             <input
               type="range"
               class="progress-bar"
@@ -137,7 +153,9 @@ const seasonHint = seasonPhaseLabel(getSeasonPhase())
           </div>
 
           <div class="particle-theme-row" role="group" aria-label="粒子效果">
-            <span class="particle-theme-label">氛围 · {{ seasonHint }} · 随响度变速</span>
+            <span class="particle-theme-label">
+              氛围 · {{ seasonHint }} · {{ isQqTrack ? '律动氛围' : '随响度变速' }}
+            </span>
             <button
               v-for="opt in themeOptions"
               :key="opt.id"
@@ -197,6 +215,7 @@ const seasonHint = seasonPhaseLabel(getSeasonPhase())
               ⏮
             </button>
             <button
+              v-if="!isQqTrack"
               type="button"
               class="ctrl-btn ctrl-main"
               :title="isPlaying ? '暂停' : '播放'"
@@ -204,6 +223,9 @@ const seasonHint = seasonPhaseLabel(getSeasonPhase())
             >
               {{ isPlaying ? '⏸' : '▶' }}
             </button>
+            <span v-else class="ctrl-qq-hint" title="请在下方 QQ 音乐播放器中操作">
+              QQ
+            </span>
             <button type="button" class="ctrl-btn" title="下一首" @click="nextTrack()">
               ⏭
             </button>
@@ -213,25 +235,31 @@ const seasonHint = seasonPhaseLabel(getSeasonPhase())
           </div>
 
           <p v-if="loadError" class="music-err">{{ loadError }}</p>
+          <p v-else-if="isQqTrack" class="music-tip">
+            由 QQ 音乐官方播放器提供，请在上方组件内点击播放；可在
+            <code>src/data/musicTracks.ts</code> 修改 <code>qqSongId</code> 与歌名
+          </p>
           <p v-else class="music-tip">
             将 mp3 放入 <code>public/music/</code> 后重启
             <code>npm run dev</code>，会自动识别曲目（文件名建议：歌手 - 歌名.mp3）
           </p>
         </div>
-      </Transition>
     </div>
 
     <button
       type="button"
       class="vinyl-trigger vinyl-float"
-      :class="{ active: musicMode, 'is-audio-playing': isPlaying }"
+      :class="{ active: musicMode, 'is-audio-playing': visualPlaybackActive }"
       :aria-label="musicMode ? '返回资料视图' : '打开音乐播放'"
       :title="musicMode ? '返回资料视图' : '点击播放音乐'"
       @click="toggleMusicMode"
     >
       <span class="vinyl-hint">{{ musicMode ? '返回资料' : '点击唱片' }}</span>
       <span class="vinyl">
-        <span class="vinyl-rotor" :class="{ 'is-playing': isPlaying }">
+        <span
+          class="vinyl-rotor"
+          :class="{ 'is-playing': visualPlaybackActive }"
+        >
           <span class="vinyl-disc" />
           <span class="vinyl-label">MUSIC</span>
           <span class="vinyl-center" />
@@ -319,6 +347,16 @@ const seasonHint = seasonPhaseLabel(getSeasonPhase())
   align-items: center;
   width: 100%;
   pointer-events: none;
+}
+
+.profile-identity .btn-edit-profile--identity {
+  pointer-events: auto;
+  margin-top: 1rem;
+}
+
+.btn-edit-profile--identity {
+  position: relative;
+  z-index: 2;
 }
 
 .profile-identity :deep(.profile-avatar) {
@@ -554,6 +592,29 @@ const seasonHint = seasonPhaseLabel(getSeasonPhase())
   margin-top: 1.25rem;
 }
 
+.panel-view--hidden {
+  visibility: hidden;
+  height: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.qq-embed-host--offscreen {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 330px;
+  height: 86px;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
 .profile-actions {
   display: flex;
   flex-direction: column;
@@ -777,6 +838,20 @@ const seasonHint = seasonPhaseLabel(getSeasonPhase())
 
 .ctrl-stop {
   font-size: 0.85rem;
+}
+
+.ctrl-qq-hint {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px dashed rgba(255, 255, 255, 0.28);
 }
 
 .music-err {

@@ -11,6 +11,7 @@ import com.personalblog.mapper.UserMapper;
 import com.personalblog.security.JwtService;
 import com.personalblog.service.AuthService;
 import com.personalblog.service.MailService;
+import com.personalblog.service.ProfileService;
 import com.personalblog.util.EmailValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +21,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Random;
-import java.util.prefs.BackingStoreException;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +32,7 @@ public class AuthServiceImpl implements AuthService {
     private final MailService mailService;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final ProfileService profileService;
 
     @Value("${developer.email:}")
     private String developerEmail;
@@ -104,6 +105,7 @@ public class AuthServiceImpl implements AuthService {
             userMapper.insert(user);
         }
 
+        profileService.ensureProfileForUser(user);
         registerCodeCache.clearPending(email);
         return buildLoginResult(user);
     }

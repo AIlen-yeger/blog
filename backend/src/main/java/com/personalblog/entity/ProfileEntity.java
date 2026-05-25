@@ -7,10 +7,14 @@ import lombok.Setter;
 @Setter
 public class ProfileEntity {
 
-    private Long id = 1L;
+    private Long id;
+    /** 关联 users.id，一人一份资料 */
+    private Long userId;
     private String name;
     private String subtitle;
     private String bio;
     private String focusJson;
     private String avatarUrl;
+    /** 是否在站点着陆页公开展示（个人博客通常仅一位 site owner） */
+    private boolean siteOwner;
 }

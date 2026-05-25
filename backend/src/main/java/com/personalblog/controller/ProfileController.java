@@ -18,20 +18,27 @@ public class ProfileController {
 
     private final ProfileService profileService;
 
+    /** 当前登录用户自己的资料（需登录） */
     @GetMapping
     public ApiResponse<ProfileDto> getProfile() {
-        return ApiResponse.ok(profileService.getProfile());
+        return ApiResponse.ok(profileService.getCurrentUserProfile());
     }
 
-    /** 公开资料：着陆页与游客浏览使用，无需登录 */
+    /** 站点主人公开资料：着陆页与游客浏览 */
     @GetMapping("/public")
     public ApiResponse<ProfileDto> getPublicProfile() {
-        return ApiResponse.ok(profileService.getProfile());
+        return ApiResponse.ok(profileService.getSitePublicProfile());
+    }
+
+    /** 指定用户公开资料（后续多用户主页扩展，只读） */
+    @GetMapping("/users/{userId}")
+    public ApiResponse<ProfileDto> getUserProfile(@PathVariable Long userId) {
+        return ApiResponse.ok(profileService.getProfileByUserId(userId));
     }
 
     @PutMapping
     public ApiResponse<ProfileDto> updateProfile(@RequestBody ProfileUpdateRequest request) {
-        return ApiResponse.ok(profileService.updateProfile(request));
+        return ApiResponse.ok(profileService.updateCurrentUserProfile(request));
     }
 
     @PostMapping("/avatar")

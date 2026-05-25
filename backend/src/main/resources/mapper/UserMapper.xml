@@ -14,6 +14,14 @@
         SELECT id, email, password_hash, role FROM users WHERE email = #{email}
     </select>
 
+    <select id="selectById" resultMap="UserMap">
+        SELECT id, email, password_hash, role FROM users WHERE id = #{id}
+    </select>
+
+    <select id="selectFirstByRole" resultMap="UserMap">
+        SELECT id, email, password_hash, role FROM users WHERE role = #{role} ORDER BY id LIMIT 1
+    </select>
+
     <select id="countByEmail" resultType="int">
         SELECT COUNT(*) FROM users WHERE email = #{email}
     </select>
