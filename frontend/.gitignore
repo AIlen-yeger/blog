@@ -2,6 +2,11 @@ node_modules
 dist
 *.local
 .DS_Store
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+scripts/musicManifest.js
+scripts/musicManifest.d.ts
 
 # 音乐文件体积大且可能涉及版权，部署时单独上传到 public/music 或 CDN
 public/music/*.mp3

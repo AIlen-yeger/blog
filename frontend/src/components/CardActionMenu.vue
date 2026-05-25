@@ -1,13 +1,10 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 
-const { pinned, showPin } = withDefaults(
-  defineProps<{
-    pinned?: boolean
-    showPin?: boolean
-  }>(),
-  { pinned: false, showPin: false },
-)
+const { pinned = false, showPin = false } = defineProps<{
+  pinned?: boolean
+  showPin?: boolean
+}>()
 
 const emit = defineEmits<{
   edit: []

@@ -89,7 +89,10 @@ export async function fetchNotes(params?: ContentListParams): Promise<NoteItem[]
 }
 
 export async function createNoteApi(
-  body: Omit<NoteItem, 'id' | 'date'> & { topicTitle?: string },
+  body: Omit<NoteItem, 'id' | 'date' | 'topicId'> & {
+    topicId?: string
+    topicTitle?: string
+  },
 ): Promise<NoteItem> {
   return post<NoteItem>('/notes', body)
 }
