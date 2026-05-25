@@ -17,6 +17,10 @@ export function resolveMediaUrl(url: string | undefined): string {
     const path = `/v1${url}`
     return import.meta.env.DEV ? `http://localhost:8080${path}` : path
   }
+  if (url.startsWith('/avatars/')) {
+    const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+    return `${base}${url}`
+  }
   if (url.startsWith('/')) {
     return import.meta.env.DEV ? `http://localhost:8080/v1${url}` : `/v1${url}`
   }

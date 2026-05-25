@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { resolveMediaUrl } from '@/utils/mediaUrl'
+import { defaultAvatarUrl } from '@/utils/defaultAvatar'
 
 const props = withDefaults(
   defineProps<{
@@ -10,7 +11,7 @@ const props = withDefaults(
     shape?: 'square' | 'round'
   }>(),
   {
-    src: 'https://api.dicebear.com/7.x/avataaars/svg?seed=personal-blog',
+    src: defaultAvatarUrl(),
     alt: '个人头像',
     size: 'lg',
     shape: 'square',

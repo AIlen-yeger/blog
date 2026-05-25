@@ -60,7 +60,7 @@ public class AuthServiceImpl implements AuthService {
     public SendCodeResultDto sendRegisterCode(RegisterCodeRequest request) {
         String email = EmailValidator.normalize(request.getEmail());
 
-        if (!email.equals("developerEmail")) throw new BusinessException(ErrorCode.NOT_SUPPORTED_FOR_NO);
+        if (!email.equals(developerEmail)) throw new BusinessException(ErrorCode.NOT_SUPPORTED_FOR_NO);
 
 
         EmailValidator.validatePassword(request.getPassword());
@@ -76,7 +76,7 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public LoginResultDto verifyRegister(RegisterVerifyRequest request) {
         String email = EmailValidator.normalize(request.getEmail());
-        if (!email.equals("developerEmail")) throw new BusinessException(ErrorCode.NOT_SUPPORTED_FOR_NO);
+        if (!email.equals(developerEmail)) throw new BusinessException(ErrorCode.NOT_SUPPORTED_FOR_NO);
         EmailValidator.validatePassword(request.getPassword());
 
         RegisterPendingData pending = registerCodeCache.getPending(email);

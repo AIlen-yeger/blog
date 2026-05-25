@@ -1,6 +1,7 @@
 /** 优先 PNG（真透明），无则回退 JPG */
 export function petSpriteSrc(id: string, ext: 'png' | 'jpg' = 'png'): string {
-  return `/desktop-pet/${id}.${ext}`
+  const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+  return `${base}/desktop-pet/${id}.${ext}`
 }
 
 export function petSpriteFallback(src: string): string | null {

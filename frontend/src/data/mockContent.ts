@@ -65,6 +65,8 @@ export interface SearchResult {
   lifeTotal: number
 }
 
+import { defaultAvatarUrl } from '@/utils/defaultAvatar'
+
 export interface ProfileData {
   name: string
   subtitle: string
@@ -78,7 +80,7 @@ export const defaultProfile: ProfileData = {
   subtitle: 'Personal Learning Blog',
   bio: '记录前端、工程化与日常学习心得。把零散的知识点整理成可回顾的笔记与专题，方便日后查阅与复盘。',
   focus: ['Vue / TypeScript', '工程化', 'CSS 与动效', '读书笔记'],
-  avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=personal-blog',
+  avatarUrl: defaultAvatarUrl(),
 }
 
 export const mockTopics: TopicItem[] = [

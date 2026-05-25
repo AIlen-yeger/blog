@@ -523,7 +523,7 @@ curl -X POST https://api.example.com/v1/auth/login \
     "CSS 与动效",
     "读书笔记"
   ],
-  "avatarUrl": "https://api.dicebear.com/7.x/avataaars/svg?seed=personal-blog"
+  "avatarUrl": "/avatars/default.svg"
 }
 ```
 
