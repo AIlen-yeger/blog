@@ -70,7 +70,7 @@ async function submit(publishStatus: 'published' | 'draft') {
   try {
     const images = (await imageUploadRef.value?.resolveImageUrls()) ?? []
     await saveNote({
-      id: props.editing?.id,
+      ...(props.editing?.id ? { id: props.editing.id } : {}),
       title: title.value.trim(),
       excerpt: excerpt.value.trim() || title.value.trim().slice(0, 48),
       tag: tag.value.trim() || '笔记',

@@ -89,7 +89,7 @@ function pickKind(): 'sakura' | 'leaf' {
   return Math.random() < 0.55 ? 'sakura' : 'leaf'
 }
 
-function spawn(w: number, h: number, level: number) {
+function spawn(w: number, _h: number, level: number) {
   const kind = pickKind()
   const size = kind === 'sakura' ? 6 + Math.random() * 10 : 8 + Math.random() * 12
   const boost = 0.5 + level * 0.9
@@ -111,7 +111,7 @@ function spawn(w: number, h: number, level: number) {
   if (particles.length > 120) particles.shift()
 }
 
-function spawnLyric(w: number, h: number, text: string, maxOnScreen: number) {
+function spawnLyric(w: number, _h: number, text: string, maxOnScreen: number) {
   if (lyricCount() >= maxOnScreen) return
   const raw = text.trim()
   if (!raw) return

@@ -1,7 +1,6 @@
 import { onUnmounted, ref } from 'vue'
 import {
   loginWithCredentials,
-  resendRegistrationCode,
   sendRegisterCode,
   verifyRegistration,
 } from '@/api/auth'

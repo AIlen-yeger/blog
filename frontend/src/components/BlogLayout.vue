@@ -30,8 +30,6 @@ const { isAdmin } = useSession()
 
 const {
   profile,
-  notes,
-  life,
   topics,
   timeline,
   loading,

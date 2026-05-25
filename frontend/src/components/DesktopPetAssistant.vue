@@ -7,7 +7,7 @@ import { useDesktopPetSprite } from '@/composables/useDesktopPetSprite'
 import { PET_SPRITE_STAGE } from '@/data/desktopPetLayout'
 import { petSpriteFallback } from '@/utils/petSpriteSrc'
 
-const props = defineProps<{
+const { loggedIn: loggedInProp } = defineProps<{
   loggedIn?: boolean
 }>()
 
@@ -15,7 +15,7 @@ const emit = defineEmits<{
   'request-login': []
 }>()
 
-const isLoggedIn = () => props.loggedIn === true
+const isLoggedIn = () => loggedInProp === true
 
 const spriteStageStyle = {
   width: `${PET_SPRITE_STAGE.width}px`,
