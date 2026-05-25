@@ -3,3 +3,4 @@ data/
 uploads/
 *.iml
 .idea/
+src/main/resources/application-local.yml
