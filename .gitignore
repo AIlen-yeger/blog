@@ -17,5 +17,9 @@ backend/.idea/
 
 # Python
 python/.venv/
-python/__pycache__/
-python/*.pyc
+python/.idea/
+**/__pycache__/
+**/*.pyc
+python/.env
+python/.env.*
+!python/.env.example

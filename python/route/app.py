@@ -8,6 +8,12 @@ from pydantic import BaseModel, Field
 router = APIRouter()
 _llm_agent = None
 
+SSE_HEADERS = {
+    "Cache-Control": "no-cache, no-transform",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no",
+}
+
 
 class ChatRequest(BaseModel):
     limit: int = Field(default=5, ge=1, le=50)
@@ -49,4 +55,8 @@ def llm_chat(body: ChatRequest):
         user_id=body.user_id,
         limit=body.limit,
     )
-    return StreamingResponse(_sse_events(stream), media_type="text/event-stream")
+    return StreamingResponse(
+        _sse_events(stream),
+        media_type="text/event-stream; charset=utf-8",
+        headers=SSE_HEADERS,
+    )

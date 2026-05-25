@@ -74,7 +74,7 @@ export interface ProfileData {
 }
 
 export const defaultProfile: ProfileData = {
-  name: '奥利奥',
+  name: '默认数据',
   subtitle: 'Personal Learning Blog',
   bio: '记录前端、工程化与日常学习心得。把零散的知识点整理成可回顾的笔记与专题，方便日后查阅与复盘。',
   focus: ['Vue / TypeScript', '工程化', 'CSS 与动效', '读书笔记'],

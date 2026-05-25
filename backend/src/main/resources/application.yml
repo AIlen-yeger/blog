@@ -8,9 +8,9 @@ spring:
     name: personal-blog-api
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/myblog?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
-    username: root
-    password: '0123'
+    url: "数据库url "
+    username: "数据库用户名"
+    password: "数据库密码"
   data:
     redis:
       host: localhost
@@ -33,11 +33,10 @@ app:
   seed:
     enabled: false
   jwt:
-    secret: personal-blog-jwt-secret-change-in-production-min-32-chars
+    secret: "jwt密钥"
     expiration-seconds: 604800
   dev:
-    # 非空时：验证码固定为该值，不发 SES，后端控制台打 [dev] 日志；模板 179636 审核通过后清空此项
-    fixed-verification-code: "123456"
+    fixed-verification-code: "123456" #测试时固定验证码
   register:
     code-ttl-seconds: 300
     resend-cooldown-seconds: 60
@@ -56,12 +55,12 @@ app:
   mail:
     # 本地开发可 false；生产发信需 true 且配置 TENCENTCLOUD_SECRET_ID/KEY
     enabled: true
-    from: 2762548283@qq.com
+    from: "邮件发送者邮箱"
     from-name: 个人博客
-    reply-to: 2762548283@qq.com
+    reply-to: "邮件回复接收者邮箱"
     subject: 欢迎注册！验证码：
     # 控制台模板「注册」ID；须状态为「已通过」后才可真实发信
-    template-id: 179636
+    template-id: "邮件模板ID"
   upload:
     avatar-dir: ./uploads/avatars
     content-dir: ./uploads/content

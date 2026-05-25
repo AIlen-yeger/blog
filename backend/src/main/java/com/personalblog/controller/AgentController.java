@@ -8,18 +8,20 @@ import com.personalblog.entity.UserEntity;
 import com.personalblog.mapper.UserMapper;
 import com.personalblog.security.AuthUserPrincipal;
 import com.personalblog.service.AgentProxyService;
-import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 
 @RestController
 @RequestMapping("/agent")
@@ -30,8 +32,7 @@ public class AgentController {
     private final UserMapper userMapper;
 
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public void chat(@Valid @RequestBody AgentChatRequest request, HttpServletResponse response)
-            throws IOException {
+    public ResponseEntity<StreamingResponseBody> chat(@Valid @RequestBody AgentChatRequest request) {
         AuthUserPrincipal principal = currentPrincipal();
         UserEntity user = userMapper.selectByEmail(principal.getEmail());
         if (user == null || user.getId() == null) {
@@ -47,14 +48,20 @@ public class AgentController {
                 request.getLimit()
         );
 
-        response.setStatus(HttpServletResponse.SC_OK);
-        response.setCharacterEncoding("UTF-8");
-        response.setContentType(MediaType.TEXT_EVENT_STREAM_VALUE);
-        response.setHeader("Cache-Control", "no-cache");
-        response.setHeader("Connection", "keep-alive");
-        response.setHeader("X-Accel-Buffering", "no");
+        StreamingResponseBody body = outputStream -> {
+            try {
+                agentProxyService.streamChat(upstream, outputStream);
+            } catch (IOException ex) {
+                throw new UncheckedIOException(ex);
+            }
+        };
 
-        agentProxyService.streamChat(upstream, response.getOutputStream());
+        return ResponseEntity.ok()
+                .contentType(MediaType.TEXT_EVENT_STREAM)
+                .header("Cache-Control", "no-cache, no-transform")
+                .header("Connection", "keep-alive")
+                .header("X-Accel-Buffering", "no")
+                .body(body);
     }
 
     private AuthUserPrincipal currentPrincipal() {

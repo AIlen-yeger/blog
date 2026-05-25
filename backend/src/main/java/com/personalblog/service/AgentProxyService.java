@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -19,21 +20,23 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 
+/**
+ * 方案 A：透传 Python Agent 的 SSE 流，边读边写并 flush，避免整段缓冲。
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class AgentProxyService {
 
+    private static final int COPY_BUFFER_SIZE = 4096;
+
     private final AgentProperties agentProperties;
     private final ObjectMapper objectMapper;
+    private final HttpClient agentHttpClient;
 
     public void streamChat(AgentPythonChatRequest payload, OutputStream clientOut) throws IOException {
         String body = objectMapper.writeValueAsString(payload);
         URI uri = URI.create(normalizeBaseUrl() + agentProperties.getChatPath());
-
-        HttpClient client = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofMillis(agentProperties.getConnectTimeoutMs()))
-                .build();
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(uri)
@@ -45,7 +48,7 @@ public class AgentProxyService {
 
         HttpResponse<InputStream> response;
         try {
-            response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            response = agentHttpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
             throw new BusinessException(ErrorCode.INTERNAL_ERROR, "Agent 服务中断");
@@ -56,13 +59,29 @@ public class AgentProxyService {
 
         int status = response.statusCode();
         if (status >= 400) {
-            String errBody = new String(response.body().readAllBytes(), StandardCharsets.UTF_8);
+            String errBody;
+            try (InputStream errStream = response.body()) {
+                errBody = new String(errStream.readAllBytes(), StandardCharsets.UTF_8);
+            }
             log.warn("[agent] upstream error status={} body={}", status, errBody);
             throw new BusinessException(ErrorCode.INTERNAL_ERROR, "Agent 返回错误");
         }
 
+        String contentType = response.headers().firstValue("Content-Type").orElse("");
+        if (!contentType.contains("text/event-stream")) {
+            log.warn("[agent] upstream did not return SSE content-type={}", contentType);
+        }
+
         try (InputStream upstream = response.body()) {
-            upstream.transferTo(clientOut);
+            pipeWithFlush(upstream, clientOut);
+        }
+    }
+
+    private void pipeWithFlush(InputStream upstream, OutputStream clientOut) throws IOException {
+        byte[] buffer = new byte[COPY_BUFFER_SIZE];
+        int read;
+        while ((read = upstream.read(buffer)) != -1) {
+            clientOut.write(buffer, 0, read);
             clientOut.flush();
         }
     }

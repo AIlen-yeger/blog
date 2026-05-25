@@ -154,7 +154,7 @@ function onSpriteError(e: Event) {
                 class="pet-assistant__history-item"
                 :class="msg.role"
               >
-                <span class="pet-assistant__history-role">{{ msg.role === 'user' ? '你' : '狐' }}</span>
+                <span class="pet-assistant__history-role">{{ msg.role === 'user' ? '你' : 'Kohaku' }}</span>
                 <p class="pet-assistant__history-text">{{ msg.content }}</p>
               </div>
             </div>
