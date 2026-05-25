@@ -7,3 +7,4 @@ dist
 public/music/*.mp3
 public/music/*.m4a
 public/music/*.ogg
+public/music/
