@@ -116,7 +116,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
-     * 限流 → 生成验证码 → 写入 Redis → 通过 QQ 邮箱 SMTP 发信。
+     * 限流 → 生成验证码 → 写入 Redis → 发信（默认 QQ SMTP）。
      */
     private SendCodeResultDto issueVerificationCode(String email, String passwordHash) {
         if (registerCodeCache.isInCooldown(email)) {

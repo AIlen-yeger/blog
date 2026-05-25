@@ -124,7 +124,7 @@ public class ProfileServiceImpl implements ProfileService {
         created.setSubtitle("Personal Learning Blog");
         created.setBio("记录前端、工程化与日常学习心得。");
         created.setFocusJson(JsonUtil.toJson(List.of("Vue / TypeScript", "工程化")));
-        created.setAvatarUrl("https://api.dicebear.com/7.x/avataaars/svg?seed=personal-blog");
+        created.setAvatarUrl("/avatars/default.svg");
         profileMapper.insert(created);
         return created;
     }

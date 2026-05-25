@@ -62,18 +62,22 @@ API 基址：`http://localhost:8080/v1`
 
 需本地启动 Redis（默认 `localhost:6379`）。
 
-### 注册验证码邮件（腾讯云 SES）
+### 注册验证码邮件（默认 QQ 邮箱 SMTP）
 
-发信实现：`MailService` → `TencentSesMailServiceImpl`（`SesClient.SendEmail`）。
+发信实现：`MailService` → `QqSmtpMailServiceImpl`（`JavaMailSender` + `smtp.qq.com`）。
 
 | 配置 | 说明 |
 |------|------|
-| `TENCENTCLOUD_SECRET_ID` / `TENCENTCLOUD_SECRET_KEY` | 环境变量（推荐，与官方 SDK 一致） |
-| `app.tencent.ses.region` | 如 `ap-guangzhou` |
-| `app.mail.from` | SES 控制台已验证的发件邮箱 |
-| `app.mail.template-id` | `0` 用 HTML 正文；填模板 ID 则用模板变量 `code` |
-| `app.mail.enabled` | `false` 时仅缓存 Redis + 日志，不调 SES |
+| `QQ_SMTP_AUTH_CODE` | QQ 邮箱 **授权码**（设置 → 账户 → POP3/SMTP 服务） |
+| `spring.mail.username` / `app.mail.from` | 发件 QQ 邮箱，如 `2762548283@qq.com` |
+| `app.mail.enabled` | `false` 时仅写 Redis + 日志 |
+| `app.dev.fixed-verification-code` | 非空时固定验证码、不发邮件 |
 
-发送顺序：限流 → 生成验证码 → **Redis** → **腾讯云 SES** → 注册 QQ 邮箱。
+本地 profile `local` 见 `application-local.yml`。生产环境变量示例：
 
-上线前在 [SES 控制台](https://console.cloud.tencent.com/ses) 验证发件地址，密钥勿提交到 Git。
+```text
+QQ_SMTP_USER=你的QQ邮箱
+QQ_SMTP_AUTH_CODE=16位授权码
+```
+
+发送顺序：限流 → 生成验证码 → **Redis** → **QQ SMTP** → 用户邮箱。

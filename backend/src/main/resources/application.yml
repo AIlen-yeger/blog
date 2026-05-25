@@ -21,6 +21,21 @@ spring:
     multipart:
       max-file-size: 5MB
       max-request-size: 10MB
+  mail:
+    host: smtp.qq.com
+    port: 465
+    username: ${QQ_SMTP_USER:}
+    password: ${QQ_SMTP_AUTH_CODE:}
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
+          socketFactory:
+            class: javax.net.ssl.SSLSocketFactory
+            port: 465
 
 mybatis:
   mapper-locations: classpath:mapper/*.xml
@@ -44,23 +59,12 @@ app:
   view:
     # 浏览增量从 Redis 刷入 MySQL 的间隔（毫秒）
     flush-interval-ms: 60000
-  tencent:
-    ses:
-      # SendEmail 仅支持 ap-guangzhou / ap-hongkong，须与控制台发信地域一致
-      region: ap-guangzhou
-      endpoint: ses.ap-guangzhou.tencentcloudapi.com
-      # 生产建议用环境变量：TENCENTCLOUD_SECRET_ID/KEY 或 SecretId/SecretKey
-      secret-id: ""
-      secret-key: ""
   mail:
-    # 本地开发可 false；生产发信需 true 且配置 TENCENTCLOUD_SECRET_ID/KEY
     enabled: true
-    from: "邮件发送者邮箱"
+    from: ${QQ_SMTP_USER:}
     from-name: 个人博客
-    reply-to: "邮件回复接收者邮箱"
+    reply-to: ${QQ_SMTP_USER:}
     subject: 欢迎注册！验证码：
-    # 控制台模板「注册」ID；须状态为「已通过」后才可真实发信
-    template-id: "邮件模板ID"
   upload:
     avatar-dir: ./uploads/avatars
     content-dir: ./uploads/content
