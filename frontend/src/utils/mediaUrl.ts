@@ -3,7 +3,10 @@ import { getApiBase } from '@/api/http'
 /** 将后端返回的相对路径转为可访问的完整 URL */
 export function resolveMediaUrl(url: string | undefined): string {
   if (!url) return ''
-  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
+    return url
+  }
+  if (url.startsWith('/api/')) {
     return url
   }
   if (url.startsWith('/v1/')) {

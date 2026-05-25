@@ -18,7 +18,11 @@ const props = withDefaults(
   },
 )
 
-const displaySrc = computed(() => resolveMediaUrl(props.src) || props.src)
+const displaySrc = computed(() => {
+  const raw = props.src || ''
+  if (!raw) return defaultAvatarUrl()
+  return resolveMediaUrl(raw) || raw
+})
 </script>
 
 <template>

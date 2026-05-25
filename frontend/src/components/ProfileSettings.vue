@@ -3,7 +3,6 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import type { ProfileData } from '@/data/mockContent'
 import { uploadProfileAvatar } from '@/api/blog'
 import { useMockApi } from '@/api/http'
-import { resolveMediaUrl } from '@/utils/mediaUrl'
 import AvatarImage from './AvatarImage.vue'
 
 const props = defineProps<{
@@ -35,7 +34,8 @@ watch(
 
 const avatarDisplaySrc = computed(() => {
   if (pendingAvatarPreview.value) return pendingAvatarPreview.value
-  return resolveMediaUrl(form.value.avatarUrl)
+  // 由 AvatarImage 统一 resolve，避免双重解析成 /v1/api/uploads/...
+  return form.value.avatarUrl
 })
 
 const hasPendingAvatar = computed(() => !!pendingAvatarFile.value)
