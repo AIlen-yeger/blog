@@ -10,6 +10,7 @@ import {
   loadLandingProfile,
   reloadBlogData,
   resetBlogStore,
+  clearBlogLoadError,
 } from '@/composables/useBlogStore'
 import { initSessionFromStorage } from '@/composables/useSession'
 import { triggerDailyCheckIn } from '@/composables/useDailyCheckIn'
@@ -32,6 +33,8 @@ const enteringBlog = ref(false)
 const returningToLanding = ref(false)
 /** 过渡期间预挂载博客层，与着陆页动画重叠 */
 const pendingBlog = ref(false)
+/** 每次回到着陆页递增，强制 LandingHero 完整重挂载 */
+const landingGeneration = ref(0)
 
 const ENTER_MS = 1240
 const LEAVE_MS = 720
@@ -136,7 +139,10 @@ function finishReturnToLanding() {
   if (!loggedIn.value) {
     resetBlogStore()
     clearMusicPlayback()
+  } else {
+    clearBlogLoadError()
   }
+  landingGeneration.value += 1
   void loadLandingProfile()
   if (loggedIn.value) {
     void loadLandingMusicTracks()
@@ -226,7 +232,7 @@ onUnmounted(() => {
         'is-returning': returningToLanding && animating,
       }"
     >
-      <div class="landing-inner">
+      <div class="landing-inner" :key="landingGeneration">
         <LandingHero
           :logged-in="loggedIn"
           @login="openLogin"

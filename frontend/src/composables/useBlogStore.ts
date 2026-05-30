@@ -348,6 +348,11 @@ export function resetBlogStore() {
   contentFilters.status = undefined
 }
 
+/** 返回着陆页时清除博客加载错误，避免再次进入仍显示红条 */
+export function clearBlogLoadError() {
+  loadError.value = ''
+}
+
 function startLoad() {
   if (!loadPromise) loadPromise = ensureLoaded()
   return loadPromise
