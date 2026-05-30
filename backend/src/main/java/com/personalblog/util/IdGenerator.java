@@ -18,4 +18,8 @@ public final class IdGenerator {
     public static String topicId() {
         return "t_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 6);
     }
+
+    public static String musicTrackId() {
+        return "m_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 6);
+    }
 }

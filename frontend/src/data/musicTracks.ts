@@ -12,6 +12,10 @@ export interface MusicTrack {
   particleTheme?: ParticleTheme
   /** 同目录 .lrc 路径；不填则按音频文件名自动匹配 */
   lyricsSrc?: string
+  /** QQ 外链曲目时长（秒），用于播放结束后自动切下一首 */
+  durationSec?: number
+  /** 累计播放次数（来自 API） */
+  playCount?: number
 }
 
 const envTheme = import.meta.env.VITE_MUSIC_PARTICLE_THEME as ParticleTheme | undefined
@@ -20,6 +24,9 @@ const validThemes = new Set<ParticleTheme>(['sakura', 'leaf', 'mixed'])
 /** 将 mp3 放入 public/music/ 后即可播放；也可改为 CDN 完整 URL */
 export const defaultParticleTheme: ParticleTheme =
   envTheme && validThemes.has(envTheme) ? envTheme : 'mixed'
+
+/** 关于页粒子：默认樱花 + 落叶混合 */
+export const aboutDisplayParticleTheme: ParticleTheme = 'mixed'
 
 /**
  * 无 manifest 时的占位；有 mp3 时由 scripts/musicManifest 自动生成 manifest.json。
@@ -33,20 +40,23 @@ export const aboutMusicTracks: MusicTrack[] = [
     artist: 'matryoshka',
     src: '',
     qqSongId: '3583378',
+    durationSec: 317,
   },
   {
     id: 'qq-301860905',
     title: 'Rainy proof',
     artist: 'HACHI',
     src: '',
-    qqSongId: '301860905'
+    qqSongId: '301860905',
+    durationSec: 269,
   },
   {
     id: 'qq-238936765',
     title: '一週間のうた',
     artist: 'ヒグチアイ (HiguchiAi)',
     src: '',
-    qqSongId: '238936765'
+    qqSongId: '238936765',
+    durationSec: 245,
   }
 ]
 

@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { ContentKind } from '@/types/views'
 import { useContentViewTracking } from '@/composables/useContentView'
 import ContentImageGallery from './ContentImageGallery.vue'
+import AgentReplyBlock from './AgentReplyBlock.vue'
+import { useAgentReplySettings } from '@/composables/useAgentReplySettings'
 
 export interface ReaderItem {
   id: string
@@ -12,6 +14,7 @@ export interface ReaderItem {
   content: string
   images?: string[]
   viewCount?: number
+  agentReply?: string | null
 }
 
 const props = defineProps<{
@@ -26,6 +29,11 @@ const emit = defineEmits<{
 }>()
 
 const trackOpen = ref(false)
+const { shouldShowReply } = useAgentReplySettings()
+
+const showAgentReply = computed(() =>
+  props.item ? shouldShowReply(props.kind, props.item.agentReply) : false,
+)
 
 const { viewCount } = useContentViewTracking(
   props.kind,
@@ -73,6 +81,12 @@ watch(viewCount, (n) => emit('view-count', n))
           </header>
           <div class="reader-body">
             <div class="content">{{ item.content }}</div>
+            <AgentReplyBlock
+              v-if="showAgentReply && item.agentReply"
+              :kind="kind"
+              mode="full"
+              :reply="item.agentReply"
+            />
             <ContentImageGallery v-if="item.images?.length" :images="item.images" />
           </div>
         </article>

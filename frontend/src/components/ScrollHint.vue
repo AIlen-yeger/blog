@@ -1,148 +1,354 @@
 <script setup lang="ts">
-const emit = defineEmits<{
-  login: []
-  guest: []
+
+defineProps<{
+
+  /** 已登录：上滑进入博客；未登录：上滑打开登录 */
+
+  loggedIn?: boolean
+
 }>()
+
+
+
+const emit = defineEmits<{
+
+  login: []
+
+  guest: []
+
+  enterBlog: []
+
+}>()
+
 </script>
 
+
+
 <template>
+
   <div
+
     class="scroll-hint"
-    aria-label="向上滑动登录，向下滑动以游客身份浏览"
+
+    :aria-label="
+
+      loggedIn
+
+        ? '向上滑动进入博客，向下滑动预览内容'
+
+        : '向上滑动登录，向下滑动以游客身份浏览'
+
+    "
+
   >
-    <button type="button" class="hint-row hint-up" @click="emit('login')">
-      <span class="text">向上滑动登录</span>
+
+    <button
+
+      type="button"
+
+      class="hint-item hint-up"
+
+      @click="loggedIn ? emit('enterBlog') : emit('login')"
+
+    >
+
+      <span class="text">{{ loggedIn ? '向上进入博客' : '向上滑动登录' }}</span>
+
       <span class="chevron-wrap" aria-hidden="true">
+
         <svg class="chevron" viewBox="0 0 24 24" fill="none">
+
           <path
+
             d="M6 14l6-6 6 6"
+
             stroke="currentColor"
+
             stroke-width="1.75"
+
             stroke-linecap="round"
+
             stroke-linejoin="round"
+
           />
+
         </svg>
+
       </span>
+
     </button>
+
     <div class="hint-divider" aria-hidden="true" />
-    <button type="button" class="hint-row hint-down" @click="emit('guest')">
-      <span class="text">向下滑动浏览</span>
+
+    <button type="button" class="hint-item hint-down" @click="emit('guest')">
+
+      <span class="text">向下滑动预览</span>
+
       <span class="chevron-wrap" aria-hidden="true">
-        <svg class="chevron chevron--down" viewBox="0 0 24 24" fill="none">
+
+        <svg class="chevron" viewBox="0 0 24 24" fill="none">
+
           <path
+
             d="M6 10l6 6 6-6"
+
             stroke="currentColor"
+
             stroke-width="1.75"
+
             stroke-linecap="round"
+
             stroke-linejoin="round"
+
           />
+
         </svg>
+
       </span>
+
     </button>
+
   </div>
+
 </template>
 
+
+
 <style scoped>
+
 .scroll-hint {
+
   display: inline-flex;
-  flex-direction: column;
+
+  flex-direction: row;
+
   align-items: stretch;
+
   gap: 0;
-  margin-top: 1.25rem;
-  padding: 0.5rem 1rem 0.55rem;
+
+  padding: 0.45rem 0.85rem 0.5rem;
+
   border-radius: 999px;
-  background: rgba(8, 20, 48, 0.38);
-  border: 1px solid rgba(160, 200, 255, 0.16);
-  backdrop-filter: blur(8px);
+
+  background: rgba(32, 52, 88, 0.24);
+
+  border: 1px solid rgba(150, 195, 255, 0.24);
+
+  -webkit-backdrop-filter: blur(7px);
+
+  backdrop-filter: blur(7px);
+
   box-shadow: 0 6px 22px rgba(0, 0, 0, 0.14);
+
 }
-.hint-row {
+
+.hint-item {
+
   display: flex;
+
+  flex-direction: column;
+
   align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.32rem 0.1rem;
+
+  justify-content: flex-end;
+
+  gap: 0.35rem;
+
+  min-width: 5.5rem;
+
+  padding: 0.2rem 0.65rem 0.15rem;
+
   border: none;
+
   background: transparent;
+
   color: rgba(232, 242, 255, 0.88);
+
   cursor: pointer;
+
   user-select: none;
+
   font: inherit;
+
   transition: color 0.2s ease;
+
 }
-.hint-row:hover {
+
+.hint-item:hover {
+
   color: #fff;
+
 }
-.hint-row:hover .chevron-wrap {
+
+.hint-item:hover .chevron-wrap {
+
   opacity: 0.9;
+
 }
+
 .hint-divider {
-  height: 1px;
-  margin: 0.08rem 0.4rem;
+
+  width: 1px;
+
+  align-self: stretch;
+
+  margin: 0.35rem 0.15rem;
+
   background: linear-gradient(
-    90deg,
+
+    180deg,
+
     transparent,
+
     rgba(200, 225, 255, 0.28) 50%,
+
     transparent
+
   );
+
 }
+
 .text {
-  font-size: 0.76rem;
-  letter-spacing: 0.1em;
+
+  font-size: 0.72rem;
+
+  letter-spacing: 0.08em;
+
   opacity: 0.88;
+
   line-height: 1.3;
+
+  text-align: center;
+
+  white-space: nowrap;
+
 }
-.hint-row:hover .text {
+
+.hint-item:hover .text {
+
   opacity: 1;
+
 }
+
 .chevron-wrap {
+
   display: flex;
+
   align-items: center;
+
   justify-content: center;
-  width: 1.125rem;
-  height: 1.125rem;
+
+  width: 1.25rem;
+
+  height: 1.25rem;
+
   flex-shrink: 0;
-  opacity: 0.55;
+
+  opacity: 0.6;
+
   transition: opacity 0.2s ease;
+
 }
+
 .chevron {
+
   width: 100%;
+
   height: 100%;
+
   display: block;
+
 }
+
 .hint-up .chevron-wrap {
+
   animation: chevron-up 2.6s ease-in-out infinite;
+
 }
+
 .hint-down .chevron-wrap {
+
   animation: chevron-down 2.6s ease-in-out infinite;
+
   animation-delay: 0.4s;
+
 }
+
 @keyframes chevron-up {
+
   0%,
+
   100% {
-    transform: translateY(1px);
-    opacity: 0.45;
-  }
-  50% {
-    transform: translateY(-2px);
-    opacity: 0.78;
-  }
-}
-@keyframes chevron-down {
-  0%,
-  100% {
-    transform: translateY(-1px);
-    opacity: 0.45;
-  }
-  50% {
+
     transform: translateY(2px);
-    opacity: 0.78;
+
+    opacity: 0.45;
+
   }
+
+  50% {
+
+    transform: translateY(-3px);
+
+    opacity: 0.85;
+
+  }
+
 }
+
+@keyframes chevron-down {
+
+  0%,
+
+  100% {
+
+    transform: translateY(-2px);
+
+    opacity: 0.45;
+
+  }
+
+  50% {
+
+    transform: translateY(3px);
+
+    opacity: 0.85;
+
+  }
+
+}
+
 @media (prefers-reduced-motion: reduce) {
+
   .chevron-wrap {
+
     animation: none !important;
+
     opacity: 0.65;
+
   }
+
 }
+
+@media (max-width: 400px) {
+
+  .hint-item {
+
+    min-width: 4.75rem;
+
+    padding-inline: 0.45rem;
+
+  }
+
+  .text {
+
+    font-size: 0.68rem;
+
+    letter-spacing: 0.05em;
+
+  }
+
+}
+
 </style>
+

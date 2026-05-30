@@ -12,11 +12,18 @@ import {
   resetBlogStore,
 } from '@/composables/useBlogStore'
 import { initSessionFromStorage } from '@/composables/useSession'
+import { triggerDailyCheckIn } from '@/composables/useDailyCheckIn'
 import { clearMusicPlayback } from '@/utils/musicPlaybackStorage'
+import QqMusicPersistentHost from '@/components/QqMusicPersistentHost.vue'
+import { handoffLandingMusicToBlog } from '@/composables/useAboutMusic'
+import { applyQqTeleportSlot, useGlobalQqPlayer } from '@/composables/useGlobalQqPlayer'
+import { loadLandingMusicTracks } from '@/composables/useUserMusicTracks'
 
 const { gradientStyle } = useGradient()
 const loggedIn = ref(initSessionFromStorage())
 const guestMode = ref(false)
+/** 已登录用户主动进入博客（非游客预览） */
+const blogViewActive = ref(false)
 const showLogin = ref(false)
 const animating = ref(false)
 /** 过渡期间预挂载博客层，与着陆页动画重叠 */
@@ -24,7 +31,7 @@ const pendingBlog = ref(false)
 
 const ENTER_MS = 1240
 
-const inBlog = computed(() => loggedIn.value || guestMode.value)
+const inBlog = computed(() => guestMode.value || blogViewActive.value)
 const showBlog = computed(() => inBlog.value || pendingBlog.value)
 const landingVisible = computed(() => !inBlog.value || animating.value)
 
@@ -49,6 +56,7 @@ function openLogin() {
 }
 
 function startBlogEnter(onComplete: () => void) {
+  void handoffLandingMusicToBlog()
   animating.value = true
   pendingBlog.value = true
   void reloadBlogData().catch(() => {
@@ -59,14 +67,24 @@ function startBlogEnter(onComplete: () => void) {
     pendingBlog.value = false
     window.setTimeout(() => {
       animating.value = false
+      const g = useGlobalQqPlayer()
+      if (g.qqPlaying.value) void applyQqTeleportSlot('about')
     }, 80)
   }, ENTER_MS)
 }
 
 function enterAsGuest() {
-  if (loggedIn.value || guestMode.value || animating.value) return
+  if (guestMode.value || animating.value) return
   guestMode.value = true
   startBlogEnter(() => {})
+}
+
+function enterBlogLoggedIn() {
+  if (!loggedIn.value || guestMode.value || animating.value) return
+  void triggerDailyCheckIn()
+  startBlogEnter(() => {
+    blogViewActive.value = true
+  })
 }
 
 function onWheel(e: WheelEvent) {
@@ -74,7 +92,8 @@ function onWheel(e: WheelEvent) {
   if (e.deltaY > 25) {
     enterAsGuest()
   } else if (e.deltaY < -25) {
-    openLogin()
+    if (loggedIn.value) enterBlogLoggedIn()
+    else openLogin()
   }
 }
 
@@ -88,31 +107,44 @@ function onTouchEnd(e: TouchEvent) {
   if (endY - touchStartY > 60) {
     enterAsGuest()
   } else if (touchStartY - endY > 60) {
-    openLogin()
+    if (loggedIn.value) enterBlogLoggedIn()
+    else openLogin()
   }
 }
 
 function onLoginSuccess() {
   showLogin.value = false
   guestMode.value = false
-  startBlogEnter(() => {
-    loggedIn.value = true
-  })
+  loggedIn.value = true
+  void reloadBlogData().catch(() => {})
+  void triggerDailyCheckIn()
 }
 
-function leaveGuest() {
+function returnToLanding() {
   guestMode.value = false
+  blogViewActive.value = false
   pendingBlog.value = false
   showLogin.value = false
   animating.value = false
-  resetBlogStore()
-  clearMusicPlayback()
+  void applyQqTeleportSlot('landing')
+  if (!loggedIn.value) {
+    resetBlogStore()
+    clearMusicPlayback()
+  }
   void loadLandingProfile()
+  if (loggedIn.value) {
+    void loadLandingMusicTracks()
+  }
+}
+
+function leaveGuest() {
+  returnToLanding()
 }
 
 function handleAuthLogout() {
   loggedIn.value = false
   guestMode.value = false
+  blogViewActive.value = false
   pendingBlog.value = false
   showLogin.value = false
   animating.value = false
@@ -123,6 +155,7 @@ function handleAuthLogout() {
 onMounted(() => {
   if (loggedIn.value) {
     void reloadBlogData().catch(() => {})
+    void triggerDailyCheckIn()
   } else {
     void loadLandingProfile()
   }
@@ -157,7 +190,12 @@ onUnmounted(() => {
 
     <div v-if="landingVisible" class="landing-wrap" :class="{ 'is-leaving': animating }">
       <div class="landing-inner">
-        <LandingHero @login="openLogin" @guest="enterAsGuest" />
+        <LandingHero
+          :logged-in="loggedIn"
+          @login="openLogin"
+          @guest="enterAsGuest"
+          @enter-blog="enterBlogLoggedIn"
+        />
       </div>
     </div>
 
@@ -168,10 +206,13 @@ onUnmounted(() => {
           :guest-mode="guestMode && !loggedIn"
           @request-login="openLogin"
           @leave-guest="leaveGuest"
+          @return-landing="returnToLanding"
         />
       </div>
     </Transition>
 
+    <div id="qq-music-offscreen" class="qq-music-offscreen" aria-hidden="true" />
+    <QqMusicPersistentHost />
     <MusicAudioHost v-if="inBlog" />
     <DesktopPetAssistant :logged-in="loggedIn" @request-login="openLogin" />
 
@@ -375,5 +416,16 @@ onUnmounted(() => {
 .app.loginOpen .landing-wrap {
   filter: blur(2px);
   opacity: 0.85;
+}
+
+.qq-music-offscreen {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 330px;
+  height: 86px;
+  overflow: hidden;
+  opacity: 0;
+  z-index: -1;
 }
 </style>

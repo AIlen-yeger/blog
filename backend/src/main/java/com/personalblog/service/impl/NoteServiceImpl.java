@@ -9,12 +9,14 @@ import com.personalblog.dto.NoteWriteRequest;
 import com.personalblog.entity.NoteEntity;
 import com.personalblog.entity.TopicEntity;
 import com.personalblog.cache.ContentViewCache;
+import com.personalblog.config.AgentReplyProperties;
 import com.personalblog.mapper.ContentViewMapper;
 import com.personalblog.mapper.NoteMapper;
 import com.personalblog.mapper.TopicMapper;
 import com.personalblog.security.AdminGuard;
 import com.personalblog.service.NoteService;
 import com.personalblog.service.TopicService;
+import com.personalblog.util.AgentReplySupport;
 import com.personalblog.util.ExcerptUtil;
 import com.personalblog.util.IdGenerator;
 import com.personalblog.util.JsonUtil;
@@ -37,6 +39,7 @@ public class NoteServiceImpl implements NoteService {
     private final ContentViewMapper contentViewMapper;
     private final ContentViewCache contentViewCache;
     private final AdminGuard adminGuard;
+    private final AgentReplyProperties agentReplyProperties;
 
     @Override
     public PageResult<NoteDto> listNotes(
@@ -251,6 +254,7 @@ public class NoteServiceImpl implements NoteService {
         dto.setViewCount(contentViewCache.getDisplayCount("note", entity.getId(), entity.getViewCount()));
         dto.setPinned(entity.isPinned());
         dto.setStatus(entity.getStatus() != null ? entity.getStatus() : ContentStatus.PUBLISHED);
+        dto.setAgentReply(AgentReplySupport.presentForNote(agentReplyProperties, entity.getAgentReply()));
         return dto;
     }
 

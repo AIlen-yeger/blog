@@ -8,6 +8,7 @@ import {
   type ImageDraftItem,
 } from '@/utils/deferredUpload'
 import { resolveMediaUrl } from '@/utils/mediaUrl'
+import { toUserErrorMessage } from '@/utils/userErrorMessage'
 
 const props = defineProps<{
   /** 打开编辑时已有的服务器图片地址 */
@@ -52,7 +53,7 @@ function onPick(e: Event) {
       drafts.value.push(createDraftFromFile(file))
     }
   } catch (err) {
-    pickError.value = err instanceof Error ? err.message : '添加失败'
+    pickError.value = toUserErrorMessage(err, '添加失败，请稍后重试')
   } finally {
     input.value = ''
   }

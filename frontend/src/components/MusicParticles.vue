@@ -80,7 +80,7 @@ function fallSpeedMul(level: number): number {
 }
 
 function spawnEveryFrames(level: number): number {
-  return Math.max(2, Math.round(9 - level * 6))
+  return Math.max(1, Math.round(7 - level * 5))
 }
 
 function lyricSpawnEveryFrames(sparse: boolean): number {
@@ -112,7 +112,7 @@ function spawn(w: number, _h: number, level: number) {
     sway: Math.random() * Math.PI * 2,
     swaySpeed: 0.018 + Math.random() * 0.028 + level * 0.02,
   })
-  if (particles.length > 120) particles.shift()
+  if (particles.length > 180) particles.shift()
 }
 
 function spawnLyric(w: number, _h: number, text: string, maxOnScreen: number) {
@@ -255,7 +255,10 @@ function tick() {
   ctx.clearRect(0, 0, w, h)
 
   spawnTimer += 1
-  if (spawnTimer % spawnGap === 0) spawn(w, h, level)
+  if (spawnTimer % spawnGap === 0) {
+    spawn(w, h, level)
+    if (props.theme === 'mixed') spawn(w, h, level)
+  }
 
   if (showLyrics) {
     lyricSpawnTimer += 1

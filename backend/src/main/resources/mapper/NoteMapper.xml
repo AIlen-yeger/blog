@@ -15,7 +15,12 @@
         <result column="view_count" property="viewCount"/>
         <result column="pinned" property="pinned"/>
         <result column="status" property="status"/>
+        <result column="agent_reply" property="agentReply"/>
     </resultMap>
+
+    <sql id="NoteColumns">
+        id, title, excerpt, tag, topic_id, content, record_date, images_json, view_count, pinned, status, agent_reply
+    </sql>
 
     <sql id="listWhere">
         <where>
@@ -50,7 +55,7 @@
     </sql>
 
     <select id="selectById" resultMap="NoteMap">
-        SELECT id, title, excerpt, tag, topic_id, content, record_date, images_json, view_count, pinned, status
+        SELECT <include refid="NoteColumns"/>
         FROM notes WHERE id = #{id}
     </select>
 
@@ -68,7 +73,7 @@
     </select>
 
     <select id="selectList" resultMap="NoteMap">
-        SELECT id, title, excerpt, tag, topic_id, content, record_date, images_json, view_count, pinned, status
+        SELECT <include refid="NoteColumns"/>
         FROM notes
         <include refid="listWhere"/>
         <include refid="listOrder"/>
@@ -99,8 +104,8 @@
     </select>
 
     <insert id="insert">
-        INSERT INTO notes (id, title, excerpt, tag, topic_id, content, record_date, images_json, view_count, pinned, status)
-        VALUES (#{id}, #{title}, #{excerpt}, #{tag}, #{topicId}, #{content}, #{date}, #{imagesJson}, 0, 0, #{status})
+        INSERT INTO notes (id, title, excerpt, tag, topic_id, content, record_date, images_json, view_count, pinned, status, agent_reply)
+        VALUES (#{id}, #{title}, #{excerpt}, #{tag}, #{topicId}, #{content}, #{date}, #{imagesJson}, 0, 0, #{status}, #{agentReply})
     </insert>
 
     <update id="update">
@@ -112,8 +117,13 @@
             content = #{content},
             record_date = #{date},
             images_json = #{imagesJson},
-            status = #{status}
+            status = #{status},
+            agent_reply = #{agentReply}
         WHERE id = #{id}
+    </update>
+
+    <update id="updateAgentReply">
+        UPDATE notes SET agent_reply = #{agentReply} WHERE id = #{id}
     </update>
 
     <delete id="deleteById">

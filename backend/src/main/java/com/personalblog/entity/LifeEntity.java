@@ -17,4 +17,6 @@ public class LifeEntity {
     private int viewCount;
     private boolean pinned;
     private String status = "published";
+    /** Kohaku 自动回复全文 */
+    private String agentReply;
 }

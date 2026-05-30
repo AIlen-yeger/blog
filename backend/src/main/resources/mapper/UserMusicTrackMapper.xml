@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.personalblog.mapper.UserMusicTrackMapper">
+
+    <resultMap id="UserMusicTrackMap" type="com.personalblog.entity.UserMusicTrackEntity">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="qq_song_id" property="qqSongId"/>
+        <result column="title" property="title"/>
+        <result column="artist" property="artist"/>
+        <result column="src" property="src"/>
+        <result column="duration_sec" property="durationSec"/>
+        <result column="source_url" property="sourceUrl"/>
+        <result column="sort_order" property="sortOrder"/>
+        <result column="play_count" property="playCount"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <sql id="TrackColumns">
+        id, user_id, qq_song_id, title, artist, src, duration_sec, source_url, sort_order, play_count, created_at
+    </sql>
+
+    <select id="selectByUserId" resultMap="UserMusicTrackMap">
+        SELECT <include refid="TrackColumns"/>
+        FROM user_music_track
+        WHERE user_id = #{userId}
+        ORDER BY sort_order ASC, created_at ASC
+    </select>
+
+    <select id="selectTopPlayedByUserId" resultMap="UserMusicTrackMap">
+        SELECT <include refid="TrackColumns"/>
+        FROM user_music_track
+        WHERE user_id = #{userId} AND play_count > 0
+        ORDER BY play_count DESC, created_at ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectById" resultMap="UserMusicTrackMap">
+        SELECT <include refid="TrackColumns"/>
+        FROM user_music_track
+        WHERE id = #{id}
+    </select>
+
+    <select id="countByUserIdAndQqSongId" resultType="int">
+        SELECT COUNT(*)
+        FROM user_music_track
+        WHERE user_id = #{userId} AND qq_song_id = #{qqSongId}
+    </select>
+
+    <select id="selectMaxSortOrder" resultType="int">
+        SELECT COALESCE(MAX(sort_order), 0)
+        FROM user_music_track
+        WHERE user_id = #{userId}
+    </select>
+
+    <insert id="insert">
+        INSERT INTO user_music_track (
+            id, user_id, qq_song_id, title, artist, src, duration_sec, source_url, sort_order
+        ) VALUES (
+            #{id}, #{userId}, #{qqSongId}, #{title}, #{artist}, #{src}, #{durationSec}, #{sourceUrl}, #{sortOrder}
+        )
+    </insert>
+
+    <delete id="deleteByIdAndUserId">
+        DELETE FROM user_music_track
+        WHERE id = #{id} AND user_id = #{userId}
+    </delete>
+
+    <update id="incrementPlayCount">
+        UPDATE user_music_track
+        SET play_count = play_count + 1
+        WHERE id = #{id}
+    </update>
+</mapper>

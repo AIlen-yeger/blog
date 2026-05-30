@@ -15,6 +15,8 @@ export interface NoteItem {
   /** 是否置顶（全局仅一篇） */
   pinned?: boolean
   status?: ContentPublishStatus
+  /** Kohaku 根据正文生成的回复（后端字段 agentReply） */
+  agentReply?: string | null
 }
 
 export interface TopicItem {
@@ -46,6 +48,8 @@ export interface LifeItem {
   /** 是否置顶（生活记录全局仅一篇） */
   pinned?: boolean
   status?: ContentPublishStatus
+  /** Kohaku 根据正文生成的回复（后端字段 agentReply） */
+  agentReply?: string | null
 }
 
 export interface TagCountItem {

@@ -15,6 +15,7 @@ const emit = defineEmits<{
   publish: []
   requestLogin: []
   leaveGuest: []
+  returnLanding: []
 }>()
 
 const { currentUser } = useSession()
@@ -83,9 +84,14 @@ function handleLogout() {
           返回首页
         </button>
       </template>
-      <button v-else type="button" class="btn-logout" @click="handleLogout">
-        退出登录
-      </button>
+      <template v-else-if="currentUser">
+        <button type="button" class="btn-logout btn-leave" @click="emit('returnLanding')">
+          返回首页
+        </button>
+        <button type="button" class="btn-logout" @click="handleLogout">
+          退出登录
+        </button>
+      </template>
       <p class="nav-foot">记录 · 整理 · 复盘</p>
     </div>
   </aside>

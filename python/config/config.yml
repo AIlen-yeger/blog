@@ -1,8 +1,28 @@
 ai:
   chat:
     temperature: 0.7
+    # 会话短期记忆默认轮数（每轮=user+assistant 各 1 条）
+    history_limit: 10
+  execute:
+    model: "qwen-plus"
+    # api_key 请写在 .env 的 DP_AGENT_API_KEY
+    api_key: ""
+    temperature: 0.0
+    base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+
+mysql:
+  host: localhost
+  port: 3306
+  user: root
+  # 密码请写在 .env 的 MYSQL_PASSWORD，与 Spring application-local.yml 一致
+  password: ""
+  database: myblog
 
 redis:
+  host: localhost
+  port: 6379
+  db: 5
+  password: ""
   chat_list_key: "chat:s:{session_id}"
   chat_ttl: 86400
   max_cache_msgs: 40

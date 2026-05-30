@@ -3,6 +3,7 @@ import { ref, watch } from 'vue'
 import type { LifeItem } from '@/data/mockContent'
 import ContentImageUpload from './ContentImageUpload.vue'
 import { useBlogStore } from '@/composables/useBlogStore'
+import { toUserErrorMessage } from '@/utils/userErrorMessage'
 
 const { saveLife } = useBlogStore()
 
@@ -62,7 +63,7 @@ async function submit(publishStatus: 'published' | 'draft') {
     })
     emit('close')
   } catch (err) {
-    submitError.value = err instanceof Error ? err.message : '保存失败'
+    submitError.value = toUserErrorMessage(err, '保存失败，请稍后重试')
   } finally {
     submitting.value = false
   }

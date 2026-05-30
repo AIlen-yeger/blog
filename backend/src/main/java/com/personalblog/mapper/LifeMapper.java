@@ -49,4 +49,6 @@ public interface LifeMapper {
     int clearAllPinned();
 
     int updatePinned(@Param("id") String id, @Param("pinned") boolean pinned);
+
+    int updateAgentReply(@Param("id") String id, @Param("agentReply") String agentReply);
 }

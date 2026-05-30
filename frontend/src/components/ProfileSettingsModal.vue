@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import type { ProfileData } from '@/data/mockContent'
+import { toUserErrorMessage } from '@/utils/userErrorMessage'
 import ProfileSettings from './ProfileSettings.vue'
 
 const props = defineProps<{
@@ -30,7 +31,7 @@ async function handleSave(data: ProfileData) {
     await props.onSave(data)
     emit('close')
   } catch (e) {
-    saveError.value = e instanceof Error ? e.message : '保存失败'
+    saveError.value = toUserErrorMessage(e, '保存失败，请稍后重试')
   } finally {
     saving.value = false
   }

@@ -1,5 +1,6 @@
 import { AUTH_CODE_UNAUTHORIZED } from '@/constants/authCodes'
 import { clearSession, getAuthToken } from '@/composables/useSession'
+import { httpStatusMessage, toUserErrorMessage } from '@/utils/userErrorMessage'
 
 export class ApiError extends Error {
   readonly code: number
@@ -80,7 +81,7 @@ export async function request<T>(
   if (!json || Number.isNaN(code)) {
     throw new ApiError(
       res.status,
-      res.ok ? '服务端响应格式错误' : `网络错误 HTTP ${res.status}`,
+      res.ok ? '服务响应异常，请稍后重试' : httpStatusMessage(res.status),
     )
   }
 
@@ -89,7 +90,11 @@ export async function request<T>(
     if (auth && (code === AUTH_CODE_UNAUTHORIZED || res.status === 401)) {
       clearSession()
     }
-    throw new ApiError(code, json.message || '请求失败')
+    const raw = json.message?.trim() || ''
+    throw new ApiError(
+      code,
+      toUserErrorMessage(new ApiError(code, raw), '请求失败，请稍后重试'),
+    )
   }
 
   return json.data

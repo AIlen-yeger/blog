@@ -8,10 +8,12 @@ import com.personalblog.dto.LifeDto;
 import com.personalblog.dto.LifeWriteRequest;
 import com.personalblog.entity.LifeEntity;
 import com.personalblog.cache.ContentViewCache;
+import com.personalblog.config.AgentReplyProperties;
 import com.personalblog.mapper.ContentViewMapper;
 import com.personalblog.mapper.LifeMapper;
 import com.personalblog.security.AdminGuard;
 import com.personalblog.service.LifeService;
+import com.personalblog.util.AgentReplySupport;
 import com.personalblog.util.ExcerptUtil;
 import com.personalblog.util.IdGenerator;
 import com.personalblog.util.JsonUtil;
@@ -32,6 +34,7 @@ public class LifeServiceImpl implements LifeService {
     private final ContentViewMapper contentViewMapper;
     private final ContentViewCache contentViewCache;
     private final AdminGuard adminGuard;
+    private final AgentReplyProperties agentReplyProperties;
 
     @Override
     public PageResult<LifeDto> listLife(
@@ -195,6 +198,7 @@ public class LifeServiceImpl implements LifeService {
         dto.setViewCount(contentViewCache.getDisplayCount("life", entity.getId(), entity.getViewCount()));
         dto.setPinned(entity.isPinned());
         dto.setStatus(entity.getStatus() != null ? entity.getStatus() : ContentStatus.PUBLISHED);
+        dto.setAgentReply(AgentReplySupport.presentForLife(agentReplyProperties, entity.getAgentReply()));
         return dto;
     }
 }

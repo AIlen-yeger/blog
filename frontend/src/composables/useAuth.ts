@@ -5,10 +5,8 @@ import {
   verifyRegistration,
 } from '@/api/auth'
 import { ApiError } from '@/api/http'
-import {
-  AUTH_CODE_SEND_TOO_FREQUENT,
-  AUTH_CODE_WRONG_PASSWORD,
-} from '@/constants/authCodes'
+import { AUTH_CODE_SEND_TOO_FREQUENT } from '@/constants/authCodes'
+import { toUserErrorMessage } from '@/utils/userErrorMessage'
 import type { LoginResult } from '@/types/auth'
 import {
   getDefaultResendCooldownSeconds,
@@ -96,11 +94,8 @@ export function useAuth() {
     } catch (e) {
       if (e instanceof ApiError && e.code === AUTH_CODE_SEND_TOO_FREQUENT) {
         beginResendCooldown()
-        error.value = e.message || '验证码发送过于频繁，请稍后再试'
-      } else {
-        error.value =
-          e instanceof Error ? e.message : '验证码邮件发送失败，请稍后重试'
       }
+      error.value = toUserErrorMessage(e, '验证码邮件发送失败，请稍后重试')
       verifyHint.value =
         '请填写验证码完成注册；若未收到邮件，可点击下方「重新发送」'
     } finally {
@@ -125,11 +120,7 @@ export function useAuth() {
       await dispatchRegisterCode(email, password)
       return null
     } catch (e) {
-      if (e instanceof ApiError && e.code === AUTH_CODE_WRONG_PASSWORD) {
-        error.value = e.message || '密码错误'
-      } else {
-        error.value = e instanceof Error ? e.message : '登录失败'
-      }
+      error.value = toUserErrorMessage(e, '登录失败，请稍后重试')
       return null
     } finally {
       submitting.value = false
@@ -145,7 +136,7 @@ export function useAuth() {
     try {
       return await verifyRegistration(email, password, code)
     } catch (e) {
-      error.value = e instanceof Error ? e.message : '验证失败'
+      error.value = toUserErrorMessage(e, '验证失败，请稍后重试')
       return null
     }
   }

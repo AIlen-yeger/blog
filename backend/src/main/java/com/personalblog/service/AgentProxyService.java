@@ -36,14 +36,21 @@ public class AgentProxyService {
 
     public void streamChat(AgentPythonChatRequest payload, OutputStream clientOut) throws IOException {
         String body = objectMapper.writeValueAsString(payload);
+        if (body == null || body.isBlank()) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "Agent 请求体为空");
+        }
+        byte[] bodyBytes = body.getBytes(StandardCharsets.UTF_8);
         URI uri = URI.create(normalizeBaseUrl() + agentProperties.getChatPath());
+        log.info("[agent] upstream POST uri={} bodyBytes={}", uri, bodyBytes.length);
+        log.debug("[agent] upstream body={}", body);
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(uri)
                 .timeout(Duration.ofMillis(agentProperties.getReadTimeoutMs()))
-                .header("Content-Type", "application/json")
+                .version(HttpClient.Version.HTTP_1_1)
+                .header("Content-Type", "application/json; charset=utf-8")
                 .header("Accept", "text/event-stream")
-                .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
+                .POST(HttpRequest.BodyPublishers.ofByteArray(bodyBytes))
                 .build();
 
         HttpResponse<InputStream> response;
@@ -64,7 +71,8 @@ public class AgentProxyService {
                 errBody = new String(errStream.readAllBytes(), StandardCharsets.UTF_8);
             }
             log.warn("[agent] upstream error status={} body={}", status, errBody);
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "Agent 返回错误");
+            String detail = summarizeUpstreamError(errBody);
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, detail);
         }
 
         String contentType = response.headers().firstValue("Content-Type").orElse("");
@@ -92,5 +100,38 @@ public class AgentProxyService {
             return base.substring(0, base.length() - 1);
         }
         return base;
+    }
+
+    private String summarizeUpstreamError(String errBody) {
+        if (errBody == null || errBody.isBlank()) {
+            return "Agent 服务返回错误，请检查 Python 服务是否已启动";
+        }
+        try {
+            var node = objectMapper.readTree(errBody);
+            if (node.has("message")) {
+                return node.get("message").asText("Agent 返回错误");
+            }
+            if (node.has("detail")) {
+                var detail = node.get("detail");
+                if (detail.isTextual()) {
+                    return detail.asText("Agent 返回错误");
+                }
+                if (detail.isArray() && !detail.isEmpty()) {
+                    var first = detail.get(0);
+                    if (first.has("msg")) {
+                        String msg = first.get("msg").asText();
+                        if (first.has("loc") && first.get("loc").isArray()) {
+                            String loc = first.get("loc").toString();
+                            return msg + " " + loc;
+                        }
+                        return msg;
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+            /* 非 JSON 响应 */
+        }
+        String trimmed = errBody.trim();
+        return trimmed.length() > 200 ? trimmed.substring(0, 200) + "…" : trimmed;
     }
 }

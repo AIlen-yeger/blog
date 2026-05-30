@@ -17,4 +17,6 @@ public class NoteDto {
     private int viewCount;
     private boolean pinned;
     private String status;
+    /** Kohaku 根据正文生成的自动回复 */
+    private String agentReply;
 }

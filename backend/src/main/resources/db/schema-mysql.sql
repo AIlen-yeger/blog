@@ -22,6 +22,16 @@ CREATE TABLE IF NOT EXISTS profile (
     CONSTRAINT fk_profile_user FOREIGN KEY (user_id) REFERENCES users (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS user_check_in (
+    id            BIGINT    NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id       BIGINT    NOT NULL COMMENT 'users.id',
+    check_in_date DATE      NOT NULL COMMENT '签到自然日',
+    created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_user_check_in (user_id, check_in_date),
+    KEY idx_user_check_in_user (user_id, check_in_date),
+    CONSTRAINT fk_user_check_in_user FOREIGN KEY (user_id) REFERENCES users (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户每日签到';
+
 CREATE TABLE IF NOT EXISTS topics (
     id           VARCHAR(64)  PRIMARY KEY,
     title        VARCHAR(255) NOT NULL,
@@ -42,6 +52,7 @@ CREATE TABLE IF NOT EXISTS notes (
     view_count   INT          NOT NULL DEFAULT 0,
     pinned       TINYINT(1)   NOT NULL DEFAULT 0,
     status       VARCHAR(16)  NOT NULL DEFAULT 'published',
+    agent_reply  MEDIUMTEXT   NULL COMMENT 'Kohaku 自动回复全文',
     KEY idx_notes_topic (topic_id),
     KEY idx_notes_date (record_date),
     KEY idx_notes_status (status)
@@ -58,6 +69,7 @@ CREATE TABLE IF NOT EXISTS life_records (
     view_count   INT          NOT NULL DEFAULT 0,
     pinned       TINYINT(1)   NOT NULL DEFAULT 0,
     status       VARCHAR(16)  NOT NULL DEFAULT 'published',
+    agent_reply  MEDIUMTEXT   NULL COMMENT 'Kohaku 自动回复全文',
     KEY idx_life_date (record_date),
     KEY idx_life_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -76,6 +88,23 @@ CREATE TABLE IF NOT EXISTS content_views (
     viewer_key   VARCHAR(128) NOT NULL,
     UNIQUE KEY uk_content_view (content_type, content_id, viewer_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS user_music_track (
+    id           VARCHAR(64)  NOT NULL PRIMARY KEY,
+    user_id      BIGINT       NOT NULL COMMENT 'users.id',
+    qq_song_id   VARCHAR(32)  NOT NULL COMMENT 'QQ 音乐 songid',
+    title        VARCHAR(255) NOT NULL DEFAULT '',
+    artist       VARCHAR(255) NOT NULL DEFAULT '',
+    src          VARCHAR(512) NOT NULL DEFAULT '',
+    duration_sec INT          NULL,
+    source_url   VARCHAR(1024) NULL,
+    sort_order   INT          NOT NULL DEFAULT 0,
+    play_count   INT          NOT NULL DEFAULT 0 COMMENT '累计播放次数',
+    created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_user_qq_song (user_id, qq_song_id),
+    KEY idx_user_music_sort (user_id, sort_order, created_at),
+    CONSTRAINT fk_user_music_user FOREIGN KEY (user_id) REFERENCES users (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户音乐播放列表';
 
 CREATE TABLE IF NOT EXISTS ai_chat_message (
     id           BIGINT AUTO_INCREMENT PRIMARY KEY,

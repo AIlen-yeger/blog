@@ -18,6 +18,7 @@ import {
   mockTopics as seedTopics,
 } from '@/data/mockContent'
 import { genId, todayISO } from '@/utils/id'
+import { toUserErrorMessage } from '@/utils/userErrorMessage'
 import { getAuthToken } from '@/composables/useSession'
 import { useMockApi } from '@/api/http'
 import * as blogApi from '@/api/blog'
@@ -271,7 +272,7 @@ async function ensureLoaded() {
     }
     hydrated = true
   } catch (e) {
-    loadError.value = e instanceof Error ? e.message : '加载失败'
+    loadError.value = toUserErrorMessage(e, '内容加载失败，请稍后重试')
     console.warn('[personal-blog] 数据加载失败', e)
     if (!useMockApi()) {
       state.notes = []

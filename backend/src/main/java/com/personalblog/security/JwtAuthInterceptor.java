@@ -66,6 +66,12 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
         if (HttpMethod.POST.matches(method) && isViewRecordPath(servletPath)) {
             return true;
         }
+        if (HttpMethod.POST.matches(method) && "/music/parse".equals(servletPath)) {
+            return true;
+        }
+        if (HttpMethod.POST.matches(method) && servletPath.matches("/music/tracks/[^/]+/play")) {
+            return true;
+        }
         if (servletPath.startsWith("/uploads/") && HttpMethod.GET.matches(method)) {
             return true;
         }
@@ -80,6 +86,8 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
         }
         if ("/profile/public".equals(servletPath)
                 || servletPath.matches("/profile/users/\\d+")
+                || "/check-ins/site-owner".equals(servletPath)
+                || "/music/site-owner".equals(servletPath)
                 || "/topics".equals(servletPath)
                 || "/timeline".equals(servletPath)
                 || "/search".equals(servletPath)

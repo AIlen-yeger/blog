@@ -1,5 +1,6 @@
 package com.personalblog.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.personalblog.common.BusinessException;
 import com.personalblog.common.ErrorCode;
 import com.personalblog.dto.AgentChatRequest;
@@ -8,8 +9,11 @@ import com.personalblog.entity.UserEntity;
 import com.personalblog.mapper.UserMapper;
 import com.personalblog.security.AuthUserPrincipal;
 import com.personalblog.service.AgentProxyService;
+import com.personalblog.util.AgentSseWriter;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -26,36 +30,57 @@ import java.io.UncheckedIOException;
 @RestController
 @RequestMapping("/agent")
 @RequiredArgsConstructor
+@Slf4j
 public class AgentController {
 
     private final AgentProxyService agentProxyService;
     private final UserMapper userMapper;
+    private final ObjectMapper objectMapper;
 
-    @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public ResponseEntity<StreamingResponseBody> chat(@Valid @RequestBody AgentChatRequest request) {
-        AuthUserPrincipal principal = currentPrincipal();
-        UserEntity user = userMapper.selectByEmail(principal.getEmail());
-        if (user == null || user.getId() == null) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED, "用户不存在");
-        }
-
-        AgentPythonChatRequest upstream = new AgentPythonChatRequest(
-                request.getQuestion().trim(),
-                request.getSessionId().trim(),
-                user.getId(),
-                user.getEmail(),
-                displayName(user.getEmail()),
-                request.getLimit()
-        );
-
-        StreamingResponseBody body = outputStream -> {
-            try {
-                agentProxyService.streamChat(upstream, outputStream);
-            } catch (IOException ex) {
-                throw new UncheckedIOException(ex);
+    @PostMapping("/chat")
+    public ResponseEntity<StreamingResponseBody> chat(
+            @Valid @RequestBody AgentChatRequest request,
+            HttpServletRequest httpRequest) {
+        try {
+            AuthUserPrincipal principal = currentPrincipal();
+            UserEntity user = userMapper.selectByEmail(principal.getEmail());
+            if (user == null || user.getId() == null) {
+                throw new BusinessException(ErrorCode.UNAUTHORIZED, "用户不存在");
             }
-        };
 
+            AgentPythonChatRequest upstream = new AgentPythonChatRequest(
+                    request.getQuestion().trim(),
+                    request.getSessionId().trim(),
+                    user.getId(),
+                    user.getEmail(),
+                    displayName(user.getEmail()),
+                    request.getLimit(),
+                    resolveBearerToken(httpRequest)
+            );
+
+            StreamingResponseBody body = outputStream -> {
+                try {
+                    agentProxyService.streamChat(upstream, outputStream);
+                } catch (BusinessException ex) {
+                    AgentSseWriter.writeError(objectMapper, outputStream, ex);
+                } catch (IOException ex) {
+                    throw new UncheckedIOException(ex);
+                } catch (Exception ex) {
+                    log.warn("[agent/chat] stream failed", ex);
+                    AgentSseWriter.writeError(
+                            objectMapper,
+                            outputStream,
+                            new BusinessException(ErrorCode.INTERNAL_ERROR, "助手暂时不可用，请稍后重试"));
+                }
+            };
+
+            return sseOk(body);
+        } catch (BusinessException ex) {
+            return sseError(ex);
+        }
+    }
+
+    private ResponseEntity<StreamingResponseBody> sseOk(StreamingResponseBody body) {
         return ResponseEntity.ok()
                 .contentType(MediaType.TEXT_EVENT_STREAM)
                 .header("Cache-Control", "no-cache, no-transform")
@@ -64,12 +89,31 @@ public class AgentController {
                 .body(body);
     }
 
+    private ResponseEntity<StreamingResponseBody> sseError(BusinessException ex) {
+        StreamingResponseBody body = outputStream -> {
+            try {
+                AgentSseWriter.writeError(objectMapper, outputStream, ex);
+            } catch (IOException ioEx) {
+                throw new UncheckedIOException(ioEx);
+            }
+        };
+        return sseOk(body);
+    }
+
     private AuthUserPrincipal currentPrincipal() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !(authentication.getPrincipal() instanceof AuthUserPrincipal principal)) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
         return principal;
+    }
+
+    private String resolveBearerToken(HttpServletRequest request) {
+        String auth = request.getHeader("Authorization");
+        if (auth != null && auth.regionMatches(true, 0, "Bearer ", 0, 7)) {
+            return auth.substring(7).trim();
+        }
+        return "";
     }
 
     private String displayName(String email) {

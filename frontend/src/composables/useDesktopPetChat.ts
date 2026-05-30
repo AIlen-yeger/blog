@@ -3,6 +3,8 @@ import { hasValidSession } from '@/composables/useSession'
 import { streamAgentChat, type ChatTurn } from '@/api/agentChat'
 import { bubbleTierFromText } from '@/utils/bubbleSize'
 import { genId } from '@/utils/id'
+import { toUserErrorMessage } from '@/utils/userErrorMessage'
+import { notifyMusicTracksChanged } from '@/composables/useUserMusicTracks'
 
 export interface ChatMessage {
   id: string
@@ -31,7 +33,7 @@ let abortCtrl: AbortController | null = null
 const displayText = computed(() => {
   if (isStreaming.value) return streamingText.value
   const last = [...history.value].reverse().find((m) => m.role === 'assistant')
-  return last?.content ?? '你好呀，我是博客小助手～'
+  return last?.content ?? '你好呀，我是kohaku'
 })
 
 const bubbleTier = computed(() => bubbleTierFromText(displayText.value))
@@ -86,15 +88,19 @@ async function sendMessage(options?: DesktopPetChatOptions) {
       abortCtrl.signal,
     )
 
+    const reply = streamingText.value.trim() || '（没有收到回复）'
     history.value.push({
       id: genId('a'),
       role: 'assistant',
-      content: streamingText.value.trim() || '（没有收到回复）',
+      content: reply,
       createdAt: Date.now(),
     })
+    if (/已添加：/.test(reply)) {
+      notifyMusicTracksChanged()
+    }
   } catch (e) {
     if (abortCtrl?.signal.aborted) return
-    error.value = e instanceof Error ? e.message : '发送失败'
+    error.value = toUserErrorMessage(e, '发送失败，请稍后重试')
   } finally {
     isStreaming.value = false
     streamingText.value = ''

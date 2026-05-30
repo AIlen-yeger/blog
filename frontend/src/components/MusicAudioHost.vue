@@ -10,6 +10,7 @@ const { bindAudio } = useAboutMusic()
     :ref="(el) => bindAudio(el as HTMLAudioElement | null)"
     class="music-audio-host"
     preload="metadata"
+    :loop="false"
   />
 </template>
 

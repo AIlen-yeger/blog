@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import type { ProfileData } from '@/data/mockContent'
-import type { ParticleTheme } from '@/types/music'
 import AvatarImage from './AvatarImage.vue'
 import MusicParticles from './MusicParticles.vue'
-import QqMusicEmbed from './QqMusicEmbed.vue'
+import MusicPlaylistDrawer from './MusicPlaylistDrawer.vue'
 import { useAboutMusic } from '@/composables/useAboutMusic'
-import { useMusicLyrics } from '@/composables/useMusicLyrics'
-import { defaultParticleTheme } from '@/data/musicTracks'
-import { getSeasonPhase, seasonPhaseLabel } from '@/utils/seasonPalette'
+import { aboutDisplayParticleTheme } from '@/data/musicTracks'
+import {
+  markQqPlaying,
+  setQqTeleportSlot,
+} from '@/composables/useGlobalQqPlayer'
+import { removeMusicTrack } from '@/composables/useUserMusicTracks'
 
 defineProps<{
   profile: ProfileData
@@ -21,29 +23,28 @@ const emit = defineEmits<{
 
 const {
   musicMode,
+  tracks,
   currentTrack,
   isQqTrack,
   qqBackgroundActive,
   embedPlaybackActive,
   visualPlaybackActive,
-  particleTheme: trackParticleTheme,
   isPlaying,
   progressPercent,
   timeLabel,
   loadError,
-  playOrderMode,
-  togglePlayOrderMode,
   toggleMusicMode,
   togglePlayPause,
   stopAndReset,
   prevTrack,
   nextTrack,
   seekByPercent,
-  currentTime,
+  selectTrackById,
 } = useAboutMusic()
 
-const { lyricLines, hasLrcFile } = useMusicLyrics()
-const lyricsFallOn = ref(true)
+const playlistOpen = ref(false)
+
+const playlistTracks = computed(() => tracks.value.filter((t) => !!t.qqSongId))
 
 function onProgressInput(e: Event) {
   seekByPercent(Number((e.target as HTMLInputElement).value))
@@ -53,19 +54,27 @@ function onStop() {
   stopAndReset()
 }
 
-const themeOptions: { id: ParticleTheme; label: string }[] = [
-  { id: 'mixed', label: '混合' },
-  { id: 'sakura', label: '樱花' },
-  { id: 'leaf', label: '落叶' },
-]
+function openPlaylist() {
+  playlistOpen.value = true
+}
 
-const displayParticleTheme = ref<ParticleTheme>(defaultParticleTheme)
+function onSelectPlaylist(index: number) {
+  const track = playlistTracks.value[index]
+  if (!track) return
+  selectTrackById(track.id)
+  markQqPlaying(true)
+  setQqTeleportSlot(musicMode.value ? 'about' : 'hidden')
+  playlistOpen.value = false
+}
 
-watch(trackParticleTheme, (t) => {
-  displayParticleTheme.value = t
-})
+function onUserPlayPause() {
+  togglePlayPause()
+}
 
-const seasonHint = seasonPhaseLabel(getSeasonPhase())
+async function onDeletePlaylist(track: (typeof playlistTracks.value)[0]) {
+  await removeMusicTrack(track)
+  playlistOpen.value = false
+}
 </script>
 
 <template>
@@ -80,10 +89,8 @@ const seasonHint = seasonPhaseLabel(getSeasonPhase())
     <MusicParticles
       :active="visualPlaybackActive"
       :ambient-motion="embedPlaybackActive && !isPlaying"
-      :theme="displayParticleTheme"
-      :lyrics-fall="lyricsFallOn && !isQqTrack"
-      :lyric-lines="lyricLines"
-      :current-time="currentTime"
+      :theme="aboutDisplayParticleTheme"
+      :lyrics-fall="false"
     />
 
     <div class="profile-identity">
@@ -113,7 +120,7 @@ const seasonHint = seasonPhaseLabel(getSeasonPhase())
               {{ qqBackgroundActive ? 'QQ 音乐后台播放中' : '后台播放中' }}
             </span>
             <div class="bg-music-actions">
-              <button type="button" class="bg-music-btn" title="暂停" @click="togglePlayPause">
+              <button type="button" class="bg-music-btn" title="暂停" @click="onUserPlayPause">
                 ⏸
               </button>
               <button type="button" class="bg-music-btn" title="打开播放器" @click="toggleMusicMode">
@@ -131,12 +138,10 @@ const seasonHint = seasonPhaseLabel(getSeasonPhase())
           <p class="track-artist">{{ currentTrack?.artist }}</p>
 
           <div
-            v-if="isQqTrack && currentTrack?.qqSongId && (musicMode || qqBackgroundActive)"
+            v-if="isQqTrack && musicMode"
+            id="about-qq-slot"
             class="qq-embed-host"
-            :class="{ 'qq-embed-host--offscreen': !musicMode }"
-          >
-            <QqMusicEmbed :song-id="currentTrack.qqSongId" />
-          </div>
+          />
 
           <div v-if="!isQqTrack" class="progress-row">
             <input
@@ -152,64 +157,9 @@ const seasonHint = seasonPhaseLabel(getSeasonPhase())
             <span class="time-text">{{ timeLabel }}</span>
           </div>
 
-          <div class="particle-theme-row" role="group" aria-label="粒子效果">
-            <span class="particle-theme-label">
-              氛围 · {{ seasonHint }} · {{ isQqTrack ? '律动氛围' : '随响度变速' }}
-            </span>
-            <button
-              v-for="opt in themeOptions"
-              :key="opt.id"
-              type="button"
-              class="theme-chip"
-              :class="{ active: displayParticleTheme === opt.id }"
-              @click="displayParticleTheme = opt.id"
-            >
-              {{ opt.label }}
-            </button>
-            <button
-              type="button"
-              class="theme-chip"
-              :class="{ active: lyricsFallOn }"
-              :title="hasLrcFile ? '已加载 LRC 歌词' : '无 LRC 时使用曲名/歌手'"
-              @click="lyricsFallOn = !lyricsFallOn"
-            >
-              歌词
-            </button>
-          </div>
-
           <div class="controls">
-            <button
-              type="button"
-              class="ctrl-btn ctrl-order"
-              :class="{
-                'is-shuffle': playOrderMode === 'shuffle',
-                'is-sequential': playOrderMode === 'sequential',
-              }"
-              :title="
-                playOrderMode === 'shuffle'
-                  ? '当前：随机播放（点击切换为顺序）'
-                  : '当前：顺序播放（点击切换为随机）'
-              "
-              :aria-label="playOrderMode === 'shuffle' ? '随机播放' : '顺序播放'"
-              @click="togglePlayOrderMode"
-            >
-              <svg
-                v-if="playOrderMode === 'sequential'"
-                class="ctrl-order-icon"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path
-                  fill="currentColor"
-                  d="M4 6h16v2H4V6zm0 5h10v2H4v-2zm0 5h16v2H4v-2z"
-                />
-              </svg>
-              <svg v-else class="ctrl-order-icon" viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  fill="currentColor"
-                  d="M10.59 9.17 5.41 4 4 5.41l5.17 5.17 1.41-1.41zM14.5 4H20v5.5l-1.96-1.96L5.41 20 4 18.59 16.46 7.04 14.5 4zm2.33 10.91-1.41 1.41 3.54 3.54 1.41-1.41-3.54-3.54zm-5.09-5.09-1.41 1.41 8.49 8.49 1.41-1.41-8.49-8.49z"
-                />
-              </svg>
+            <button type="button" class="ctrl-btn" title="播放列表" @click="openPlaylist">
+              ☰
             </button>
             <button type="button" class="ctrl-btn" title="上一首" @click="prevTrack">
               ⏮
@@ -219,7 +169,7 @@ const seasonHint = seasonPhaseLabel(getSeasonPhase())
               type="button"
               class="ctrl-btn ctrl-main"
               :title="isPlaying ? '暂停' : '播放'"
-              @click="togglePlayPause"
+              @click="onUserPlayPause"
             >
               {{ isPlaying ? '⏸' : '▶' }}
             </button>
@@ -234,10 +184,12 @@ const seasonHint = seasonPhaseLabel(getSeasonPhase())
             </button>
           </div>
 
-          <p v-if="loadError" class="music-err">{{ loadError }}</p>
+          <p v-if="loadError" class="blog-alert blog-alert--error music-err" role="alert">
+            <span class="blog-alert__icon" aria-hidden="true">!</span>
+            <span>{{ loadError }}</span>
+          </p>
           <p v-else-if="isQqTrack" class="music-tip">
-            由 QQ 音乐官方播放器提供，请在上方组件内点击播放；可在
-            <code>src/data/musicTracks.ts</code> 修改 <code>qqSongId</code> 与歌名
+            由 QQ 音乐官方播放器提供；登录后可通过 Kohaku 发送分享链接添加曲目
           </p>
           <p v-else class="music-tip">
             将 mp3 放入 <code>public/music/</code> 后重启
@@ -267,6 +219,14 @@ const seasonHint = seasonPhaseLabel(getSeasonPhase())
       </span>
     </button>
 
+    <MusicPlaylistDrawer
+      :open="playlistOpen"
+      :tracks="playlistTracks"
+      :current-track-id="currentTrack?.id"
+      @close="playlistOpen = false"
+      @select="onSelectPlaylist"
+      @delete="onDeletePlaylist"
+    />
   </div>
 </template>
 
@@ -747,42 +707,26 @@ const seasonHint = seasonPhaseLabel(getSeasonPhase())
   background: #a78bfa;
 }
 
+.progress-bar--read {
+  height: 6px;
+  appearance: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+  cursor: default;
+}
+
+.progress-bar-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #7c3aed, #a78bfa);
+  transition: width 0.35s linear;
+}
+
 .time-text {
   font-size: 0.78rem;
   color: rgba(220, 215, 255, 0.7);
   font-variant-numeric: tabular-nums;
-}
-
-.particle-theme-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-bottom: 0.85rem;
-}
-
-.particle-theme-label {
-  font-size: 0.75rem;
-  color: rgba(210, 205, 255, 0.65);
-  margin-right: 0.15rem;
-}
-
-.theme-chip {
-  padding: 0.25rem 0.65rem;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(230, 225, 255, 0.85);
-  font-size: 0.72rem;
-  cursor: pointer;
-  transition: background 0.2s, border-color 0.2s;
-}
-
-.theme-chip.active {
-  background: rgba(167, 139, 250, 0.35);
-  border-color: rgba(196, 181, 253, 0.55);
-  color: #fff;
 }
 
 .controls {
@@ -856,8 +800,8 @@ const seasonHint = seasonPhaseLabel(getSeasonPhase())
 
 .music-err {
   margin: 0.75rem 0 0;
+  align-items: center;
   font-size: 0.8rem;
-  color: #fca5a5;
 }
 
 .music-tip {

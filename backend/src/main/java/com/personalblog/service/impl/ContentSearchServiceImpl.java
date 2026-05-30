@@ -1,6 +1,7 @@
 package com.personalblog.service.impl;
 
 import com.personalblog.common.ContentStatus;
+import com.personalblog.config.AgentReplyProperties;
 import com.personalblog.dto.LifeDto;
 import com.personalblog.dto.NoteDto;
 import com.personalblog.dto.SearchResultDto;
@@ -11,6 +12,7 @@ import com.personalblog.mapper.LifeMapper;
 import com.personalblog.mapper.NoteMapper;
 import com.personalblog.security.AdminGuard;
 import com.personalblog.service.ContentSearchService;
+import com.personalblog.util.AgentReplySupport;
 import com.personalblog.util.JsonUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,6 +27,7 @@ public class ContentSearchServiceImpl implements ContentSearchService {
     private final LifeMapper lifeMapper;
     private final ContentViewCache contentViewCache;
     private final AdminGuard adminGuard;
+    private final AgentReplyProperties agentReplyProperties;
 
     @Override
     public SearchResultDto search(String keyword, int limit) {
@@ -76,6 +79,7 @@ public class ContentSearchServiceImpl implements ContentSearchService {
         dto.setViewCount(contentViewCache.getDisplayCount("note", entity.getId(), entity.getViewCount()));
         dto.setPinned(entity.isPinned());
         dto.setStatus(entity.getStatus() != null ? entity.getStatus() : ContentStatus.PUBLISHED);
+        dto.setAgentReply(AgentReplySupport.presentForNote(agentReplyProperties, entity.getAgentReply()));
         return dto;
     }
 
@@ -91,6 +95,7 @@ public class ContentSearchServiceImpl implements ContentSearchService {
         dto.setViewCount(contentViewCache.getDisplayCount("life", entity.getId(), entity.getViewCount()));
         dto.setPinned(entity.isPinned());
         dto.setStatus(entity.getStatus() != null ? entity.getStatus() : ContentStatus.PUBLISHED);
+        dto.setAgentReply(AgentReplySupport.presentForLife(agentReplyProperties, entity.getAgentReply()));
         return dto;
     }
 

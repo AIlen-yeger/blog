@@ -21,6 +21,8 @@ public enum ErrorCode {
     /** 登录时邮箱未注册，前端据此进入验证码注册页 */
     ACCOUNT_NOT_REGISTERED(40403, "该邮箱未注册，请完成验证码注册"),
     EMAIL_ALREADY_REGISTERED(40901, "该邮箱已注册"),
+    MUSIC_TRACK_EXISTS(40902, "该歌曲已在播放列表中"),
+    INVALID_QQ_MUSIC_URL(40007, "无法从链接解析 QQ 音乐歌曲 ID"),
     CODE_SEND_TOO_FREQUENT(42901, "验证码发送过于频繁，请稍后再试"),
     CODE_DAILY_LIMIT(42902, "今日验证码发送次数已达上限，请明日再试"),
     MAIL_SEND_FAILED(50001, "验证码邮件发送失败，请稍后重试"),

@@ -6,6 +6,8 @@ from typing import Any
 import redis
 from redis import ConnectionPool
 
+from config.config import AgentConfig
+
 logger = logging.getLogger(__name__)
 
 
@@ -35,11 +37,9 @@ class RedisChatCache:
         list_key_template: str,
         ttl_sec: int,
         max_cache_msgs: int,
-        host: str | None = None,
-        port: int | None = None,
-        db: int | None = None,
-        password: str | None = None,
+        config: AgentConfig | None = None,
     ):
+        cfg = config or AgentConfig()
         self.list_key_template = list_key_template
         self.ttl_sec = ttl_sec
         self.max_cache_msgs = max(2, max_cache_msgs)
@@ -51,10 +51,10 @@ class RedisChatCache:
 
         try:
             pool = ConnectionPool(
-                host=host or os.getenv("REDIS_HOST"),
-                port=int(port or os.getenv("REDIS_PORT")),
-                db=int(db if db is not None else os.getenv("REDIS_DB")),
-                password=password or os.getenv("REDIS_PASSWORD") or None,
+                host=cfg.redis_host,
+                port=cfg.redis_port,
+                db=cfg.redis_db,
+                password=cfg.redis_password or None,
                 decode_responses=True,
             )
             client = redis.Redis(connection_pool=pool)

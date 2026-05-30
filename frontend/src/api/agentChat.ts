@@ -1,4 +1,5 @@
-import { getApiBase } from '@/api/http'
+import { ApiError, getApiBase } from '@/api/http'
+import { toUserErrorMessage } from '@/utils/userErrorMessage'
 import { getAuthToken, hasValidSession } from '@/composables/useSession'
 import { buildAgentChatPayload } from '@/utils/agentPayload'
 
@@ -132,7 +133,9 @@ export async function streamAgentChat(
     } catch {
       /* keep raw */
     }
-    throw new Error(errText || `助手请求失败 HTTP ${res.status}`)
+    throw new Error(
+      toUserErrorMessage(errText || new ApiError(res.status, ''), '助手暂时不可用，请稍后再试'),
+    )
   }
 
   const ctype = res.headers.get('content-type') ?? ''

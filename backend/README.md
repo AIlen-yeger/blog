@@ -69,7 +69,7 @@ API 基址：`http://localhost:8080/v1`
 | 配置 | 说明 |
 |------|------|
 | `QQ_SMTP_AUTH_CODE` | QQ 邮箱 **授权码**（设置 → 账户 → POP3/SMTP 服务） |
-| `spring.mail.username` / `app.mail.from` | 发件 QQ 邮箱，如 `2762548283@qq.com` |
+| `spring.mail.username` / `app.mail.from` | 发件 QQ 邮箱，如 `你的QQ号@qq.com` |
 | `app.mail.enabled` | `false` 时仅写 Redis + 日志 |
 | `app.dev.fixed-verification-code` | 非空时固定验证码、不发邮件 |
 

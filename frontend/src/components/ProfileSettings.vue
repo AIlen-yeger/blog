@@ -4,6 +4,7 @@ import type { ProfileData } from '@/data/mockContent'
 import { uploadProfileAvatar } from '@/api/blog'
 import { useMockApi } from '@/api/http'
 import AvatarImage from './AvatarImage.vue'
+import AgentReplySettingsPanel from './AgentReplySettingsPanel.vue'
 
 const props = defineProps<{
   profile: ProfileData
@@ -163,6 +164,8 @@ onUnmounted(() => {
         v-model="focusText"
         placeholder="Vue / TypeScript、工程化、读书笔记"
       />
+
+      <AgentReplySettingsPanel />
 
       <div class="actions">
         <button type="button" class="btn ghost" :disabled="saving" @click="emit('cancel')">

@@ -45,3 +45,24 @@ export function clearMusicPlayback() {
     /* ignore */
   }
 }
+
+/** 仅更新当前曲目（着陆页 QQ 播放器 / 切歌时调用） */
+export function saveCurrentTrackId(trackId: string) {
+  const prev = loadMusicPlayback()
+  saveMusicPlayback({
+    trackId,
+    currentTime: prev?.currentTime ?? 0,
+    wasPlaying: prev?.wasPlaying ?? false,
+    musicMode: prev?.musicMode ?? false,
+    playOrder: prev?.playOrder ?? 'sequential',
+    updatedAt: Date.now(),
+  })
+}
+
+export function findTrackIndexById<T extends { id: string }>(
+  tracks: T[],
+  trackId: string | null | undefined,
+): number {
+  if (!trackId || tracks.length === 0) return -1
+  return tracks.findIndex((t) => t.id === trackId)
+}

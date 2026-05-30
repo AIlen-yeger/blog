@@ -1,10 +1,38 @@
+import logging
+import os
+from contextlib import asynccontextmanager
+from pathlib import Path
+
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from route.app import router
+from utils.agent_log_scheduler import start_agent_log_prune_scheduler
+from utils.bug_agent_scheduler import start_bug_agent_scheduler
+from utils.trace_log import setup_agent_logging
 
-app = FastAPI(title="Blog Agent", version="0.1.0")
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(Path(__file__).resolve().parent / ".env")
+except ImportError:
+    logging.getLogger(__name__).warning(
+        "未安装 python-dotenv，跳过 .env 加载。请执行: pip install python-dotenv"
+    )
+
+setup_agent_logging("log/agent.log")
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    start_agent_log_prune_scheduler()
+    start_bug_agent_scheduler()
+    yield
+
+
+app = FastAPI(title="Blog Agent", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -23,5 +51,13 @@ def health():
 
 
 if __name__ == "__main__":
-    # 仅监听本机，由 Spring Boot 内网转发，勿暴露公网
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    # 热重载会在请求中途重启进程，导致对话卡住；需要时设 AGENT_RELOAD=true
+    use_reload = os.getenv("AGENT_RELOAD", "false").lower() == "true"
+    uvicorn.run(
+        "main:app",
+        host="127.0.0.1",
+        port=8000,
+        reload=use_reload,
+        http="httptools",
+        ws="websockets",
+    )

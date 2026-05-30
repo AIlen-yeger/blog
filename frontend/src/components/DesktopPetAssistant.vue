@@ -275,9 +275,12 @@ function onSpriteError(e: Event) {
 }
 
 .pet-assistant__speech {
-  --qq-bg: #ffffff;
-  --qq-border: #c5dcf0;
-  --qq-accent: #4a90c8;
+  --qq-bg: rgba(22, 38, 68, 0.82);
+  --qq-bg-solid: rgba(24, 42, 72, 0.94);
+  --qq-border: rgba(140, 190, 255, 0.28);
+  --qq-accent: #8ec8ff;
+  --qq-text: rgba(232, 244, 255, 0.94);
+  --qq-text-muted: rgba(186, 210, 240, 0.72);
   position: absolute;
   left: 50%;
   bottom: calc(100% + 0.35rem);
@@ -288,10 +291,13 @@ function onSpriteError(e: Event) {
   padding: 0.5rem 0.62rem 0.48rem;
   background: var(--qq-bg);
   border: 1px solid var(--qq-border);
-  border-radius: 4px 14px 14px 14px;
+  border-radius: 6px 16px 16px 16px;
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  backdrop-filter: blur(14px) saturate(1.15);
   box-shadow:
-    0 2px 8px rgba(15, 40, 70, 0.12),
-    0 6px 18px rgba(15, 40, 70, 0.08);
+    0 4px 18px rgba(0, 0, 0, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+    0 8px 32px rgba(40, 90, 160, 0.12);
   cursor: default;
   transition:
     max-width 0.32s ease,
@@ -314,11 +320,11 @@ function onSpriteError(e: Event) {
   left: 22px;
   width: 12px;
   height: 12px;
-  background: var(--qq-bg);
+  background: var(--qq-bg-solid);
   border-right: 1px solid var(--qq-border);
   border-bottom: 1px solid var(--qq-border);
   transform: rotate(45deg);
-  box-shadow: 3px 3px 4px rgba(15, 40, 70, 0.06);
+  box-shadow: 3px 3px 6px rgba(0, 0, 0, 0.18);
   pointer-events: none;
 }
 
@@ -329,13 +335,14 @@ function onSpriteError(e: Event) {
   gap: 0.35rem;
   margin-bottom: 0.2rem;
   padding-bottom: 0.15rem;
-  border-bottom: 1px solid #e8f2fa;
+  border-bottom: 1px solid rgba(140, 190, 255, 0.16);
 }
 
 .pet-assistant__name {
   font-size: 0.7rem;
   font-weight: 700;
   color: var(--qq-accent);
+  letter-spacing: 0.04em;
 }
 
 .pet-assistant__history-btn {
@@ -345,15 +352,17 @@ function onSpriteError(e: Event) {
   width: 1.3rem;
   height: 1.3rem;
   padding: 0;
-  border: none;
-  border-radius: 4px;
-  background: #eef6fc;
-  color: #5a8eb8;
+  border: 1px solid rgba(140, 190, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--qq-accent);
   cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .pet-assistant__history-btn:hover {
-  background: #dceaf6;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(140, 190, 255, 0.35);
 }
 
 .pet-assistant__history-chevron {
@@ -373,9 +382,9 @@ function onSpriteError(e: Event) {
   overflow-y: auto;
   margin-bottom: 0.35rem;
   padding: 0.35rem 0.4rem;
-  border-radius: 6px;
-  background: #f3f8fc;
-  border: 1px solid #dceaf6;
+  border-radius: 8px;
+  background: rgba(8, 16, 32, 0.35);
+  border: 1px solid rgba(140, 190, 255, 0.14);
   font-size: 0.72rem;
 }
 
@@ -396,13 +405,13 @@ function onSpriteError(e: Event) {
 }
 
 .pet-assistant__history-item.user .pet-assistant__history-role {
-  color: #7a92a8;
+  color: rgba(160, 190, 220, 0.85);
 }
 
 .pet-assistant__history-text {
   margin: 0.08rem 0 0;
   line-height: 1.45;
-  color: #334a5e;
+  color: var(--qq-text-muted);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -416,7 +425,7 @@ function onSpriteError(e: Event) {
   margin: 0;
   font-size: 0.8rem;
   line-height: 1.52;
-  color: #1f2d3a;
+  color: var(--qq-text);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -435,18 +444,23 @@ function onSpriteError(e: Event) {
 .pet-assistant__error {
   margin: 0.3rem 0 0;
   font-size: 0.68rem;
-  color: #c45a5a;
+  color: #f0a0a0;
 }
 
 .pet-assistant__login-btn {
   margin-left: 0.35rem;
   padding: 0.12rem 0.45rem;
-  border: 1px solid #c5dcf0;
-  border-radius: 4px;
-  background: #eef6fc;
-  color: #4a90c8;
+  border: 1px solid rgba(140, 190, 255, 0.28);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--qq-accent);
   font-size: 0.68rem;
   cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.pet-assistant__login-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .pet-assistant__error-dismiss {
@@ -470,19 +484,24 @@ function onSpriteError(e: Event) {
   min-width: 0;
   padding: 0.34rem 0.52rem;
   font-size: 0.75rem;
-  border: 1px solid #c5dcf0;
-  border-radius: 4px;
-  background: #f8fbfe;
-  color: #1f2d3a;
+  border: 1px solid rgba(140, 190, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(8, 16, 32, 0.42);
+  color: var(--qq-text);
   outline: none;
   cursor: text;
   user-select: text;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pet-assistant__input::placeholder {
+  color: rgba(160, 190, 220, 0.5);
 }
 
 .pet-assistant__input:focus {
-  border-color: var(--qq-accent);
-  background: #fff;
-  box-shadow: 0 0 0 2px rgba(74, 144, 200, 0.18);
+  border-color: rgba(140, 200, 255, 0.45);
+  background: rgba(8, 16, 32, 0.55);
+  box-shadow: 0 0 0 2px rgba(100, 170, 255, 0.15);
 }
 
 .pet-assistant__send {
@@ -490,13 +509,23 @@ function onSpriteError(e: Event) {
   width: 1.7rem;
   height: 1.7rem;
   padding: 0;
-  border: none;
-  border-radius: 4px;
-  background: linear-gradient(180deg, #6eb0e0, #4a90c8);
+  border: 1px solid rgba(140, 200, 255, 0.35);
+  border-radius: 8px;
+  background: linear-gradient(165deg, rgba(100, 170, 240, 0.95), rgba(60, 120, 200, 0.92));
   color: #fff;
   font-size: 0.82rem;
   line-height: 1;
   cursor: pointer;
+  box-shadow: 0 2px 8px rgba(40, 100, 180, 0.35);
+  transition: filter 0.2s ease, transform 0.15s ease;
+}
+
+.pet-assistant__send:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.pet-assistant__send:active:not(:disabled) {
+  transform: scale(0.96);
 }
 
 .pet-assistant__send:disabled {
@@ -505,7 +534,9 @@ function onSpriteError(e: Event) {
 }
 
 .pet-assistant__send--stop {
-  background: linear-gradient(180deg, #e09090, #c86868);
+  background: linear-gradient(165deg, rgba(230, 120, 120, 0.95), rgba(190, 70, 70, 0.92));
+  border-color: rgba(255, 160, 160, 0.35);
+  box-shadow: 0 2px 8px rgba(160, 50, 50, 0.3);
   font-size: 0.52rem;
 }
 

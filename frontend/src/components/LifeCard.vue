@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import type { LifeItem } from '@/data/mockContent'
 import CardActionMenu from './CardActionMenu.vue'
 import ContentImageGallery from './ContentImageGallery.vue'
 import ContentReaderModal from './ContentReaderModal.vue'
+import AgentReplyBlock from './AgentReplyBlock.vue'
+import { useAgentReplySettings } from '@/composables/useAgentReplySettings'
 
 const props = withDefaults(
   defineProps<{
@@ -20,21 +22,12 @@ const emit = defineEmits<{
 }>()
 
 const readerOpen = ref(false)
-const displayViewCount = ref(props.item.viewCount ?? 0)
+const { shouldShowReply } = useAgentReplySettings()
 
-watch(
-  () => props.item.viewCount,
-  (v) => {
-    if (v != null) displayViewCount.value = v
-  },
-)
+const showAgentReply = computed(() => shouldShowReply('life', props.item.agentReply))
 
 function openReader() {
   readerOpen.value = true
-}
-
-function onViewCount(n: number) {
-  displayViewCount.value = n
 }
 
 function onEdit() {
@@ -72,11 +65,16 @@ function onPin() {
       </div>
       <h3 class="card-title" :class="{ 'is-pinned': item.pinned }">{{ item.title }}</h3>
       <p class="excerpt">{{ item.excerpt }}</p>
+      <AgentReplyBlock
+        v-if="showAgentReply && item.agentReply"
+        kind="life"
+        mode="preview"
+        :reply="item.agentReply"
+      />
       <ContentImageGallery v-if="item.images?.length" :images="item.images" compact />
       <div class="meta">
         <time :datetime="item.date">{{ item.date }}</time>
         <div class="meta-right">
-          <span class="view-count">{{ displayViewCount }} 次浏览</span>
           <button type="button" class="read-btn" @click="openReader">阅读全文</button>
         </div>
       </div>
@@ -87,7 +85,6 @@ function onPin() {
       kind="life"
       :item="item"
       @close="readerOpen = false"
-      @view-count="onViewCount"
     />
   </article>
 </template>
@@ -167,12 +164,7 @@ function onPin() {
 .meta-right {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
   flex-shrink: 0;
-}
-.view-count {
-  font-size: 0.75rem;
-  color: #8b8b9e;
 }
 time {
   font-size: 0.78rem;

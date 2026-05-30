@@ -13,6 +13,7 @@ import { useSectionScroll } from '@/composables/useSectionScroll'
 import { useBlogStore } from '@/composables/useBlogStore'
 import { useSession } from '@/composables/useSession'
 import type { LifeItem, NoteItem, ProfileData } from '@/data/mockContent'
+import { toUserErrorMessage } from '@/utils/userErrorMessage'
 
 defineProps<{
   guestMode?: boolean
@@ -21,6 +22,7 @@ defineProps<{
 const emit = defineEmits<{
   requestLogin: []
   leaveGuest: []
+  returnLanding: []
 }>()
 
 const mainRef = ref<HTMLElement | null>(null)
@@ -96,8 +98,7 @@ async function onPinNote(id: string) {
   try {
     await pinNote(id)
   } catch (e) {
-    const msg = e instanceof Error ? e.message : '置顶失败'
-    window.alert(msg.includes('pinned') ? '置顶失败：请确认数据库已执行 migration-note-pinned.sql' : msg)
+    window.alert(toUserErrorMessage(e, '置顶失败，请稍后重试'))
   }
 }
 
@@ -105,8 +106,7 @@ async function onPinLife(id: string) {
   try {
     await pinLife(id)
   } catch (e) {
-    const msg = e instanceof Error ? e.message : '置顶失败'
-    window.alert(msg.includes('pinned') ? '置顶失败：请确认数据库已执行 migration-life-pinned.sql' : msg)
+    window.alert(toUserErrorMessage(e, '置顶失败，请稍后重试'))
   }
 }
 
@@ -144,12 +144,28 @@ async function onSaveProfile(data: ProfileData) {
       @publish="openNoteEditor(null)"
       @request-login="emit('requestLogin')"
       @leave-guest="emit('leaveGuest')"
+      @return-landing="emit('returnLanding')"
     />
 
     <main ref="mainRef" class="main-scroll">
-      <p v-if="loading" class="load-hint">正在从服务器加载内容…</p>
-      <p v-else-if="loadError" class="load-err" role="alert">{{ loadError }}</p>
-      <p v-if="!isAdmin" class="readonly-banner">当前为浏览模式，仅管理员可发布与编辑内容</p>
+      <p v-if="loading" class="blog-alert blog-alert--loading" role="status">
+        <span class="blog-alert__dot" aria-hidden="true" />
+        正在从服务器加载内容…
+      </p>
+      <div v-else-if="loadError" class="blog-alert blog-alert--error" role="alert">
+        <span class="blog-alert__icon" aria-hidden="true">!</span>
+        <div class="blog-alert__content">
+          <strong class="blog-alert__title">无法加载内容</strong>
+          <p class="blog-alert__text">{{ loadError }}</p>
+        </div>
+        <button type="button" class="blog-alert__retry" @click="void ensureLoaded()">
+          重试
+        </button>
+      </div>
+      <p v-if="!isAdmin" class="blog-alert blog-alert--info" role="status">
+        <span class="blog-alert__icon" aria-hidden="true">i</span>
+        <span>当前为浏览模式，仅管理员可发布与编辑内容</span>
+      </p>
 
       <BlogDiscoverBar
         :tags="tagCloud"
@@ -327,20 +343,6 @@ async function onSaveProfile(data: ProfileData) {
   scroll-behavior: smooth;
 }
 
-.load-hint {
-  margin: 0 0 1rem;
-  font-size: 0.88rem;
-  color: var(--color-text-muted);
-}
-.load-err {
-  margin: 0 0 1rem;
-  padding: 0.55rem 0.85rem;
-  border-radius: 12px;
-  background: #fdecea;
-  color: #a63d32;
-  font-size: 0.88rem;
-}
-
 .search-hint {
   margin: 0 0 0.85rem;
   font-size: 0.84rem;
@@ -348,17 +350,6 @@ async function onSaveProfile(data: ProfileData) {
 }
 .search-results {
   margin-bottom: 1.5rem;
-}
-
-.readonly-banner {
-  margin: 0 0 1rem;
-  padding: 0.55rem 0.85rem;
-  border-radius: 12px;
-  background: rgba(59, 130, 246, 0.12);
-  border: 1px solid rgba(59, 130, 246, 0.2);
-  color: var(--color-text-muted);
-  font-size: 0.86rem;
-  line-height: 1.45;
 }
 
 .link-btn {

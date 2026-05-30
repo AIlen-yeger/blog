@@ -14,6 +14,19 @@ import {
   startMusicLevelMeter,
   stopMusicLevelMeter,
 } from '@/composables/useMusicAnalyser'
+import { loadBlogMusicTracks, MUSIC_TRACKS_CHANGED } from '@/composables/useUserMusicTracks'
+import { MUSIC_PLAY_COUNT_UPDATED, MIN_EFFECTIVE_PLAY_SECONDS, recordTrackPlay } from '@/composables/useMusicPlayRecord'
+import {
+  globalQqNext,
+  globalQqPrev,
+  hydrateGlobalQqFromStorage,
+  markQqPlaying,
+  applyQqTeleportSlot,
+  prepareBlogHandoff,
+  setGlobalQqTracks,
+  setQqTeleportSlot,
+  useGlobalQqPlayer,
+} from '@/composables/useGlobalQqPlayer'
 import {
   clearMusicPlayback,
   loadMusicPlayback,
@@ -28,15 +41,24 @@ function formatTime(sec: number): string {
 }
 
 async function fetchMusicTracks(): Promise<MusicTrack[]> {
+  let mp3Tracks: MusicTrack[] = []
   try {
     const res = await fetch(`/music/manifest.json?t=${Date.now()}`)
-    if (!res.ok) return mergeMusicTracks([])
-    const data: unknown = await res.json()
-    if (!Array.isArray(data) || data.length === 0) return mergeMusicTracks([])
-    return mergeMusicTracks(data as MusicTrack[])
+    if (res.ok) {
+      const data: unknown = await res.json()
+      if (Array.isArray(data)) {
+        mp3Tracks = (data as MusicTrack[]).filter((t) => !isQqMusicTrack(t))
+      }
+    }
   } catch {
-    return mergeMusicTracks([])
+    /* 无 manifest 时仍尝试 API 曲目 */
   }
+
+  const qqFromApi = await loadBlogMusicTracks()
+  if (qqFromApi.length > 0) {
+    return [...mp3Tracks, ...qqFromApi]
+  }
+  return mergeMusicTracks(mp3Tracks)
 }
 
 function waitCanPlay(a: HTMLAudioElement): Promise<void> {
@@ -78,17 +100,31 @@ const playOrderMode = ref<PlayOrderMode>('sequential')
 const qqBackgroundActive = ref(false)
 /** 随机模式下「上一首」用的历史栈（存曲目下标） */
 const shuffleHistory = ref<number[]>([])
+/** 本地 mp3：当前曲目在本轮切歌后是否已计入有效播放 */
+const localPlayCountedForTrackId = ref<string | null>(null)
 
 let listenersBound = false
 let persistTimer: ReturnType<typeof setTimeout> | null = null
 let tracksInitPromise: Promise<void> | null = null
 
+export function invalidateMusicTracksCache() {
+  tracksLoaded.value = false
+  tracksInitPromise = null
+}
+
 const currentTrack = computed(() => tracks.value[trackIndex.value] ?? tracks.value[0])
 const isQqTrack = computed(() => isQqMusicTrack(currentTrack.value))
+const globalQqState = useGlobalQqPlayer()
+
 const embedPlaybackActive = computed(
   () => isQqTrack.value && (musicMode.value || qqBackgroundActive.value),
 )
-const visualPlaybackActive = computed(() => isPlaying.value || embedPlaybackActive.value)
+const visualPlaybackActive = computed(
+  () =>
+    isPlaying.value ||
+    embedPlaybackActive.value ||
+    (isQqTrack.value && globalQqState.qqPlaying.value),
+)
 const particleTheme = computed<ParticleTheme>(
   () => currentTrack.value?.particleTheme ?? defaultParticleTheme,
 )
@@ -99,19 +135,34 @@ const timeLabel = computed(
   () => `${formatTime(currentTime.value)} / ${formatTime(duration.value)}`,
 )
 
+function buildPlaybackSnapshot(): MusicPlaybackSnapshot | null {
+  const trackId = currentTrack.value?.id ?? loadedTrackId.value
+  if (!trackId) {
+    if (!isPlaying.value && currentTime.value <= 0 && !musicMode.value) return null
+    return null
+  }
+  return {
+    trackId,
+    currentTime: currentTime.value,
+    wasPlaying: isPlaying.value,
+    musicMode: musicMode.value,
+    playOrder: playOrderMode.value,
+    updatedAt: Date.now(),
+  }
+}
+
 function persistPlaybackSoon() {
   if (persistTimer) clearTimeout(persistTimer)
   persistTimer = setTimeout(() => {
     persistTimer = null
-    if (!loadedTrackId.value && !isPlaying.value && currentTime.value <= 0) return
-    saveMusicPlayback({
-      trackId: currentTrack.value?.id ?? loadedTrackId.value,
-      currentTime: currentTime.value,
-      wasPlaying: isPlaying.value,
-      musicMode: musicMode.value,
-      playOrder: playOrderMode.value,
-      updatedAt: Date.now(),
-    })
+    const snapshot = buildPlaybackSnapshot()
+    if (!snapshot) {
+      if (!isPlaying.value && currentTime.value <= 0 && !musicMode.value) {
+        clearMusicPlayback()
+      }
+      return
+    }
+    saveMusicPlayback(snapshot)
   }, 400)
 }
 
@@ -120,18 +171,14 @@ function persistPlaybackNow() {
     clearTimeout(persistTimer)
     persistTimer = null
   }
-  if (!loadedTrackId.value && !isPlaying.value && currentTime.value <= 0) {
-    clearMusicPlayback()
+  const snapshot = buildPlaybackSnapshot()
+  if (!snapshot) {
+    if (!isPlaying.value && currentTime.value <= 0 && !musicMode.value) {
+      clearMusicPlayback()
+    }
     return
   }
-  saveMusicPlayback({
-    trackId: currentTrack.value?.id ?? loadedTrackId.value,
-    currentTime: currentTime.value,
-    wasPlaying: isPlaying.value,
-    musicMode: musicMode.value,
-    playOrder: playOrderMode.value,
-    updatedAt: Date.now(),
-  })
+  saveMusicPlayback(snapshot)
 }
 
 function applySavedSnapshot() {
@@ -157,7 +204,16 @@ async function ensureTracksLoaded() {
       tracks.value = await fetchMusicTracks()
       tracksLoaded.value = true
       if (trackIndex.value >= tracks.value.length) trackIndex.value = 0
+      const qqList = tracks.value.filter((t) => isQqMusicTrack(t))
+      if (qqList.length > 0) {
+        hydrateGlobalQqFromStorage(qqList)
+      }
       applySavedSnapshot()
+      const saved = loadMusicPlayback()
+      if (saved?.wasPlaying && isQqMusicTrack(tracks.value[trackIndex.value])) {
+        qqBackgroundActive.value = true
+        markQqPlaying(true)
+      }
     })()
   }
   await tracksInitPromise
@@ -260,15 +316,18 @@ async function toggleMusicMode() {
 
   if (musicMode.value) {
     musicMode.value = false
-    if (isQqTrack.value) qqBackgroundActive.value = true
+    if (isQqTrack.value) {
+      qqBackgroundActive.value = true
+      setQqTeleportSlot('hidden')
+    }
     persistPlaybackSoon()
     return
   }
 
   musicMode.value = true
+  if (isQqTrack.value) setQqTeleportSlot('about')
   if (tracks.value.length === 0) {
-    loadError.value =
-      '没有可播放曲目：请在 public/music/ 放入 mp3，或在 musicTracks.ts 配置 qqSongId'
+    loadError.value = '暂无可播放的音乐'
     return
   }
   loadCurrent()
@@ -283,6 +342,7 @@ async function play() {
   if (isQqMusicTrack(track)) {
     musicMode.value = true
     qqBackgroundActive.value = true
+    setQqTeleportSlot(musicMode.value ? 'about' : 'hidden')
     loadCurrent()
     persistPlaybackSoon()
     return
@@ -299,9 +359,9 @@ async function play() {
     persistPlaybackSoon()
   } catch {
     if (a.error?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
-      loadError.value = `无法加载：${track.title}（检查 public/music/ 内是否有该文件）`
+      loadError.value = `无法加载「${track.title}」，请稍后再试`
     } else if (a.error) {
-      loadError.value = '音频加载失败，请确认文件名与 manifest 一致'
+      loadError.value = '音频加载失败，请稍后再试'
     } else {
       loadError.value = '请点击播放按钮继续播放'
     }
@@ -345,8 +405,20 @@ function stopAndReset() {
   shuffleHistory.value = []
 }
 
+function maybeCountLocalEffectivePlay() {
+  const track = currentTrack.value
+  const id = track?.id?.trim()
+  if (!id || isQqMusicTrack(track)) return
+  if (!isPlaying.value) return
+  if (currentTime.value < MIN_EFFECTIVE_PLAY_SECONDS) return
+  if (localPlayCountedForTrackId.value === id) return
+  localPlayCountedForTrackId.value = id
+  void recordTrackPlay(id)
+}
+
 function onTimeUpdate() {
   currentTime.value = audio.value?.currentTime ?? 0
+  maybeCountLocalEffectivePlay()
   persistPlaybackSoon()
 }
 
@@ -363,7 +435,7 @@ function onEnded() {
 
 function onAudioError() {
   const name = currentTrack.value?.title ?? '当前曲目'
-  loadError.value = `无法播放「${name}」，请确认文件在 public/music/ 且已重启 npm run dev`
+  loadError.value = `无法播放「${name}」，请稍后再试`
   isPlaying.value = false
   persistPlaybackSoon()
 }
@@ -407,8 +479,21 @@ function goToTrackIndex(index: number, auto = false) {
   if (tracks.value.length === 0) return
   trackIndex.value = ((index % tracks.value.length) + tracks.value.length) % tracks.value.length
   pendingSeek.value = 0
+  localPlayCountedForTrackId.value = null
   const next = tracks.value[trackIndex.value]
-  if (!isQqMusicTrack(next)) qqBackgroundActive.value = false
+  if (isQqMusicTrack(next)) {
+    const qqList = tracks.value.filter((t) => isQqMusicTrack(t))
+    const qi = qqList.findIndex((t) => t.id === next.id)
+    if (qi >= 0) {
+      const g = useGlobalQqPlayer()
+      g.trackIndex.value = qi
+    }
+    if (musicMode.value) setQqTeleportSlot('about')
+    else if (qqBackgroundActive.value) setQqTeleportSlot('hidden')
+  } else {
+    qqBackgroundActive.value = false
+    setQqTeleportSlot('landing')
+  }
   loadCurrent()
   if (auto || isPlaying.value) void play()
   else persistPlaybackSoon()
@@ -427,6 +512,13 @@ function togglePlayOrderMode() {
 
 function prevTrack() {
   if (tracks.value.length === 0) return
+  if (isQqTrack.value) {
+    globalQqPrev()
+    const g = useGlobalQqPlayer()
+    const idx = tracks.value.findIndex((t) => t.id === g.currentTrack.value?.id)
+    if (idx >= 0) goToTrackIndex(idx)
+    return
+  }
   if (playOrderMode.value === 'shuffle') {
     const prev = shuffleHistory.value.pop()
     if (prev === undefined) {
@@ -441,6 +533,13 @@ function prevTrack() {
 
 function nextTrack(auto = false) {
   if (tracks.value.length === 0) return
+  if (isQqTrack.value) {
+    globalQqNext()
+    const g = useGlobalQqPlayer()
+    const idx = tracks.value.findIndex((t) => t.id === g.currentTrack.value?.id)
+    if (idx >= 0) goToTrackIndex(idx, auto)
+    return
+  }
   if (playOrderMode.value === 'shuffle') {
     shuffleHistory.value.push(trackIndex.value)
     goToTrackIndex(pickRandomIndex(trackIndex.value), auto)
@@ -465,16 +564,96 @@ if (typeof window !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') persistPlaybackNow()
   })
+  window.addEventListener(MUSIC_TRACKS_CHANGED, () => {
+    invalidateMusicTracksCache()
+    void ensureTracksLoaded()
+  })
+  window.addEventListener(MUSIC_PLAY_COUNT_UPDATED, (ev) => {
+    const detail = (ev as CustomEvent<{ trackId: string; playCount: number }>).detail
+    if (!detail?.trackId) return
+    tracks.value = tracks.value.map((t) =>
+      t.id === detail.trackId ? { ...t, playCount: detail.playCount } : t,
+    )
+  })
 }
 
 watch(trackIndex, () => {
+  if (tracksLoaded.value) persistPlaybackSoon()
   if (musicMode.value && restoreDone.value) loadCurrent()
 })
 
+watch(musicMode, (open) => {
+  if (!isQqTrack.value) return
+  if (open) void applyQqTeleportSlot('about')
+  else if (qqBackgroundActive.value) void applyQqTeleportSlot('hidden')
+  else void applyQqTeleportSlot('landing')
+})
+
+/** 着陆页切歌后与全局播放列表同步（进入博客时沿用同一首） */
+export async function syncGlobalMusicTrackId(trackId: string) {
+  await ensureTracksLoaded()
+  const idx = tracks.value.findIndex((t) => t.id === trackId)
+  if (idx >= 0) trackIndex.value = idx
+  const qqList = tracks.value.filter((t) => isQqMusicTrack(t))
+  setGlobalQqTracks(qqList)
+  const qqIdx = qqList.findIndex((t) => t.id === trackId)
+  if (qqIdx >= 0) {
+    const g = useGlobalQqPlayer()
+    g.trackIndex.value = qqIdx
+  }
+  persistPlaybackSoon()
+}
+
+/** 着陆页滑入博客前：保存 QQ 播放进度并屏外续播 */
+export function selectTrackById(trackId: string) {
+  const idx = tracks.value.findIndex((t) => t.id === trackId)
+  if (idx >= 0) goToTrackIndex(idx)
+}
+
+export async function handoffLandingMusicToBlog() {
+  const g = useGlobalQqPlayer()
+  const saved = loadMusicPlayback()
+  const wasPlaying =
+    g.qqPlaying.value || !!saved?.wasPlaying || g.currentTime.value >= 1
+
+  prepareBlogHandoff()
+  qqBackgroundActive.value = !!g.songId.value
+
+  const globalTrack = g.currentTrack.value
+  if (globalTrack && g.tracks.value.length > 0) {
+    setGlobalQqTracks(g.tracks.value)
+    const inList = tracks.value.some((t) => t.id === globalTrack.id)
+    if (!inList) {
+      const mp3 = tracks.value.filter((t) => !isQqMusicTrack(t))
+      tracks.value = [...mp3, ...g.tracks.value]
+    }
+    selectTrackById(globalTrack.id)
+  }
+
+  await applyQqTeleportSlot('hidden')
+
+  if (wasPlaying && g.songId.value) {
+    musicMode.value = true
+    markQqPlaying(true)
+  }
+
+  void ensureTracksLoaded().then(async () => {
+    applySavedSnapshot()
+    if (wasPlaying || loadMusicPlayback()?.wasPlaying) {
+      musicMode.value = true
+      qqBackgroundActive.value = true
+      markQqPlaying(true)
+      await applyQqTeleportSlot('about')
+    }
+  })
+}
+
 export function useAboutMusic() {
   void ensureTracksLoaded()
+  const globalQq = useGlobalQqPlayer()
 
   return {
+    globalQq,
     musicMode,
     tracks,
     currentTrack,
@@ -499,6 +678,7 @@ export function useAboutMusic() {
     stopAndReset,
     prevTrack,
     nextTrack,
+    selectTrackById,
     onTimeUpdate,
     onLoadedMetadata,
     onEnded,

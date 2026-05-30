@@ -37,6 +37,18 @@
   --discover-bar-bg: rgba(255, 255, 255, 0.06);
   --discover-chip-bg: rgba(255, 255, 255, 0.08);
   --discover-chip-active: rgba(59, 130, 246, 0.35);
+
+  --blog-alert-radius: 16px;
+  --blog-alert-error-bg: rgba(220, 80, 70, 0.14);
+  --blog-alert-error-border: rgba(248, 130, 120, 0.28);
+  --blog-alert-error-text: #fecdd3;
+  --blog-alert-error-title: #ffe4e6;
+  --blog-alert-info-bg: rgba(59, 130, 246, 0.12);
+  --blog-alert-info-border: rgba(96, 165, 250, 0.26);
+  --blog-alert-info-text: rgba(219, 234, 254, 0.92);
+  --blog-alert-loading-bg: rgba(255, 255, 255, 0.05);
+  --blog-alert-loading-border: rgba(148, 163, 184, 0.2);
+  --blog-alert-loading-text: rgba(203, 213, 225, 0.88);
 }
 
 [data-theme='light'] {
@@ -66,4 +78,15 @@
   --discover-bar-bg: rgba(255, 255, 255, 0.85);
   --discover-chip-bg: #f1f5f9;
   --discover-chip-active: #dbeafe;
+
+  --blog-alert-error-bg: rgba(254, 226, 226, 0.95);
+  --blog-alert-error-border: rgba(248, 113, 113, 0.45);
+  --blog-alert-error-text: #991b1b;
+  --blog-alert-error-title: #7f1d1d;
+  --blog-alert-info-bg: rgba(219, 234, 254, 0.9);
+  --blog-alert-info-border: rgba(59, 130, 246, 0.35);
+  --blog-alert-info-text: #1e40af;
+  --blog-alert-loading-bg: rgba(241, 245, 249, 0.9);
+  --blog-alert-loading-border: rgba(148, 163, 184, 0.35);
+  --blog-alert-loading-text: #475569;
 }

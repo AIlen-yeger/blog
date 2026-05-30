@@ -23,3 +23,5 @@ python/.idea/
 python/.env
 python/.env.*
 !python/.env.example
+python/log/
+python/config/config.local.yml
