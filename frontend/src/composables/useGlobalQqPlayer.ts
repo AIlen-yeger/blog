@@ -116,6 +116,7 @@ export function hydrateGlobalQqFromStorage(list: MusicTrack[]) {
 }
 
 function resolveTeleportSelector(slot: QqTeleportSlot): string {
+  if (typeof document === 'undefined') return '#qq-music-offscreen'
   if (slot === 'landing' && document.querySelector('#landing-qq-slot')) {
     return '#landing-qq-slot'
   }
@@ -125,21 +126,30 @@ function resolveTeleportSelector(slot: QqTeleportSlot): string {
   return '#qq-music-offscreen'
 }
 
+/** 同步更新 Teleport 目标（卸载/切页时必须同步，避免 Vue patch 报错） */
+export function syncQqTeleportSlot(slot: QqTeleportSlot) {
+  teleportSlot.value = slot
+  qqTeleportTo.value = resolveTeleportSelector(slot)
+}
+
 /** 切换挂载点；DOM 未就绪时先挂到屏外，避免登录页卸载后播放器消失 */
 export async function applyQqTeleportSlot(slot: QqTeleportSlot) {
-  teleportSlot.value = slot
+  syncQqTeleportSlot(slot)
   await nextTick()
-  qqTeleportTo.value = resolveTeleportSelector(slot)
+  const resolved = resolveTeleportSelector(slot)
+  if (resolved !== qqTeleportTo.value) {
+    qqTeleportTo.value = resolved
+  }
   if (slot !== 'hidden' && qqTeleportTo.value === '#qq-music-offscreen') {
     await new Promise((r) => setTimeout(r, 80))
-    await nextTick()
     qqTeleportTo.value = resolveTeleportSelector(slot)
   }
   persistSoon()
 }
 
 export function setQqTeleportSlot(slot: QqTeleportSlot) {
-  void applyQqTeleportSlot(slot)
+  syncQqTeleportSlot(slot)
+  persistSoon()
 }
 
 export function markQqPlaying(playing = true) {
@@ -182,7 +192,7 @@ export function prepareBlogHandoff() {
     trackId: track.id,
     currentTime: currentTime.value,
     wasPlaying: qqPlaying.value,
-    musicMode: true,
+    musicMode: qqPlaying.value,
     updatedAt: Date.now(),
   })
 }

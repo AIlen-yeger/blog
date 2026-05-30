@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import QqMusicEmbed from '@/components/QqMusicEmbed.vue'
 import {
-  applyQqTeleportSlot,
   globalQqNext,
   qqTeleportTo,
   useGlobalQqPlayer,
@@ -34,20 +33,6 @@ const teleportTarget = computed(() => {
     }
   }
   return '#qq-music-offscreen'
-})
-
-watch(teleportSlot, () => {
-  if (!alive.value) return
-  void applyQqTeleportSlot(teleportSlot.value)
-})
-
-watch(songId, (id) => {
-  if (!alive.value) return
-  if (id) markQqPlaying(true)
-})
-
-onBeforeUnmount(() => {
-  alive.value = false
 })
 </script>
 

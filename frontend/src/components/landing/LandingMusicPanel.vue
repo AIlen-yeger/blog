@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
 import MusicPlaylistDrawer from '@/components/MusicPlaylistDrawer.vue'
 import QqMusicEmbed from '@/components/QqMusicEmbed.vue'
 import { syncGlobalMusicTrackId } from '@/composables/useAboutMusic'
@@ -11,6 +11,7 @@ import {
   hydrateGlobalQqFromStorage,
   markQqPlaying,
   setGlobalQqTracks,
+  syncQqTeleportSlot,
   useGlobalQqPlayer,
 } from '@/composables/useGlobalQqPlayer'
 import {
@@ -24,6 +25,7 @@ import { aboutMusicTracks, isQqMusicTrack } from '@/data/musicTracks'
 
 const landingSongId = import.meta.env.VITE_LANDING_QQ_SONG_ID as string | undefined
 const playlistOpen = ref(false)
+const panelAlive = ref(true)
 
 const landingTracks = computed(() => {
   const fromApi = landingMusicTracks.value.filter((t) => isQqMusicTrack(t))
@@ -60,7 +62,9 @@ function fallbackIndex() {
 }
 
 async function refreshTracks() {
+  if (!panelAlive.value) return
   await loadLandingMusicTracks()
+  if (!panelAlive.value) return
   const list = landingTracks.value
   setGlobalQqTracks(list)
   if (list.length > 0 && trackIndex.value >= list.length) {
@@ -71,7 +75,8 @@ async function refreshTracks() {
     const fb = fallbackIndex()
     if (fb > 0) trackIndex.value = fb
   }
-  await applyQqTeleportSlot('landing')
+  syncQqTeleportSlot('landing')
+  void applyQqTeleportSlot('landing')
 }
 
 onMounted(() => {
@@ -80,12 +85,15 @@ onMounted(() => {
   window.addEventListener('auth:logout', onTracksChanged)
 })
 
+onBeforeUnmount(() => {
+  panelAlive.value = false
+  playlistOpen.value = false
+  syncQqTeleportSlot('hidden')
+})
+
 onUnmounted(() => {
   window.removeEventListener(MUSIC_TRACKS_CHANGED, onTracksChanged)
   window.removeEventListener('auth:logout', onTracksChanged)
-  if (teleportSlot.value === 'landing') {
-    void applyQqTeleportSlot('hidden')
-  }
 })
 
 function onTracksChanged() {
@@ -93,9 +101,9 @@ function onTracksChanged() {
 }
 
 watch(landingTracks, (list) => {
+  if (!panelAlive.value) return
   setGlobalQqTracks(list)
   if (trackIndex.value >= list.length) trackIndex.value = 0
-  void applyQqTeleportSlot('landing')
 })
 
 const trackLabel = computed(() => {

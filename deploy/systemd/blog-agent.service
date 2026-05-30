@@ -1,0 +1,28 @@
+[Unit]
+Description=Personal Blog Python Agent (FastAPI)
+After=network.target blog-api.service
+Wants=blog-api.service
+
+[Service]
+Type=simple
+User=blog
+Group=blog
+WorkingDirectory=/opt/blog/app/python
+
+Environment=PYTHONUNBUFFERED=1
+Environment=AGENT_RELOAD=false
+
+ExecStart=/opt/blog/app/python/.venv/bin/uvicorn main:app \
+  --host 127.0.0.1 \
+  --port 8000 \
+  --http httptools \
+  --ws websockets
+
+Restart=on-failure
+RestartSec=5
+SuccessExitStatus=143
+
+ReadWritePaths=/opt/blog/app/python/log
+
+[Install]
+WantedBy=multi-user.target

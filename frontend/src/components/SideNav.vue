@@ -81,12 +81,12 @@ function handleLogout() {
         <button type="button" class="btn-logout btn-login" @click="emit('requestLogin')">
           登录
         </button>
-        <button type="button" class="btn-logout btn-leave" @click="goHome">
+        <button type="button" class="btn-logout btn-leave" @mousedown.prevent.stop="goHome">
           返回首页
         </button>
       </template>
       <template v-else-if="currentUser">
-        <button type="button" class="btn-logout btn-leave" @click="goHome">
+        <button type="button" class="btn-logout btn-leave" @mousedown.prevent.stop="goHome">
           返回首页
         </button>
         <button type="button" class="btn-logout" @click="handleLogout">

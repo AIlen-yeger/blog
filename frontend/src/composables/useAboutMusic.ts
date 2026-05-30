@@ -25,6 +25,7 @@ import {
   prepareBlogHandoff,
   setGlobalQqTracks,
   setQqTeleportSlot,
+  syncQqTeleportSlot,
   useGlobalQqPlayer,
 } from '@/composables/useGlobalQqPlayer'
 import {
@@ -123,7 +124,6 @@ const embedPlaybackActive = computed(
 const visualPlaybackActive = computed(
   () =>
     isPlaying.value ||
-    embedPlaybackActive.value ||
     (isQqTrack.value && globalQqState.qqPlaying.value),
 )
 const particleTheme = computed<ParticleTheme>(
@@ -182,7 +182,7 @@ function persistPlaybackNow() {
   saveMusicPlayback(snapshot)
 }
 
-function applySavedSnapshot() {
+function applySavedSnapshot(opts?: { restoreMusicUi?: boolean }) {
   const saved = loadMusicPlayback()
   if (!saved?.trackId || tracks.value.length === 0) return
 
@@ -190,7 +190,9 @@ function applySavedSnapshot() {
   if (idx < 0) return
 
   trackIndex.value = idx
-  musicMode.value = saved.musicMode
+  if (opts?.restoreMusicUi !== false) {
+    musicMode.value = saved.musicMode && saved.wasPlaying
+  }
   playOrderMode.value = saved.playOrder ?? 'sequential'
   shuffleHistory.value = []
   pendingSeek.value = saved.currentTime
@@ -212,7 +214,7 @@ async function ensureTracksLoaded() {
       applySavedSnapshot()
       const saved = loadMusicPlayback()
       if (saved?.wasPlaying && isQqMusicTrack(tracks.value[trackIndex.value])) {
-        qqBackgroundActive.value = true
+        qqBackgroundActive.value = !saved.musicMode
         markQqPlaying(true)
       }
     })()
@@ -401,6 +403,7 @@ function stopAndReset() {
   pendingSeek.value = 0
   pendingResume.value = false
   qqBackgroundActive.value = false
+  if (isQqTrack.value) markQqPlaying(false)
   clearMusicPlayback()
   stopMusicLevelMeter()
   shuffleHistory.value = []
@@ -613,12 +616,13 @@ export function selectTrackById(trackId: string) {
 
 export async function handoffLandingMusicToBlog() {
   const g = useGlobalQqPlayer()
-  const saved = loadMusicPlayback()
-  const wasPlaying =
-    g.qqPlaying.value || !!saved?.wasPlaying || g.currentTime.value >= 1
+  const activelyPlaying = g.qqPlaying.value
+
+  musicMode.value = false
+  qqBackgroundActive.value = false
 
   prepareBlogHandoff()
-  qqBackgroundActive.value = !!g.songId.value
+  syncQqTeleportSlot('hidden')
 
   const globalTrack = g.currentTrack.value
   if (globalTrack && g.tracks.value.length > 0) {
@@ -633,18 +637,27 @@ export async function handoffLandingMusicToBlog() {
 
   await applyQqTeleportSlot('hidden')
 
-  if (wasPlaying && g.songId.value) {
+  if (activelyPlaying && g.songId.value) {
     musicMode.value = true
+    qqBackgroundActive.value = true
     markQqPlaying(true)
+  } else {
+    markQqPlaying(false)
   }
 
   void ensureTracksLoaded().then(async () => {
-    applySavedSnapshot()
-    if (wasPlaying || loadMusicPlayback()?.wasPlaying) {
+    applySavedSnapshot({ restoreMusicUi: false })
+
+    if (activelyPlaying && g.songId.value) {
       musicMode.value = true
       qqBackgroundActive.value = true
       markQqPlaying(true)
       await applyQqTeleportSlot('about')
+    } else {
+      musicMode.value = false
+      qqBackgroundActive.value = false
+      markQqPlaying(false)
+      syncQqTeleportSlot('hidden')
     }
   })
 }
@@ -653,7 +666,7 @@ export async function handoffLandingMusicToBlog() {
 export function resetAboutMusicForLanding() {
   musicMode.value = false
   qqBackgroundActive.value = false
-  void applyQqTeleportSlot('landing')
+  syncQqTeleportSlot('landing')
 }
 
 export function useAboutMusic() {
