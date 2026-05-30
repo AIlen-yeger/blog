@@ -17,6 +17,7 @@ from server.agent import ChatModel
 from server.route_graph.music_route import run_music_react
 from server.state import AgentState
 from utils.path_tools import get_abs_path
+from utils.trace_log import record_model
 
 _DEFAULT_HISTORY_LIMIT = AgentConfig().history_limit
 
@@ -116,6 +117,8 @@ class AgentLangGraph:
 
         self.chat_model = ChatModel()
 
+        self.execute_model_name = cfg.execute_model_name
+
         self.execute_model = ChatOpenAI(
 
             model=cfg.execute_model_name,
@@ -167,6 +170,8 @@ class AgentLangGraph:
             HumanMessage(content=state.get("question") or ""),
 
         ]
+
+        record_model(self.execute_model_name)
 
         resp = self.execute_model.invoke(messages)
 

@@ -8,6 +8,7 @@ from langchain_openai import ChatOpenAI
 
 from server.prompt_skills import build_system_prompt
 from service.chat_history import ChatHistoryService
+from utils.trace_log import record_model
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,7 @@ class ChatModel:
 
     def chat(self, question: str, session_id: str, user_id: int, limit: int | None = None):
         """流式对话：逐 token 产出 SSE delta，结束后写入历史。"""
+        record_model(self.model)
         if limit is None:
             limit = AgentConfig().history_limit
         system_prompt = build_system_prompt()

@@ -285,10 +285,11 @@ sudo nginx -t && sudo systemctl reload nginx
 ## 10. NapCat（QQ 告警，可选）
 
 ```bash
-cd /opt/blog/app/python/docker/napcat
-# 编辑 docker-compose：ports 改为 "127.0.0.1:3000:3000" 仅本机
-docker compose up -d
-docker logs -f napcat   # 首次扫码登录
+cd /opt/blog/python/docker/napcat
+mkdir -p data/QQ data/config
+# 镜像使用 Docker Hub：mlikiowa/napcat-docker（ports 已绑 127.0.0.1）
+docker-compose up -d
+docker logs -f napcat   # 首次扫码登录；WebUI: http://127.0.0.1:6099/webui
 ```
 
 Bug Ops 手动巡检（需配置 `AGENT_OPS_TOKEN`）：

@@ -24,13 +24,17 @@ from utils.qq_music_tools import (
     parse_qq_share_with_meta,
     save_music_track,
 )
-from utils.trace_log import bind_trace, span, log_event, preview, redact_args, tool_result_status
+from utils.trace_log import bind_trace, span, log_event, preview, redact_args, record_model, tool_result_status
 
 _DEFAULT_HISTORY_LIMIT = AgentConfig().history_limit
 
 logger = logging.getLogger(__name__)
 
 MAX_REACT_ROUNDS = 6
+
+
+def _execute_model_name() -> str:
+    return AgentConfig().execute_model_name
 
 
 def _build_bound_model(tools: list):
@@ -85,13 +89,16 @@ def music_agent_node(state: AgentState, *, model, task_mode: str = "general") ->
         msgs = _build_initial_messages(state, task_mode=task_mode)
 
     round_no = _count_tool_rounds(msgs) + 1
-    with span("react.llm",round=round_no,message_count=len(msgs)):
+    model_name = _execute_model_name()
+    record_model(model_name)
+    with span("react.llm", round=round_no, message_count=len(msgs), model=model_name):
         ai_msg = model.invoke(msgs)
 
     tool_calls = getattr(ai_msg, "tool_calls", None) or []
     log_event(
         "react.llm.result",
         round=round_no,
+        model=model_name,
         has_tool_calls=bool(tool_calls),
         tool_names=[tc.get("name") for tc in tool_calls],
         content_preview=preview(str(ai_msg.content)),
@@ -205,7 +212,7 @@ def _add_fallback_reason(task_mode: str, messages: list, *, invoke_failed: bool)
 
 def run_music_add_direct(state: AgentState, *, reason: str = "unknown") -> dict:
     """加歌降级链路：解析链接 → 拉元数据 → 保存（ReAct 失败时自动触发）。"""
-    log_event("react.fallback", subgraph="music", reason=reason)
+    log_event("react.fallback", subgraph="music", reason=reason, model=_execute_model_name())
     question = (state.get("question") or "").strip()
     access_token = (state.get("access_token") or "").strip()
 
@@ -302,6 +309,7 @@ def run_music_add_direct(state: AgentState, *, reason: str = "unknown") -> dict:
             "react.done",
             subgraph="music",
             mode="add_fallback",
+            model=_execute_model_name(),
             song_id=song_id,
             title=title,
             artist=artist,
@@ -349,7 +357,7 @@ def run_music_react(state: AgentState) -> dict:
         except Exception:
             invoke_failed = True
             logger.exception("[music_react] invoke failed")
-            log_event("react.error", subgraph="music")
+            log_event("react.error", subgraph="music", model=_execute_model_name())
 
     fallback_reason = _add_fallback_reason(
         task_mode, messages, invoke_failed=invoke_failed
@@ -369,6 +377,7 @@ def run_music_react(state: AgentState) -> dict:
         "react.done",
         subgraph="music",
         rounds=rounds,
+        model=_execute_model_name(),
         final_preview=preview(final),
         message_count=len(messages),
         mode="react",

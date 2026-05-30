@@ -31,6 +31,9 @@ class AgentConfig:
         chat_config = ai_config.get("chat") or {}
         self.temperature = chat_config.get("temperature", 0.7)
         self.history_limit = int(chat_config.get("history_limit", 10))
+        self.chat_model_name = str(
+            _read_env("DP_MODEL", "dp-model", "deepseek-chat") or "deepseek-chat"
+        )
 
         mysql_config = config.get("mysql") or {}
         self.mysql_host = (mysql_config.get("host"))

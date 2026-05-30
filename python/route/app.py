@@ -1,9 +1,9 @@
 import json
 import logging
 import os
-from typing import Iterator
+from typing import Any, Iterator
 
-from fastapi import APIRouter, Body, Header
+from fastapi import APIRouter, Header, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
@@ -33,6 +33,61 @@ class ChatRequest(BaseModel):
     user_name: str = Field(default="", validation_alias=AliasChoices("user_name", "userName"))
     user_id: int = Field(default=0, validation_alias=AliasChoices("user_id", "userId"))
     access_token: str = Field(default="", validation_alias=AliasChoices("access_token", "accessToken"))
+
+
+def _pick_str(raw: dict[str, Any], *keys: str) -> str:
+    for key in keys:
+        value = raw.get(key)
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    return ""
+
+
+def _pick_int(raw: dict[str, Any], *keys: str, default: int = 0) -> int:
+    for key in keys:
+        value = raw.get(key)
+        if value is None or value == "":
+            continue
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            continue
+    return default
+
+
+def _parse_chat_request(raw: object) -> ChatRequest | JSONResponse:
+    if not isinstance(raw, dict):
+        logger.warning("[ai/chat] body is not object: %r", raw)
+        return JSONResponse(
+            status_code=422,
+            content={"code": 42200, "message": "请求体必须是 JSON 对象"},
+        )
+
+    limit = _pick_int(raw, "limit", default=_DEFAULT_HISTORY_LIMIT)
+    limit = max(1, min(50, limit))
+    question = _pick_str(raw, "question")
+    session_id = _pick_str(raw, "session_id", "sessionId")
+
+    if not question:
+        return JSONResponse(
+            status_code=422,
+            content={"code": 42200, "message": "question 不能为空"},
+        )
+    if not session_id:
+        return JSONResponse(
+            status_code=422,
+            content={"code": 42200, "message": "session_id 不能为空"},
+        )
+
+    return ChatRequest(
+        question=question,
+        session_id=session_id,
+        user_id=_pick_int(raw, "user_id", "userId"),
+        account=_pick_str(raw, "account"),
+        user_name=_pick_str(raw, "user_name", "userName"),
+        limit=limit,
+        access_token=_pick_str(raw, "access_token", "accessToken"),
+    )
 
 
 def _safe_chat_stream(body: ChatRequest, trace_id: str) -> Iterator[str]:
@@ -74,8 +129,28 @@ def ops_bug_scan(x_ops_token: str | None = Header(default=None, alias="X-Ops-Tok
 
 
 @router.post("/ai/chat")
-def llm_chat(body: ChatRequest = Body(...)):
+async def llm_chat(request: Request):
+    try:
+        raw = await request.json()
+    except Exception as exc:
+        logger.warning("[ai/chat] invalid json: %s", exc)
+        return JSONResponse(
+            status_code=422,
+            content={"code": 42200, "message": "JSON 格式错误"},
+        )
+
+    parsed = _parse_chat_request(raw)
+    if isinstance(parsed, JSONResponse):
+        return parsed
+    body = parsed
+
     trace_id = new_trace_id()
+    logger.info(
+        "[ai/chat] ok session_id=%s user_id=%s limit=%s",
+        body.session_id,
+        body.user_id,
+        body.limit,
+    )
     if not body.account or not body.user_name or not body.user_id:
         return JSONResponse(
             status_code=400,

@@ -36,6 +36,8 @@ _session_id: ContextVar[str] = ContextVar("session_id", default="-")
 
 _user_id: ContextVar[int] = ContextVar("user_id", default=0)
 
+_request_models: ContextVar[list[str] | None] = ContextVar("request_models", default=None)
+
 
 
 # 长留摘要：每请求关键结果 + 告警向事件（明细见 trace.jsonl）
@@ -121,6 +123,35 @@ def current_trace() -> dict[str, Any]:
         "user_id": _user_id.get(),
 
     }
+
+
+def reset_request_models() -> None:
+    """新请求开始时清空本次已调用模型列表。"""
+    _request_models.set([])
+
+
+def record_model(model_name: str) -> None:
+    """记录本次请求实际调用过的模型（去重、保序）。"""
+    name = (model_name or "").strip()
+    if not name:
+        return
+    models = _request_models.get()
+    if models is None:
+        models = []
+    if name not in models:
+        models.append(name)
+    _request_models.set(models)
+
+
+def request_model_fields() -> dict[str, Any]:
+    """供 summary 日志输出：model=最后一次调用，models_used=本次全部。"""
+    models = _request_models.get() or []
+    if not models:
+        return {}
+    fields: dict[str, Any] = {"models_used": models, "model": models[-1]}
+    if len(models) == 1:
+        return fields
+    return fields
 
 
 
@@ -405,11 +436,18 @@ def span(event: str, **fields: Any):
 
     t0 = time.perf_counter()
 
+    if event == "request":
+        reset_request_models()
+
     log_event(f"{event}.start", **fields)
 
     try:
 
         yield
+
+        end_fields = dict(fields)
+        if event == "request":
+            end_fields.update(request_model_fields())
 
         log_event(
 
@@ -417,7 +455,7 @@ def span(event: str, **fields: Any):
 
             latency_ms=int((time.perf_counter() - t0) * 1000),
 
-            **fields,
+            **end_fields,
 
         )
 

@@ -1,18 +1,21 @@
 # NapCat（OneBot v11）— QQ 协议桥，供 Bug Ops 告警与可选 qq-agent-mcp 使用
+# 镜像：Docker Hub mlikiowa/napcat-docker（docker.napcat.space 在大陆 ECS 常无法解析）
 # 首次启动后扫码登录：docker logs -f napcat
-# 文档参考：https://github.com/JulesLiu390/Amadeus-QQ-MCP
+# WebUI（可选）：http://127.0.0.1:6099/webui
+# 文档参考：https://github.com/NapNeko/NapCat-Docker
 
 services:
   napcat:
-    image: docker.napcat.space/napcat/napcat:latest
+    image: mlikiowa/napcat-docker:latest
     container_name: napcat
     restart: unless-stopped
     ports:
-      - "${NAPCAT_HTTP_PORT:-3000}:3000"
-      - "${NAPCAT_WS_PORT:-3001}:3001"
+      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:3001:3001"
+      - "127.0.0.1:6099:6099"
     volumes:
-      - ./data:/app/napcat
-      - ./config:/app/napcat/config
+      - ./data/QQ:/app/.config/QQ
+      - ./data/config:/app/napcat/config
     environment:
       - NAPCAT_UID=${NAPCAT_UID:-1000}
       - NAPCAT_GID=${NAPCAT_GID:-1000}

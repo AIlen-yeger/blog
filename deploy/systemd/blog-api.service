@@ -7,22 +7,21 @@ Wants=mysql.service redis.service
 Type=simple
 User=blog
 Group=blog
-WorkingDirectory=/opt/blog/app/backend
+WorkingDirectory=/opt/blog/backend
 
 EnvironmentFile=-/opt/blog/config/blog-api.env
 Environment=JAVA_OPTS=-Xms256m -Xmx512m
 
 ExecStart=/usr/bin/java \
   ${JAVA_OPTS} \
-  -jar /opt/blog/app/backend/target/personal-blog-api-1.0.0.jar \
+  -jar /opt/blog/backend/target/personal-blog-api-1.0.0.jar \
   --spring.config.additional-location=file:/opt/blog/config/application-prod.yml
 
 Restart=on-failure
 RestartSec=5
 SuccessExitStatus=143
 
-# 上传目录、日志
-ReadWritePaths=/opt/blog/data /opt/blog/app/backend
+ReadWritePaths=/opt/blog/data /opt/blog/backend
 
 [Install]
 WantedBy=multi-user.target

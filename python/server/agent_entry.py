@@ -11,7 +11,7 @@ from typing import Iterator
 
 from config.config import AgentConfig
 from server.application_graph import AgentLangGraph
-from utils.trace_log import bind_trace, span, log_event
+from utils.trace_log import bind_trace, span, log_event, record_model
 
 _DEFAULT_HISTORY_LIMIT = AgentConfig().history_limit
 from server.route_graph.music_route import run_music_react
@@ -76,7 +76,9 @@ class AgentEntry:
                 intent = "chat"
 
         bind_trace(intent=intent)
-        log_event("intent.classified", intent=intent)
+        execute_model = AgentConfig().execute_model_name
+        record_model(execute_model)
+        log_event("intent.classified", intent=intent, model=execute_model)
         yield _sse_line({"type": "meta", "intent": intent})
 
         if intent == "chat":
