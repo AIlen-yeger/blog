@@ -83,6 +83,9 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener(MUSIC_TRACKS_CHANGED, onTracksChanged)
   window.removeEventListener('auth:logout', onTracksChanged)
+  if (teleportSlot.value === 'landing') {
+    void applyQqTeleportSlot('hidden')
+  }
 })
 
 function onTracksChanged() {

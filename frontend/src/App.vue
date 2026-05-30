@@ -17,6 +17,7 @@ import { clearMusicPlayback } from '@/utils/musicPlaybackStorage'
 import QqMusicPersistentHost from '@/components/QqMusicPersistentHost.vue'
 import { handoffLandingMusicToBlog } from '@/composables/useAboutMusic'
 import { applyQqTeleportSlot, useGlobalQqPlayer } from '@/composables/useGlobalQqPlayer'
+import { goHome } from '@/utils/goHome'
 
 const { gradientStyle } = useGradient()
 const loggedIn = ref(initSessionFromStorage())
@@ -57,13 +58,19 @@ function openLogin() {
 }
 
 function startBlogEnter(onComplete: () => void) {
-  void handoffLandingMusicToBlog()
   enteringBlog.value = true
   animating.value = true
   pendingBlog.value = true
-  void reloadBlogData().catch(() => {
-    /* 错误由 BlogLayout 展示 loadError */
-  })
+  void (async () => {
+    try {
+      await handoffLandingMusicToBlog()
+    } catch {
+      /* 音乐 handoff 失败不阻塞进入博客 */
+    }
+    void reloadBlogData().catch(() => {
+      /* 错误由 BlogLayout 展示 loadError */
+    })
+  })()
   window.setTimeout(() => {
     onComplete()
     pendingBlog.value = false
@@ -123,13 +130,13 @@ function onLoginSuccess() {
   void triggerDailyCheckIn()
 }
 
-/** 返回首页：整页刷新，避免 SPA 状态残留导致黑屏 */
+/** 返回首页：强制整页导航，避免 Vue Teleport/Transition 卸载报错 */
 function returnToLanding() {
-  window.location.reload()
+  goHome()
 }
 
 function leaveGuest() {
-  returnToLanding()
+  goHome()
 }
 
 function handleAuthLogout() {
@@ -145,6 +152,13 @@ function handleAuthLogout() {
 }
 
 onMounted(() => {
+  // 返回首页带 ?home= 时去掉查询参数，保持地址栏干净
+  if (typeof window !== 'undefined' && /[?&]home=/.test(window.location.search)) {
+    const url = new URL(window.location.href)
+    url.searchParams.delete('home')
+    const clean = url.pathname + (url.search || '') + url.hash
+    window.history.replaceState(null, '', clean || '/')
+  }
   if (loggedIn.value) {
     void reloadBlogData().catch(() => {})
     void triggerDailyCheckIn()
@@ -195,17 +209,15 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <Transition name="blog-reveal">
-      <div v-if="showBlog" key="blog" class="blog-stage">
-        <div v-if="animating" class="blog-frost" aria-hidden="true" />
-        <BlogLayout
-          :guest-mode="guestMode && !loggedIn"
-          @request-login="openLogin"
-          @leave-guest="leaveGuest"
-          @return-landing="returnToLanding"
-        />
-      </div>
-    </Transition>
+    <div v-if="showBlog" key="blog" class="blog-stage">
+      <div v-if="animating" class="blog-frost" aria-hidden="true" />
+      <BlogLayout
+        :guest-mode="guestMode && !loggedIn"
+        @request-login="openLogin"
+        @leave-guest="leaveGuest"
+        @return-landing="returnToLanding"
+      />
+    </div>
 
     <div id="qq-music-offscreen" class="qq-music-offscreen" aria-hidden="true" />
     <QqMusicPersistentHost />

@@ -2,6 +2,7 @@
 import type { SectionId } from '@/data/mockContent'
 import { navSections } from '@/data/mockContent'
 import { logout, useSession } from '@/composables/useSession'
+import { goHome } from '@/utils/goHome'
 
 defineProps<{
   active: SectionId
@@ -80,12 +81,12 @@ function handleLogout() {
         <button type="button" class="btn-logout btn-login" @click="emit('requestLogin')">
           登录
         </button>
-        <button type="button" class="btn-logout btn-leave" @click="emit('leaveGuest')">
+        <button type="button" class="btn-logout btn-leave" @click="goHome">
           返回首页
         </button>
       </template>
       <template v-else-if="currentUser">
-        <button type="button" class="btn-logout btn-leave" @click="emit('returnLanding')">
+        <button type="button" class="btn-logout btn-leave" @click="goHome">
           返回首页
         </button>
         <button type="button" class="btn-logout" @click="handleLogout">
