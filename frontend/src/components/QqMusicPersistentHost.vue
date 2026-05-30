@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, Teleport, watch } from 'vue'
+import { computed, watch } from 'vue'
 import QqMusicEmbed from '@/components/QqMusicEmbed.vue'
 import {
   applyQqTeleportSlot,

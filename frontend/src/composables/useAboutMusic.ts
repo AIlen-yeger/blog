@@ -31,6 +31,7 @@ import {
   clearMusicPlayback,
   loadMusicPlayback,
   saveMusicPlayback,
+  type MusicPlaybackSnapshot,
 } from '@/utils/musicPlaybackStorage'
 
 function formatTime(sec: number): string {

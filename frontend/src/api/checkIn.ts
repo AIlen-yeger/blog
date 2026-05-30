@@ -14,7 +14,7 @@ export async function fetchSiteOwnerCheckInBoard(): Promise<CheckInBoard> {
 
 /** 当前登录用户今日签到（幂等） */
 export async function checkInTodayApi(): Promise<CheckInBoard> {
-  return post<CheckInBoard>('/check-ins/today')
+  return post<CheckInBoard>('/check-ins/today', {})
 }
 
 /** 当前登录用户签到板（只读） */

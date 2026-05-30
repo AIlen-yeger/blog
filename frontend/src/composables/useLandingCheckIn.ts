@@ -1,6 +1,5 @@
 import { computed, onMounted } from 'vue'
 import { useMockApi } from '@/api/http'
-import { hasValidSession } from '@/composables/useSession'
 import {
   checkInCheckedToday,
   checkInDates,
@@ -8,7 +7,6 @@ import {
   checkInTotalDays,
   loadLandingCheckInBoard,
   toCheckInDateKey,
-  triggerDailyCheckIn,
 } from '@/composables/useDailyCheckIn'
 
 const STORAGE_KEY = 'blog:landing-check-in'

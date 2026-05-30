@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { MusicTrack } from '@/data/musicTracks'
 
-const props = defineProps<{
+defineProps<{
   open: boolean
   tracks: MusicTrack[]
   currentTrackId?: string
