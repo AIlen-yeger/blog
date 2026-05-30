@@ -19,7 +19,7 @@ import {
 } from '@/data/mockContent'
 import { genId, todayISO } from '@/utils/id'
 import { toUserErrorMessage } from '@/utils/userErrorMessage'
-import { getAuthToken } from '@/composables/useSession'
+import { hasValidSession } from '@/composables/useSession'
 import { useMockApi } from '@/api/http'
 import * as blogApi from '@/api/blog'
 import type { ContentListParams } from '@/api/blog'
@@ -197,7 +197,7 @@ async function loadFromServer() {
   const listParams = listParamsFromFilters()
   const kw = contentFilters.keyword?.trim()
 
-  const profileReq = getAuthToken()
+  const profileReq = hasValidSession()
     ? blogApi.fetchProfile()
     : blogApi.fetchPublicProfile()
 

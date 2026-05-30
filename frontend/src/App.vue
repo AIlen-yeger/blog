@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useGradient } from '@/composables/useGradient'
 import LandingHero from '@/components/LandingHero.vue'
 import LoginModal from '@/components/LoginModal.vue'
@@ -15,7 +15,7 @@ import { initSessionFromStorage } from '@/composables/useSession'
 import { triggerDailyCheckIn } from '@/composables/useDailyCheckIn'
 import { clearMusicPlayback } from '@/utils/musicPlaybackStorage'
 import QqMusicPersistentHost from '@/components/QqMusicPersistentHost.vue'
-import { handoffLandingMusicToBlog } from '@/composables/useAboutMusic'
+import { handoffLandingMusicToBlog, resetAboutMusicForLanding } from '@/composables/useAboutMusic'
 import { applyQqTeleportSlot, useGlobalQqPlayer } from '@/composables/useGlobalQqPlayer'
 import { loadLandingMusicTracks } from '@/composables/useUserMusicTracks'
 
@@ -26,10 +26,15 @@ const guestMode = ref(false)
 const blogViewActive = ref(false)
 const showLogin = ref(false)
 const animating = ref(false)
+/** 进入博客过渡（着陆页下滑淡出） */
+const enteringBlog = ref(false)
+/** 返回着陆页过渡 */
+const returningToLanding = ref(false)
 /** 过渡期间预挂载博客层，与着陆页动画重叠 */
 const pendingBlog = ref(false)
 
 const ENTER_MS = 1240
+const LEAVE_MS = 720
 
 const inBlog = computed(() => guestMode.value || blogViewActive.value)
 const showBlog = computed(() => inBlog.value || pendingBlog.value)
@@ -57,6 +62,7 @@ function openLogin() {
 
 function startBlogEnter(onComplete: () => void) {
   void handoffLandingMusicToBlog()
+  enteringBlog.value = true
   animating.value = true
   pendingBlog.value = true
   void reloadBlogData().catch(() => {
@@ -66,6 +72,7 @@ function startBlogEnter(onComplete: () => void) {
     onComplete()
     pendingBlog.value = false
     window.setTimeout(() => {
+      enteringBlog.value = false
       animating.value = false
       const g = useGlobalQqPlayer()
       if (g.qqPlaying.value) void applyQqTeleportSlot('about')
@@ -120,13 +127,12 @@ function onLoginSuccess() {
   void triggerDailyCheckIn()
 }
 
-function returnToLanding() {
+function finishReturnToLanding() {
   guestMode.value = false
   blogViewActive.value = false
   pendingBlog.value = false
   showLogin.value = false
-  animating.value = false
-  void applyQqTeleportSlot('landing')
+  resetAboutMusicForLanding()
   if (!loggedIn.value) {
     resetBlogStore()
     clearMusicPlayback()
@@ -135,6 +141,27 @@ function returnToLanding() {
   if (loggedIn.value) {
     void loadLandingMusicTracks()
   }
+  void nextTick(() => {
+    void applyQqTeleportSlot('landing')
+  })
+}
+
+function returnToLanding() {
+  if (!inBlog.value && !pendingBlog.value) {
+    finishReturnToLanding()
+    return
+  }
+  if (animating.value || returningToLanding.value) return
+
+  resetAboutMusicForLanding()
+  returningToLanding.value = true
+  animating.value = true
+
+  window.setTimeout(() => {
+    finishReturnToLanding()
+    returningToLanding.value = false
+    animating.value = false
+  }, LEAVE_MS)
 }
 
 function leaveGuest() {
@@ -147,7 +174,10 @@ function handleAuthLogout() {
   blogViewActive.value = false
   pendingBlog.value = false
   showLogin.value = false
+  enteringBlog.value = false
+  returningToLanding.value = false
   animating.value = false
+  resetAboutMusicForLanding()
   resetBlogStore()
   clearMusicPlayback()
 }
@@ -188,7 +218,14 @@ onUnmounted(() => {
       <div class="bg-panel bg-panel--br" />
     </div>
 
-    <div v-if="landingVisible" class="landing-wrap" :class="{ 'is-leaving': animating }">
+    <div
+      v-if="landingVisible"
+      class="landing-wrap"
+      :class="{
+        'is-leaving': enteringBlog && animating,
+        'is-returning': returningToLanding && animating,
+      }"
+    >
       <div class="landing-inner">
         <LandingHero
           :logged-in="loggedIn"
@@ -388,6 +425,34 @@ onUnmounted(() => {
   transform: translateY(0) scale(1);
   filter: blur(0);
   opacity: 1;
+}
+
+.blog-reveal-leave-active {
+  transition:
+    transform 0.72s cubic-bezier(0.32, 0.72, 0, 1),
+    filter 0.65s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.65s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.blog-reveal-leave-to {
+  transform: translateY(14vh) scale(0.985);
+  filter: blur(16px);
+  opacity: 0;
+}
+
+.landing-wrap.is-returning .landing-inner {
+  animation: landing-return-in 0.72s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+@keyframes landing-return-in {
+  from {
+    transform: translateY(18vh) scale(0.96);
+    opacity: 0.35;
+    filter: blur(8px);
+  }
+  to {
+    transform: none;
+    opacity: 1;
+    filter: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

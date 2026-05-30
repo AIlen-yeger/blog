@@ -649,6 +649,13 @@ export async function handoffLandingMusicToBlog() {
   })
 }
 
+/** 从博客回到着陆页：重置 About 音乐 UI，避免 Teleport 仍指向 #about-qq-slot */
+export function resetAboutMusicForLanding() {
+  musicMode.value = false
+  qqBackgroundActive.value = false
+  void applyQqTeleportSlot('landing')
+}
+
 export function useAboutMusic() {
   void ensureTracksLoaded()
   const globalQq = useGlobalQqPlayer()
