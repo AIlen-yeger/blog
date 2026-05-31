@@ -524,22 +524,96 @@ async function onDeletePlaylist(track: (typeof playlistTracks.value)[0]) {
   color: rgba(220, 215, 255, 0.85);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 767px) {
+  .about-panel {
+    padding: 0.35rem 0 0.25rem;
+    min-height: 14rem;
+  }
+
+  .profile-name {
+    font-size: 1.4rem;
+    margin-top: 0.85rem;
+  }
+
+  .profile-bio {
+    font-size: 0.88rem;
+    line-height: 1.55;
+    padding: 0 0.25rem;
+  }
+
+  .focus-tags li {
+    font-size: 0.78rem;
+    padding: 0.32rem 0.7rem;
+  }
+
   .vinyl-float {
-    top: auto;
-    bottom: 7.25rem;
-    right: 0.5rem;
-    flex-direction: column-reverse;
-    gap: 0.35rem;
+    top: 0.25rem;
+    right: 0.25rem;
+    bottom: auto;
+    flex-direction: row-reverse;
+    gap: 0.25rem;
   }
 
   .vinyl {
-    width: 68px;
-    height: 68px;
+    width: 58px;
+    height: 58px;
   }
 
   .vinyl-hint {
     display: none;
+  }
+
+  .panel-bottom {
+    max-width: 100%;
+    margin-top: 1rem;
+    padding: 0 0.15rem;
+  }
+
+  .bg-music-bar {
+    max-width: 100%;
+    padding: 0.65rem 0.75rem;
+  }
+
+  .bg-music-title {
+    font-size: 0.86rem;
+    word-break: break-word;
+  }
+
+  .bg-music-meta {
+    font-size: 0.72rem;
+    line-height: 1.35;
+  }
+
+  .bg-music-actions {
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.5rem;
+  }
+
+  .bg-music-btn {
+    min-height: 40px;
+    padding: 0.4rem 0.65rem;
+    font-size: 0.75rem;
+  }
+
+  .bg-music-stop {
+    margin-left: 0;
+  }
+
+  .music-player {
+    padding: 0.85rem 0.9rem 0.2rem;
+  }
+
+  .controls {
+    gap: 0.45rem;
+    flex-wrap: wrap;
+  }
+
+  .ctrl-btn,
+  .ctrl-main,
+  .ctrl-qq-hint {
+    min-width: 44px;
+    min-height: 44px;
   }
 }
 

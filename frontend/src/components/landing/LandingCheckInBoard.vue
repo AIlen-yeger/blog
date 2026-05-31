@@ -124,4 +124,37 @@ const weekdays = ['日', '一', '二', '三', '四', '五', '六']
   opacity: 0.28;
   pointer-events: none;
 }
+
+@media (max-width: 767px) {
+  .check-in-board {
+    padding: 0.5rem 0.55rem;
+    min-height: 7.5rem;
+  }
+  .board-title {
+    font-size: 0.85rem;
+  }
+  .board-sub {
+    font-size: 0.7rem;
+  }
+  .weekday-labels {
+    width: 1.25rem;
+    font-size: 0.62rem;
+  }
+  .board-grid {
+    --cell-gap: 4px;
+  }
+  .cell {
+    min-height: 10px;
+    border-radius: 4px;
+  }
+}
+
+@media (max-width: 380px) {
+  .board-grid {
+    --cell-gap: 3px;
+  }
+  .cell {
+    min-height: 8px;
+  }
+}
 </style>

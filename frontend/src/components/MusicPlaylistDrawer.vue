@@ -239,4 +239,17 @@ function onDelete(track: MusicTrack) {
 .playlist-drawer-leave-to .playlist-panel {
   transform: translateX(100%);
 }
+
+@media (max-width: 767px) {
+  .playlist-panel {
+    width: min(100%, 100vw);
+    max-width: 100%;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .playlist-play,
+  .playlist-del {
+    min-height: 44px;
+  }
+}
 </style>

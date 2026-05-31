@@ -39,17 +39,31 @@ async function mockStreamReply(
   }
 }
 
-function extractPiece(payload: unknown): string {
-  if (!payload || typeof payload !== 'object') return ''
+export interface AgentChatStreamOptions {
+  onMeta?: (meta: { intent?: string }) => void
+}
+
+function handleSsePayload(payload: unknown, onChunk: (piece: string) => void, onMeta?: AgentChatStreamOptions['onMeta']) {
+  if (!payload || typeof payload !== 'object') return
   const row = payload as Record<string, unknown>
   if (typeof row.code === 'number' && row.code !== 0) {
     throw new Error(String(row.message ?? 'Agent 返回错误'))
   }
-  const piece = row.content ?? row.delta ?? row.text ?? ''
-  return typeof piece === 'string' ? piece : ''
+  const type = String(row.type ?? '')
+  if (type === 'meta') {
+    const intent = typeof row.intent === 'string' ? row.intent : undefined
+    onMeta?.({ intent })
+    return
+  }
+  const piece = extractPiece(payload)
+  if (piece) onChunk(piece)
 }
 
-function parseSseChunk(buffer: string, onChunk: (piece: string) => void): string {
+function parseSseChunk(
+  buffer: string,
+  onChunk: (piece: string) => void,
+  onMeta?: AgentChatStreamOptions['onMeta'],
+): string {
   let rest = buffer
   const lines = rest.split('\n')
   rest = lines.pop() ?? ''
@@ -60,7 +74,7 @@ function parseSseChunk(buffer: string, onChunk: (piece: string) => void): string
       const data = trimmed.slice(5).trim()
       if (!data || data === '[DONE]') continue
       try {
-        onChunk(extractPiece(JSON.parse(data)))
+        handleSsePayload(JSON.parse(data), onChunk, onMeta)
       } catch (e) {
         if (e instanceof Error && e.message !== 'Agent 返回错误') {
           onChunk(data)
@@ -71,8 +85,7 @@ function parseSseChunk(buffer: string, onChunk: (piece: string) => void): string
       continue
     }
     try {
-      const piece = extractPiece(JSON.parse(trimmed))
-      if (piece) onChunk(piece)
+      handleSsePayload(JSON.parse(trimmed), onChunk, onMeta)
     } catch {
       /* 忽略非 JSON 行 */
     }
@@ -87,10 +100,23 @@ function resolveAgentUrl(): string {
   return `${getApiBase().replace(/\/$/, '')}/agent/chat`
 }
 
+function extractPiece(payload: unknown): string {
+  if (!payload || typeof payload !== 'object') return ''
+  const row = payload as Record<string, unknown>
+  if (typeof row.code === 'number' && row.code !== 0) {
+    throw new Error(String(row.message ?? 'Agent 返回错误'))
+  }
+  const type = String(row.type ?? '')
+  if (type === 'meta') return ''
+  const piece = row.content ?? row.delta ?? row.text ?? ''
+  return typeof piece === 'string' ? piece : ''
+}
+
 export async function streamAgentChat(
   messages: ChatTurn[],
   onChunk: (piece: string) => void,
   signal?: AbortSignal,
+  options?: AgentChatStreamOptions,
 ): Promise<void> {
   const lastUser = [...messages].reverse().find((m) => m.role === 'user')
   const question = lastUser?.content?.trim() ?? ''
@@ -141,8 +167,7 @@ export async function streamAgentChat(
   const ctype = res.headers.get('content-type') ?? ''
   if (!ctype.includes('text/event-stream') || !res.body) {
     const json = (await res.json()) as Record<string, unknown>
-    const piece = extractPiece(json)
-    if (piece) onChunk(piece)
+    handleSsePayload(json, onChunk, options?.onMeta)
     return
   }
 
@@ -156,6 +181,6 @@ export async function streamAgentChat(
     pending += decoder.decode(value, { stream: true })
     pending = parseSseChunk(pending, (piece) => {
       if (piece) onChunk(piece)
-    })
+    }, options?.onMeta)
   }
 }

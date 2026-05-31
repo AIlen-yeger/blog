@@ -92,12 +92,12 @@ def _parse_chat_request(raw: object) -> ChatRequest | JSONResponse:
 
 def _safe_chat_stream(body: ChatRequest, trace_id: str) -> Iterator[str]:
     """Graph 判意图 → chat 走流式，其它分支暂返回占位文案。"""
-    bind_trace(
-        trace_id=trace_id,
-        session_id=body.session_id,
-        user_id=body.user_id,
-    )
     with span("request", question_preview=preview(body.question)):
+        bind_trace(
+            trace_id=trace_id,
+            session_id=body.session_id,
+            user_id=body.user_id,
+        )
         try:
             entry = get_agent_entry()
             yield from entry.stream_sse(
@@ -115,17 +115,52 @@ def _safe_chat_stream(body: ChatRequest, trace_id: str) -> Iterator[str]:
             yield "data: [DONE]\n\n"
 
 
-@router.post("/ai/ops/bug-scan")
-def ops_bug_scan(x_ops_token: str | None = Header(default=None, alias="X-Ops-Token")):
-    """开发者手动触发 Bug Ops 巡检（不对用户开放）。"""
+def _require_ops_token(x_ops_token: str | None) -> JSONResponse | None:
     expected = (os.getenv("AGENT_OPS_TOKEN") or "").strip()
     if not expected or x_ops_token != expected:
         return JSONResponse(status_code=403, content={"code": 40300, "message": "forbidden"})
+    return None
+
+
+@router.post("/ai/ops/bug-scan")
+def ops_bug_scan(x_ops_token: str | None = Header(default=None, alias="X-Ops-Token")):
+    """开发者手动触发 Bug Ops 巡检（不对用户开放）。"""
+    denied = _require_ops_token(x_ops_token)
+    if denied:
+        return denied
 
     from server.bug_agent_runner import scan_and_run_pending
 
     ran = scan_and_run_pending()
     return {"ok": True, "handled": len(ran), "items": ran}
+
+
+@router.post("/ai/ops/napcat-test")
+def ops_napcat_test(x_ops_token: str | None = Header(default=None, alias="X-Ops-Token")):
+    """向 NAPCAT_ALERT_QQ 发送一条测试私聊（验证 NapCat HTTP 与登录状态）。"""
+    denied = _require_ops_token(x_ops_token)
+    if denied:
+        return denied
+
+    from utils.napcat_notify import napcat_configured, send_developer_alert
+
+    if not napcat_configured():
+        return JSONResponse(
+            status_code=503,
+            content={
+                "code": 50300,
+                "message": "NapCat 未配置：请设置 NAPCAT_HTTP_URL、NAPCAT_ALERT_QQ，并确认 NAPCAT_NOTIFY_ENABLED=true",
+            },
+        )
+    result = send_developer_alert(
+        title="NapCat 连通测试",
+        message="来自博客 Agent 的测试消息；若收到说明 QQ 告警通道正常。",
+        severity="high",
+        trace_id=new_trace_id(),
+        event="ops.napcat_test",
+    )
+    status = 200 if result.get("ok") else 502
+    return JSONResponse(status_code=status, content={"ok": bool(result.get("ok")), **result})
 
 
 @router.post("/ai/chat")

@@ -302,4 +302,35 @@ function onEmbedInteract() {
   padding: 0.5rem;
 }
 
+@media (max-width: 767px) {
+  .landing-music {
+    padding: 0.35rem 0.45rem;
+  }
+  .music-label {
+    font-size: 0.68rem;
+  }
+  .nav-btn {
+    width: 1.85rem;
+    height: 1.85rem;
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .music-embed-wrap {
+    min-height: 56px;
+  }
+  .music-embed-wrap :deep(.qq-music-embed__frame) {
+    height: 56px;
+  }
+}
+
+@media (max-width: 520px) {
+  .music-head {
+    flex-wrap: wrap;
+  }
+  .music-label {
+    width: 100%;
+    margin-bottom: 0.15rem;
+  }
+}
+
 </style>

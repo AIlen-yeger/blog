@@ -68,15 +68,23 @@ def search_agent_logs(keyword: str, stream: str = "summary", limit: int = 30) ->
 
 @tool
 def notify_developer(title: str, message: str, severity: str = "medium") -> str:
-    """向开发者发送告警/通知（后续接入 MCP；当前为占位记录）。"""
+    """向开发者 QQ 发送告警（NapCat OneBot HTTP 私聊）。"""
+    from utils.napcat_notify import send_developer_alert
+
     trace = current_trace()
+    result = send_developer_alert(
+        title=title,
+        message=message,
+        severity=(severity or "medium").strip().lower(),
+        trace_id=str(trace.get("trace_id") or ""),
+        event="notify_developer",
+    )
     payload = {
-        "status": "queued",
         "title": preview(title, 120),
         "message": preview(message, 500),
         "severity": (severity or "medium").strip().lower(),
         "trace_id": trace.get("trace_id"),
-        "hint": "MCP 通知通道尚未接入，请稍后实现 push 到开发者",
+        **result,
     }
     return json.dumps(payload, ensure_ascii=False)
 

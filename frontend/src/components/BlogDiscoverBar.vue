@@ -383,4 +383,30 @@ onUnmounted(() => {
   opacity: 0;
   transform: translateY(-4px);
 }
+
+@media (max-width: 767px) {
+  .discover-bar {
+    margin-bottom: 0.75rem;
+  }
+  .discover-top {
+    gap: 0.35rem;
+  }
+  .search-trigger,
+  .search-expanded {
+    min-height: 44px;
+  }
+  .search-input {
+    font-size: 16px;
+    min-height: 44px;
+  }
+  .theme-btn,
+  .clear-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .chip {
+    padding: 0.32rem 0.62rem;
+    min-height: 36px;
+  }
+}
 </style>

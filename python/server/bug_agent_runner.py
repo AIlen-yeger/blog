@@ -104,6 +104,59 @@ def mark_processed(fp: str, *, incident_id: str, trigger: str) -> None:
     _save_state(state)
 
 
+def is_napcat_sent(fp: str) -> bool:
+    return fp in (_load_state().get("napcat_sent") or {})
+
+
+def mark_napcat_sent(fp: str) -> None:
+    state = _load_state()
+    sent = state.setdefault("napcat_sent", {})
+    sent[fp] = datetime.now(timezone.utc).isoformat()
+    if len(sent) > 500:
+        items = sorted(sent.items(), key=lambda x: x[1], reverse=True)[:500]
+        state["napcat_sent"] = dict(items)
+    _save_state(state)
+
+
+def try_send_napcat_error_alert(payload: dict[str, Any], *, severity: str) -> dict[str, Any] | None:
+    """严重错误时即时 QQ 私聊（与 Bug Ops 分析并行，同指纹只发一次）。"""
+    from config.config import AgentConfig
+    from utils.napcat_notify import napcat_configured, send_developer_alert
+
+    cfg = AgentConfig()
+    if not cfg.napcat_alert_on_error or not napcat_configured():
+        return None
+
+    fp = event_fingerprint(payload)
+    if is_napcat_sent(fp):
+        return None
+
+    event = str(payload.get("event") or "")
+    msg = preview(
+        str(payload.get("msg") or payload.get("error") or payload.get("exc") or ""),
+        400,
+    )
+    title = f"Agent 错误 · {event or 'ERROR'}"
+    result = send_developer_alert(
+        title=title,
+        message=msg,
+        severity=severity,
+        trace_id=str(payload.get("trace_id") or ""),
+        event=event,
+    )
+    if result.get("ok"):
+        mark_napcat_sent(fp)
+    log_event(
+        "napcat.alert",
+        ok=bool(result.get("ok")),
+        status=result.get("status"),
+        severity=severity,
+        event=event,
+        trace_id=payload.get("trace_id"),
+    )
+    return result
+
+
 def build_ops_task_message(
     *,
     trigger: str,
@@ -241,6 +294,7 @@ def try_trigger_from_log_event(payload: dict[str, Any], *, min_severity: str = "
         480,
     )
     sev = classify_severity(payload)
+    try_send_napcat_error_alert(payload, severity=sev)
     out = run_bug_agent_internal(
         trigger="error_alert",
         symptoms=symptoms,

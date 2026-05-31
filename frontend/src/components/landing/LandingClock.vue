@@ -77,4 +77,17 @@ function pad(n: number) {
     opacity: 0.25;
   }
 }
+
+@media (max-width: 767px) {
+  .landing-clock {
+    padding: 0.45rem 0.55rem;
+  }
+  .clock-time {
+    font-size: clamp(1.35rem, 6vw, 1.65rem);
+  }
+  .clock-date {
+    font-size: 0.72rem;
+    margin-top: 0.25rem;
+  }
+}
 </style>

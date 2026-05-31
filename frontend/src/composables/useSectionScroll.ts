@@ -1,6 +1,7 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import type { SectionId } from '@/data/mockContent'
 import { navSections } from '@/data/mockContent'
+import { isMobileViewport } from '@/utils/viewport'
 
 export function useSectionScroll(mainRef: () => HTMLElement | null) {
   const activeSection = ref<SectionId>('about')
@@ -29,7 +30,11 @@ export function useSectionScroll(mainRef: () => HTMLElement | null) {
           activeSection.value = visible.target.id as SectionId
         }
       },
-      { root, threshold: [0.25, 0.45, 0.6], rootMargin: '-8% 0px -55% 0px' },
+      {
+        root,
+        threshold: [0.25, 0.45, 0.6],
+        rootMargin: isMobileViewport() ? '-5% 0px -36% 0px' : '-8% 0px -55% 0px',
+      },
     )
 
     navSections.forEach(({ id }) => {

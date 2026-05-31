@@ -24,7 +24,18 @@ from utils.qq_music_tools import (
     parse_qq_share_with_meta,
     save_music_track,
 )
-from utils.trace_log import bind_trace, span, log_event, preview, redact_args, record_model, tool_result_status
+from utils.trace_log import (
+    answer_log_fields,
+    bind_trace,
+    bind_trace_from_state,
+    log_event,
+    preview,
+    record_model,
+    redact_args,
+    run_in_trace_context,
+    span,
+    tool_result_status,
+)
 
 _DEFAULT_HISTORY_LIMIT = AgentConfig().history_limit
 
@@ -33,21 +44,26 @@ logger = logging.getLogger(__name__)
 MAX_REACT_ROUNDS = 6
 
 
-def _execute_model_name() -> str:
-    return AgentConfig().execute_model_name
+def _react_model_name() -> str:
+    return AgentConfig().react_model_name
 
 
 def _build_bound_model(tools: list):
     cfg = AgentConfig()
     llm = ChatOpenAI(
-        model=cfg.execute_model_name,
-        base_url=cfg.execute_base_url,
-        api_key=cfg.execute_api_key,
-        temperature=cfg.execute_temperature,
+        model=cfg.react_model_name,
+        base_url=cfg.react_base_url,
+        api_key=cfg.react_api_key,
+        temperature=cfg.react_temperature,
         timeout=90,
         max_retries=1,
     )
     return llm.bind_tools(tools)
+
+
+def _execute_model_name() -> str:
+    """日志兼容：ReAct 实际模型名。"""
+    return _react_model_name()
 
 
 def _count_tool_rounds(messages: list) -> int:
@@ -163,6 +179,7 @@ def _extract_final_answer(messages: list) -> str:
 
 
 def _save_music_turn(state: AgentState, *, question: str, final: str) -> dict:
+    bind_trace_from_state(state, intent="music")
     session_id = state.get("session_id") or ""
     user_id = int(state.get("user_id") or 0)
     if session_id:
@@ -174,6 +191,23 @@ def _save_music_turn(state: AgentState, *, question: str, final: str) -> dict:
         )
         log_event("history.saved", session_id=session_id)
     return {"final_answer": final}
+
+
+def should_polish_music_final(final: str) -> bool:
+    """短句/操作结果不润色，长分析才交给 DeepSeek。"""
+    text = (final or "").strip()
+    if len(text) < 60:
+        return False
+    if text.startswith(("已添加：", "音乐助手处理失败", "请输入", "已识别")):
+        return False
+    return True
+
+
+def _finish_music_result(state: AgentState, *, question: str, final: str) -> dict:
+    """千问草稿：可选 defer 保存，由 DeepSeek 润色后再落库。"""
+    if AgentConfig().music_final_via_chat and should_polish_music_final(final):
+        return {"final_answer": final, "polish": True}
+    return {**_save_music_turn(state, question=question, final=final), "polish": False}
 
 
 def _react_add_save_succeeded(messages: list) -> bool:
@@ -324,11 +358,7 @@ def run_music_add_direct(state: AgentState, *, reason: str = "unknown") -> dict:
 
 def run_music_react(state: AgentState) -> dict:
     """Music 子 ReAct 入口：invoke 子图并返回 final_answer。"""
-    bind_trace(
-        session_id=state.get("session_id") or None,
-        user_id=int(state.get("user_id") or 0),
-        intent="music",
-    )
+    bind_trace_from_state(state, intent="music")
 
     access_token = (state.get("access_token") or "").strip()
     question = (state.get("question") or "").strip()
@@ -345,13 +375,15 @@ def run_music_react(state: AgentState) -> dict:
     with span("react", subgraph="music", logged_in=bool(access_token), task_mode=task_mode):
         try:
             graph = compile_music_react_graph(access_token, task_mode)
-            result = graph.invoke(
+            result = run_in_trace_context(
+                graph.invoke,
                 {
                     "question": question,
                     "access_token": access_token,
                     "session_id": state.get("session_id") or "",
                     "user_id": state.get("user_id") or 0,
-                }
+                    "trace_id": state.get("trace_id") or "",
+                },
             )
             messages = result.get("messages") or []
         except Exception:
@@ -367,7 +399,11 @@ def run_music_react(state: AgentState) -> dict:
         return {**fallback_result, "messages": messages}
 
     if invoke_failed:
-        return {"final_answer": "音乐助手处理失败，请稍后重试。"}
+        return _finish_music_result(
+            state,
+            question=question,
+            final="音乐助手处理失败，请稍后重试。",
+        )
 
     final = _extract_final_answer(messages)
     final = final or "处理完成。"
@@ -378,13 +414,14 @@ def run_music_react(state: AgentState) -> dict:
         subgraph="music",
         rounds=rounds,
         model=_execute_model_name(),
-        final_preview=preview(final),
         message_count=len(messages),
         mode="react",
+        polish_deferred=AgentConfig().music_final_via_chat and should_polish_music_final(final),
+        **answer_log_fields(final),
     )
 
     return {
-        **_save_music_turn(state, question=question, final=final),
+        **_finish_music_result(state, question=question, final=final),
         "messages": messages,
     }
 

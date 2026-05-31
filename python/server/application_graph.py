@@ -1,5 +1,7 @@
 import json
 
+import logging
+
 import re
 
 
@@ -17,13 +19,73 @@ from server.agent import ChatModel
 from server.route_graph.music_route import run_music_react
 from server.state import AgentState
 from utils.path_tools import get_abs_path
-from utils.trace_log import record_model
+from utils.trace_log import log_event, record_model
 
 _DEFAULT_HISTORY_LIMIT = AgentConfig().history_limit
+
+logger = logging.getLogger(__name__)
 
 
 
 _VALID_INTENTS = frozenset({"chat", "music", "add_son", "commit_user"})
+
+# 用户原文命中则强制 music（模型误判 chat 时的兜底，不依赖历史）
+_MUSIC_QUESTION_SIGNALS = (
+    "听歌报告",
+    "听歌排行",
+    "听歌情况",
+    "听歌情绪",
+    "听歌习惯",
+    "听歌数据",
+    "听歌记录",
+    "最近听了",
+    "最近听",
+    "听了什么",
+    "播放记录",
+    "播放次数",
+    "播放排行",
+    "加歌",
+    "添加歌曲",
+    "添加音乐",
+    "歌曲背景",
+    "制作背景",
+    "创作背景",
+    "qq音乐",
+    "qq 音乐",
+)
+
+_MUSIC_QUERY_WORDS = ("查询", "查一下", "看看", "统计", "分析", "报告", "数据", "记录", "排行")
+_MUSIC_TOPIC_WORDS = ("听歌", "歌曲", "音乐", "播放")
+
+
+def intent_from_question(question: str) -> str | None:
+    """从用户当前问题推断意图；仅做 music 等强信号兜底。"""
+    q = (question or "").strip()
+    if not q:
+        return None
+    lower = q.lower()
+    if "y.qq.com" in lower or "songid" in lower:
+        return "music"
+    if any(signal in q for signal in _MUSIC_QUESTION_SIGNALS):
+        return "music"
+    if any(k in q for k in _MUSIC_TOPIC_WORDS) and any(
+        k in q for k in ("分析", "报告", "排行", "记录", "数据", "统计", "背景", "情绪", "循环")
+    ):
+        return "music"
+    if any(k in q for k in _MUSIC_QUERY_WORDS) and any(k in q for k in _MUSIC_TOPIC_WORDS):
+        return "music"
+    if "笔记" in q and any(k in q for k in ("发布", "写了", "刚发", "我的笔记")):
+        return "commit_user"
+    return None
+
+
+def resolve_intent(question: str, raw: str) -> tuple[str, str | None]:
+    """模型输出 + 用户原文规则；不一致时以原文强信号为准。"""
+    model_intent = normalize_intent(raw)
+    question_intent = intent_from_question(question)
+    if question_intent and question_intent != model_intent:
+        return question_intent, f"question_keyword→{question_intent}"
+    return model_intent, None
 
 
 
@@ -117,23 +179,27 @@ class AgentLangGraph:
 
         self.chat_model = ChatModel()
 
-        self.execute_model_name = cfg.execute_model_name
+        self.judge_model_name = cfg.judge_model_name
 
-        self.execute_model = ChatOpenAI(
+        self.judge_model = ChatOpenAI(
 
-            model=cfg.execute_model_name,
+            model=cfg.judge_model_name,
 
-            base_url=cfg.execute_base_url,
+            base_url=cfg.judge_base_url,
 
-            temperature=cfg.execute_temperature,
+            temperature=cfg.judge_temperature,
 
-            api_key=cfg.execute_api_key,
+            api_key=cfg.judge_api_key,
 
             timeout=90,
 
             max_retries=1,
 
         )
+
+        self.execute_model_name = cfg.judge_model_name
+
+        self.execute_model = self.judge_model
 
         self.router_graph = self.compile_router_graph()
 
@@ -171,15 +237,33 @@ class AgentLangGraph:
 
         ]
 
-        record_model(self.execute_model_name)
+        record_model(self.judge_model_name)
 
-        resp = self.execute_model.invoke(messages)
+        question = state.get("question") or ""
+        try:
+            resp = self.execute_model.invoke(messages)
+            raw = resp.content.strip() if resp.content else ""
+        except Exception as exc:
+            logger.warning("[agent] judge_route api failed: %s", exc)
+            intent = intent_from_question(question) or "chat"
+            log_event(
+                "intent.fallback",
+                reason="judge_api_failed",
+                intent=intent,
+                error=str(exc)[:200],
+                question_preview=question[:120],
+            )
+            return {"route": intent, "intent": intent}
 
-        raw = resp.content.strip() if resp.content else ""
-
-        intent = normalize_intent(raw)
-
-
+        intent, override = resolve_intent(question, raw)
+        if override:
+            log_event(
+                "intent.override",
+                model_route=normalize_intent(raw),
+                intent=intent,
+                reason=override,
+                question_preview=(state.get("question") or "")[:120],
+            )
 
         return {"route": intent, "intent": intent}
 

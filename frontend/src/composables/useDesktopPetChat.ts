@@ -1,10 +1,14 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { hasValidSession } from '@/composables/useSession'
 import { streamAgentChat, type ChatTurn } from '@/api/agentChat'
 import { bubbleTierFromText } from '@/utils/bubbleSize'
+import { clearAgentChatHistory, loadAgentChatHistory, saveAgentChatHistory } from '@/utils/agentChatStorage'
 import { genId } from '@/utils/id'
 import { toUserErrorMessage } from '@/utils/userErrorMessage'
-import { notifyMusicTracksChanged } from '@/composables/useUserMusicTracks'
+import {
+  refreshMusicTracksAfterAgentAdd,
+  replyIndicatesMusicPlaylistSaved,
+} from '@/composables/useUserMusicTracks'
 
 export interface ChatMessage {
   id: string
@@ -20,7 +24,7 @@ export interface DesktopPetChatOptions {
   onLoginRequired?: () => void
 }
 
-const history = ref<ChatMessage[]>([])
+const history = ref<ChatMessage[]>(loadAgentChatHistory())
 const input = ref('')
 const streamingText = ref('')
 const isStreaming = ref(false)
@@ -29,6 +33,8 @@ const error = ref('')
 const loginRequired = ref(false)
 
 let abortCtrl: AbortController | null = null
+
+watch(history, (messages) => saveAgentChatHistory(messages), { deep: true })
 
 const displayText = computed(() => {
   if (isStreaming.value) return streamingText.value
@@ -78,6 +84,7 @@ async function sendMessage(options?: DesktopPetChatOptions) {
   isStreaming.value = true
   streamingText.value = ''
   abortCtrl = new AbortController()
+  let agentIntent = ''
 
   try {
     await streamAgentChat(
@@ -86,6 +93,11 @@ async function sendMessage(options?: DesktopPetChatOptions) {
         streamingText.value += piece
       },
       abortCtrl.signal,
+      {
+        onMeta: (meta) => {
+          if (meta.intent) agentIntent = meta.intent
+        },
+      },
     )
 
     const reply = streamingText.value.trim() || '（没有收到回复）'
@@ -95,8 +107,11 @@ async function sendMessage(options?: DesktopPetChatOptions) {
       content: reply,
       createdAt: Date.now(),
     })
-    if (/已添加：/.test(reply)) {
-      notifyMusicTracksChanged()
+    if (
+      replyIndicatesMusicPlaylistSaved(reply) ||
+      (agentIntent === 'music' && /播放列表|已保存|添加/.test(reply))
+    ) {
+      await refreshMusicTracksAfterAgentAdd()
     }
   } catch (e) {
     if (abortCtrl?.signal.aborted) return
@@ -124,6 +139,11 @@ function stopStreaming() {
   streamingText.value = ''
 }
 
+function clearHistory() {
+  history.value = []
+  clearAgentChatHistory()
+}
+
 export function useDesktopPetChat() {
   return {
     history,
@@ -140,5 +160,6 @@ export function useDesktopPetChat() {
     sendMessage,
     stopStreaming,
     clearError,
+    clearHistory,
   }
 }

@@ -330,24 +330,34 @@ const emit = defineEmits<{
 
 }
 
-@media (max-width: 400px) {
-
+@media (max-width: 767px) {
+  .scroll-hint {
+    width: 100%;
+    max-width: min(100%, 22rem);
+    justify-content: center;
+    padding: 0.4rem 0.55rem 0.45rem;
+  }
   .hint-item {
-
-    min-width: 4.75rem;
-
-    padding-inline: 0.45rem;
-
+    min-width: 0;
+    flex: 1;
+    padding: 0.25rem 0.4rem 0.2rem;
+    min-height: 44px;
   }
-
   .text {
-
-    font-size: 0.68rem;
-
-    letter-spacing: 0.05em;
-
+    font-size: 0.7rem;
+    letter-spacing: 0.04em;
+    white-space: normal;
+    line-height: 1.25;
   }
+}
 
+@media (max-width: 400px) {
+  .hint-item {
+    padding-inline: 0.3rem;
+  }
+  .text {
+    font-size: 0.65rem;
+  }
 }
 
 </style>

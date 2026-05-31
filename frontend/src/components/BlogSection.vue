@@ -73,14 +73,25 @@ defineProps<{
 }
 
 @media (max-width: 768px) {
+  .blog-section {
+    scroll-margin-top: 0.5rem;
+    padding-bottom: 1rem;
+  }
   .section-card {
-    border-radius: 20px;
-    padding: 1.25rem 1.15rem 1.5rem;
+    border-radius: 18px;
+    padding: 1.1rem 1rem 1.35rem;
     min-height: auto;
   }
+  .section-head {
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+  }
   .title-en {
-    font-size: 1.1rem;
-    letter-spacing: 0.18em;
+    font-size: 1.05rem;
+    letter-spacing: 0.12em;
+  }
+  .title-zh {
+    font-size: 0.78rem;
   }
 }
 </style>

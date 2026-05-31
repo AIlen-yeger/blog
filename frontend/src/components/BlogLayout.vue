@@ -460,7 +460,32 @@ async function onSaveProfile(data: ProfileData) {
 @media (max-width: 768px) {
   .main-scroll {
     margin-left: 0;
-    padding: 1rem 1rem 6rem;
+    padding: 0.85rem 0.85rem var(--mobile-content-pad-bottom, 6.75rem);
+    scroll-padding-bottom: var(--mobile-content-pad-bottom, 6.75rem);
+  }
+
+  .blog-section {
+    scroll-margin-top: 0.75rem;
+  }
+
+  .timeline-item {
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.9rem 1rem;
+  }
+
+  .period {
+    min-width: 0;
+    font-size: 0.75rem;
+  }
+
+  .topic-filter-bar {
+    gap: 0.4rem;
+  }
+
+  .filter-tag {
+    padding: 0.38rem 0.75rem;
+    font-size: 0.8rem;
   }
 }
 </style>

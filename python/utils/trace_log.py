@@ -6,6 +6,8 @@ import json
 
 import logging
 
+import os
+
 import logging.handlers
 
 import time
@@ -38,6 +40,8 @@ _user_id: ContextVar[int] = ContextVar("user_id", default=0)
 
 _request_models: ContextVar[list[str] | None] = ContextVar("request_models", default=None)
 
+_request_trace: ContextVar[dict[str, Any] | None] = ContextVar("request_trace", default=None)
+
 
 
 # 长留摘要：每请求关键结果 + 告警向事件（明细见 trace.jsonl）
@@ -50,6 +54,10 @@ _SUMMARY_EVENTS = frozenset(
 
         "intent.classified",
 
+        "intent.override",
+
+        "intent.fallback",
+
         "react.done",
 
         "react.fallback",
@@ -59,6 +67,12 @@ _SUMMARY_EVENTS = frozenset(
         "react.skip",
 
         "history.saved",
+
+        "chat.done",
+
+        "music.polish.start",
+
+        "music.polish.done",
 
     }
 
@@ -106,6 +120,59 @@ def bind_trace(
 
         _user_id.set(int(user_id))
 
+    _merge_request_trace(current_trace())
+
+
+
+
+
+def _merge_request_trace(values: dict[str, Any]) -> None:
+    """跨 SSE yield / 线程池时保留本请求 trace 字段（供 summary 使用）。"""
+    acc = dict(_request_trace.get() or {})
+    for key, val in values.items():
+        if key == "user_id":
+            uid = int(val or 0)
+            if uid > 0 or "user_id" not in acc:
+                acc["user_id"] = uid
+            continue
+        text = str(val or "").strip()
+        if text and text != "-":
+            acc[key] = text
+    _request_trace.set(acc)
+
+
+def request_trace_fields() -> dict[str, Any]:
+    """当前请求累积的 trace（优先于可能已丢失的 contextvars）。"""
+    return dict(_request_trace.get() or {})
+
+
+def reset_request_trace() -> None:
+    _request_trace.set({})
+
+
+def reset_request_trace() -> None:
+    _request_trace.set({})
+
+
+def trace_fields_for_log(**fields: Any) -> dict[str, Any]:
+    """合并 contextvars、请求快照与显式字段；显式字段优先。"""
+    merged: dict[str, Any] = {}
+    merged.update(current_trace())
+    merged.update(request_trace_fields())
+    merged.update(fields)
+    return merged
+
+
+def bind_trace_from_state(state: dict[str, Any], *, intent: str | None = None) -> None:
+    """从 AgentState / 请求 dict 恢复 trace（SSE 子阶段调用）。"""
+    tid = (state.get("trace_id") or "").strip()
+    bind_trace(
+        trace_id=tid or None,
+        session_id=state.get("session_id") or None,
+        user_id=int(state.get("user_id") or 0),
+        intent=intent,
+    )
+
 
 
 
@@ -128,6 +195,11 @@ def current_trace() -> dict[str, Any]:
 def reset_request_models() -> None:
     """新请求开始时清空本次已调用模型列表。"""
     _request_models.set([])
+
+
+def reset_request_context() -> None:
+    reset_request_models()
+    reset_request_trace()
 
 
 def record_model(model_name: str) -> None:
@@ -162,6 +234,24 @@ def preview(text: str, max_len: int = 200) -> str:
     s = (text or "").replace("\n", " ").strip()
 
     return s if len(s) <= max_len else s[: max_len - 1] + "…"
+
+
+def answer_log_fields(text: str, *, max_len: int | None = None) -> dict[str, Any]:
+    """摘要日志里的回复预览：默认较长，并标明是否截断。"""
+    if max_len is None:
+        try:
+            from utils.agent_log_config import SUMMARY_ANSWER_PREVIEW_LEN
+
+            max_len = SUMMARY_ANSWER_PREVIEW_LEN
+        except Exception:
+            max_len = 800
+    raw = (text or "").strip()
+    limit = max(200, int(max_len))
+    return {
+        "answer_length": len(raw),
+        "final_preview": preview(raw, limit),
+        "preview_truncated": len(raw) > limit,
+    }
 
 
 
@@ -412,7 +502,7 @@ def log_event(event: str, level: int = logging.INFO, **fields: Any) -> None:
     payload = {
         "event": event,
         "level": logging.getLevelName(level),
-        **current_trace(),
+        **trace_fields_for_log(**fields),
         **fields,
     }
 
@@ -437,7 +527,7 @@ def span(event: str, **fields: Any):
     t0 = time.perf_counter()
 
     if event == "request":
-        reset_request_models()
+        reset_request_context()
 
     log_event(f"{event}.start", **fields)
 
@@ -445,7 +535,7 @@ def span(event: str, **fields: Any):
 
         yield
 
-        end_fields = dict(fields)
+        end_fields = trace_fields_for_log(**fields)
         if event == "request":
             end_fields.update(request_model_fields())
 
@@ -471,7 +561,7 @@ def span(event: str, **fields: Any):
 
             error=str(exc),
 
-            **fields,
+            **trace_fields_for_log(**fields),
 
         )
 

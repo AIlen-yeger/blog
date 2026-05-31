@@ -1,25 +1,19 @@
 import logging
 import os
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from config.config import ensure_env_loaded, log_startup_config
 from route.app import router
 from utils.agent_log_scheduler import start_agent_log_prune_scheduler
 from utils.bug_agent_scheduler import start_bug_agent_scheduler
 from utils.trace_log import setup_agent_logging
 
-try:
-    from dotenv import load_dotenv
-
-    load_dotenv(Path(__file__).resolve().parent / ".env")
-except ImportError:
-    logging.getLogger(__name__).warning(
-        "未安装 python-dotenv，跳过 .env 加载。请执行: pip install python-dotenv"
-    )
+ensure_env_loaded()
+log_startup_config()
 
 setup_agent_logging("log/agent.log")
 logger = logging.getLogger(__name__)

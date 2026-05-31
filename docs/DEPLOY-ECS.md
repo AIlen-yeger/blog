@@ -292,6 +292,35 @@ docker-compose up -d
 docker logs -f napcat   # 首次扫码登录；WebUI: http://127.0.0.1:6099/webui
 ```
 
+在 **`python/.env`** 中配置 Agent 侧 QQ 告警（与 NapCat 同机）：
+
+```env
+NAPCAT_NOTIFY_ENABLED=true
+NAPCAT_HTTP_URL=http://127.0.0.1:3000
+NAPCAT_ALERT_QQ=你的QQ号
+# NAPCAT_ACCESS_TOKEN=   # 与 NapCat HTTP 配置一致时填写
+NAPCAT_MIN_SEVERITY=high
+NAPCAT_ALERT_ON_ERROR=true
+AGENT_OPS_TOKEN=随机长串
+```
+
+重启 Agent 后日志应出现 `[config] napcat ... configured=True`。
+
+**测试 QQ 私聊**（需 `AGENT_OPS_TOKEN`）：
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/ai/ops/napcat-test \
+  -H "X-Ops-Token: 你的token"
+```
+
+**NapCat HTTP 直连**（排查 Agent 之外的问题）：
+
+```bash
+curl -s -X POST http://127.0.0.1:3000/send_private_msg \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":你的QQ号,"message":[{"type":"text","data":{"text":"ping"}}]}'
+```
+
 Bug Ops 手动巡检（需配置 `AGENT_OPS_TOKEN`）：
 
 ```bash

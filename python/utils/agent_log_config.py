@@ -21,6 +21,9 @@ LEGACY_ACCESS_RETAIN_DAYS = TRACE_RETAIN_DAYS
 
 DEFAULT_LOG_DIR = os.getenv("AGENT_LOG_DIR", "log/agent.log")
 
+# summary.jsonl 中 final_preview 最大字符数（完整回复见 MySQL/Redis 历史或 trace.jsonl）
+SUMMARY_ANSWER_PREVIEW_LEN = int(os.getenv("AGENT_LOG_ANSWER_PREVIEW_LEN", "800"))
+
 # 进程内定时清理（Agent 启动后自动跑，默认开启）
 LOG_PRUNE_ENABLED = os.getenv("AGENT_LOG_PRUNE_ENABLED", "true").lower() != "false"
 LOG_PRUNE_ON_STARTUP = os.getenv("AGENT_LOG_PRUNE_ON_STARTUP", "true").lower() != "false"

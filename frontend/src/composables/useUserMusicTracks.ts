@@ -17,6 +17,27 @@ export function notifyMusicTracksChanged() {
   }
 }
 
+/** Agent / 用户操作后判断播放列表是否可能已变更 */
+export function replyIndicatesMusicPlaylistSaved(text: string): boolean {
+  const t = text.trim()
+  if (!t) return false
+  return (
+    /已添加[：:《]?/.test(t) ||
+    /已经添加/.test(t) ||
+    /添加到你的播放列表/.test(t) ||
+    /添加到.*播放列表/.test(t) ||
+    /已成功保存/.test(t) ||
+    /保存到.*播放列表/.test(t) ||
+    /已保存.*曲目/.test(t)
+  )
+}
+
+/** 加歌成功后立即拉列表并通知各面板刷新 */
+export async function refreshMusicTracksAfterAgentAdd(): Promise<void> {
+  await loadLandingMusicTracks()
+  notifyMusicTracksChanged()
+}
+
 /** 从 API 加载着陆页音乐（已登录优先自己的列表，否则站点主人） */
 export async function loadLandingMusicTracks(): Promise<MusicTrack[]> {
   if (useMockApi()) {

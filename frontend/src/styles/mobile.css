@@ -1,0 +1,61 @@
+/**
+ * 手机端专属适配（< 768px）
+ * 与 theme.css 中的 CSS 变量配合，供布局与桌宠避让使用。
+ */
+
+@media (max-width: 767px) {
+  :root {
+    --landing-gap-x: 1rem;
+    --landing-gap-top: max(0.75rem, env(safe-area-inset-top, 0px));
+    --mobile-nav-height: calc(4.35rem + env(safe-area-inset-bottom, 0px));
+    --mobile-landing-footer: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+    --mobile-content-pad-bottom: calc(6.75rem + env(safe-area-inset-bottom, 0px));
+    --mobile-pet-bottom-reserve: calc(5.25rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    overscroll-behavior-y: none;
+  }
+
+  /* 博客主滚动区底部留白，避免被底栏与桌宠遮挡 */
+  .main-scroll {
+    padding-bottom: var(--mobile-content-pad-bottom) !important;
+    padding-left: max(0.85rem, env(safe-area-inset-left, 0px)) !important;
+    padding-right: max(0.85rem, env(safe-area-inset-right, 0px)) !important;
+  }
+
+  /* 着陆页为底部滑动提示预留空间 */
+  .landing-wrap .hero-center {
+    padding-bottom: var(--mobile-landing-footer);
+  }
+
+  .landing-wrap .hero-footer {
+    bottom: max(0.65rem, env(safe-area-inset-bottom, 0px));
+    padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
+    padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
+  }
+
+  .landing-wrap .scroll-hint {
+    max-width: min(100%, calc(100vw - 1.5rem));
+  }
+
+  /* About 区块底部留白 */
+  #about .about-panel {
+    padding-bottom: 0.25rem;
+  }
+
+  #about .panel-bottom {
+    margin-bottom: 0.35rem;
+  }
+}
+
+@media (max-width: 380px) {
+  :root {
+    --landing-gap-x: 0.75rem;
+  }
+}

@@ -1,4 +1,5 @@
 import { onMounted, onUnmounted, ref, type Ref } from 'vue'
+import { isMobileViewport, mobileBottomReservePx } from '@/utils/viewport'
 
 const STORAGE_KEY = 'desktop-pet-position-v1'
 const DRAG_THRESHOLD_PX = 8
@@ -29,7 +30,16 @@ function saveStored(p: PetPosition) {
 }
 
 function defaultPosition(rootW: number, rootH: number): PetPosition {
-  const margin = 20
+  const margin = isMobileViewport() ? 10 : 20
+  const bottomReserve = isMobileViewport()
+    ? mobileBottomReservePx(!!document.querySelector('.blog-stage'))
+    : margin
+  if (isMobileViewport()) {
+    return {
+      x: margin,
+      y: Math.max(margin, window.innerHeight - rootH - bottomReserve),
+    }
+  }
   return {
     x: Math.max(margin, window.innerWidth - rootW - margin),
     y: Math.max(margin, window.innerHeight - rootH - margin),
@@ -37,9 +47,12 @@ function defaultPosition(rootW: number, rootH: number): PetPosition {
 }
 
 function clampPosition(x: number, y: number, rootW: number, rootH: number): PetPosition {
-  const margin = 8
+  const margin = isMobileViewport() ? 10 : 8
+  const bottomReserve = isMobileViewport()
+    ? mobileBottomReservePx(!!document.querySelector('.blog-stage'))
+    : margin
   const maxX = Math.max(margin, window.innerWidth - rootW - margin)
-  const maxY = Math.max(margin, window.innerHeight - rootH - margin)
+  const maxY = Math.max(margin, window.innerHeight - rootH - bottomReserve)
   return {
     x: Math.min(maxX, Math.max(margin, x)),
     y: Math.min(maxY, Math.max(margin, y)),
@@ -154,7 +167,7 @@ export function useDesktopPetPosition(
   }
 
   onMounted(() => {
-    requestAnimationFrame(() => measureAndPlace(true))
+    requestAnimationFrame(() => measureAndPlace(false))
     window.addEventListener('resize', onResize)
   })
 

@@ -275,15 +275,20 @@ function handleLogout() {
   .side-nav {
     width: 100%;
     height: auto;
+    min-height: var(--mobile-nav-height, auto);
     position: fixed;
     bottom: 0;
     top: auto;
     left: 0;
-    flex-direction: row;
-    align-items: center;
-    padding: 0.5rem 0.65rem;
-    border-radius: 20px 20px 0 0;
-    gap: 0.35rem;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0.4rem max(0.5rem, env(safe-area-inset-right, 0px))
+      calc(0.4rem + env(safe-area-inset-bottom, 0px))
+      max(0.5rem, env(safe-area-inset-left, 0px));
+    border-radius: 18px 18px 0 0;
+    gap: 0.3rem;
+    box-shadow: 0 -6px 28px rgba(0, 0, 0, 0.22);
   }
   .brand,
   .nav-foot,
@@ -294,45 +299,64 @@ function handleLogout() {
   .btn-publish-mobile {
     display: inline-flex;
     align-items: center;
-    padding: 0.45rem 0.75rem;
+    justify-content: center;
+    min-height: 40px;
+    padding: 0.4rem 0.65rem;
     border: 1px dashed rgba(255, 255, 255, 0.45);
     border-radius: 10px;
     background: rgba(255, 255, 255, 0.14);
     color: #fff;
-    font-size: 0.78rem;
+    font-size: 0.75rem;
     font-weight: 600;
     cursor: pointer;
-    white-space: nowrap;
-  }
-  .nav-bottom {
-    flex-direction: row;
-    margin-top: 0;
-    padding-top: 0;
-    border-top: none;
-    flex-shrink: 0;
-  }
-  .btn-logout {
-    width: auto;
-    padding: 0.45rem 0.75rem;
-    font-size: 0.78rem;
     white-space: nowrap;
   }
   .nav-list {
     flex-direction: row;
     flex: 1;
-    justify-content: space-around;
+    width: 100%;
+    justify-content: space-between;
+    gap: 0.2rem;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .nav-list::-webkit-scrollbar {
+    display: none;
   }
   .nav-item {
-    padding: 0.45rem 0.55rem;
-    min-width: 4.5rem;
+    flex: 1;
+    min-width: 0;
+    padding: 0.42rem 0.35rem;
     align-items: center;
+    min-height: 44px;
+    justify-content: center;
   }
   .nav-en {
     display: none;
   }
   .nav-label {
-    font-size: 0.78rem;
+    font-size: 0.76rem;
+    white-space: nowrap;
+  }
+  .nav-bottom {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    width: 100%;
+    margin-top: 0;
+    padding-top: 0.25rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.14);
+    gap: 0.35rem;
+    flex-shrink: 0;
+  }
+  .btn-logout {
+    width: auto;
+    min-height: 40px;
+    padding: 0.42rem 0.7rem;
+    font-size: 0.76rem;
+    white-space: nowrap;
   }
 }
 </style>

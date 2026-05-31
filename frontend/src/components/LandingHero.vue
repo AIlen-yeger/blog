@@ -280,55 +280,88 @@ const landingVideo = resolveLandingVideoUrl()
   .hero {
     justify-content: flex-start;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
   .hero-center {
     padding-top: var(--landing-gap-top);
-    padding-bottom: 4.75rem;
+    padding-bottom: var(--mobile-landing-footer, 5.5rem);
   }
   .hero-layout {
     grid-template-columns: 1fr;
+    gap: 0.85rem;
   }
   .hero-left {
     width: 100%;
     flex-direction: row;
     flex-wrap: wrap;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
-    gap: 1rem;
+    gap: 0.75rem;
   }
   .avatar-frame {
-    width: min(42vw, 160px);
-    height: min(52vw, 200px);
+    width: min(38vw, 140px);
+    height: min(46vw, 172px);
     margin: 0;
     flex-shrink: 0;
   }
   .identity {
     flex: 1;
-    min-width: 180px;
+    min-width: 0;
+    max-width: none;
+  }
+  .identity .name {
+    font-size: clamp(1.35rem, 5vw, 1.75rem);
+  }
+  .intro {
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
   }
   .hero-right {
     height: auto;
     max-height: none;
-    min-height: 240px;
+    min-height: 0;
+    gap: 0.45rem;
   }
   .hero-widgets-row {
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
     min-height: 0;
+    height: auto;
+    gap: 0.45rem;
+  }
+  .hero-widgets-row > :deep(.landing-clock) {
+    flex: 1 1 42%;
+    min-width: 9.5rem;
+  }
+  .hero-widgets-row > :deep(.landing-music) {
+    flex: 1 1 52%;
+    min-width: 10rem;
   }
 }
 
 @media (max-width: 520px) {
   .hero-left {
     flex-direction: column;
+    align-items: center;
     text-align: center;
   }
   .identity {
     text-align: center;
+    width: 100%;
   }
   .avatar-frame {
-    width: min(72vw, 220px);
-    height: min(88vw, 268px);
+    width: min(56vw, 168px);
+    height: min(68vw, 204px);
     margin: 0 auto;
+  }
+  .hero-widgets-row {
+    flex-direction: column;
+  }
+  .hero-widgets-row > :deep(.landing-clock),
+  .hero-widgets-row > :deep(.landing-music) {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
   }
 }
 </style>

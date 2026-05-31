@@ -39,7 +39,21 @@ const {
   sendMessage,
   stopStreaming,
   clearError,
+  clearHistory,
 } = useDesktopPetChat()
+
+const messageBodyRef = ref<HTMLElement | null>(null)
+
+function scrollMessageToBottom() {
+  const el = messageBodyRef.value
+  if (!el) return
+  el.scrollTop = el.scrollHeight
+}
+
+watch([displayText, isStreaming, bubbleTier], () => {
+  if (bubbleTier.value !== 'scroll') return
+  void nextTick(scrollMessageToBottom)
+})
 
 const { currentSprite, setChatOpen } = useDesktopPetSprite()
 
@@ -91,7 +105,7 @@ const spriteImgStyle = computed(() => {
 })
 
 onMounted(() => {
-  requestAnimationFrame(() => measureAndPlace(true))
+  requestAnimationFrame(() => measureAndPlace(false))
 })
 
 function onSpriteLoad() {
@@ -135,32 +149,42 @@ function onSpriteError(e: Event) {
           <div class="pet-assistant__qq-head">
             <span class="pet-assistant__name">Kohaku</span>
             <button
-              v-if="hasHistory"
               type="button"
               class="pet-assistant__history-btn"
               :aria-expanded="historyOpen"
-              :title="historyOpen ? '收起历史' : '展开历史'"
+              :title="historyOpen ? '收起历史' : '对话历史'"
               @click.stop="toggleHistory"
             >
+              <span class="pet-assistant__history-icon" aria-hidden="true">☰</span>
               <span class="pet-assistant__history-chevron" :class="{ open: historyOpen }">›</span>
             </button>
           </div>
 
           <Transition name="pet-history">
-            <div v-if="historyOpen && hasHistory" class="pet-assistant__history">
-              <div
-                v-for="msg in history"
-                :key="msg.id"
-                class="pet-assistant__history-item"
-                :class="msg.role"
-              >
-                <span class="pet-assistant__history-role">{{ msg.role === 'user' ? '你' : 'Kohaku' }}</span>
-                <p class="pet-assistant__history-text">{{ msg.content }}</p>
-              </div>
+            <div v-if="historyOpen" class="pet-assistant__history">
+              <div v-if="!hasHistory" class="pet-assistant__history-empty">暂无记录，发一条消息开始吧</div>
+              <template v-else>
+                <div
+                  v-for="msg in history"
+                  :key="msg.id"
+                  class="pet-assistant__history-item"
+                  :class="msg.role"
+                >
+                  <span class="pet-assistant__history-role">{{ msg.role === 'user' ? '你' : 'Kohaku' }}</span>
+                  <p class="pet-assistant__history-text">{{ msg.content }}</p>
+                </div>
+                <button type="button" class="pet-assistant__history-clear" @click.stop="clearHistory">
+                  清空本地历史
+                </button>
+              </template>
             </div>
           </Transition>
 
-          <div class="pet-assistant__qq-body">
+          <div
+            ref="messageBodyRef"
+            class="pet-assistant__qq-body"
+            :class="{ 'is-scrollable': bubbleTier === 'scroll' }"
+          >
             <p class="pet-assistant__msg">{{ displayText }}</p>
             <span v-if="isStreaming" class="pet-assistant__cursor" aria-hidden="true">▍</span>
           </div>
@@ -314,6 +338,34 @@ function onSpriteError(e: Event) {
   max-width: min(78vw, 320px);
 }
 
+.pet-assistant__speech--scroll {
+  min-width: 268px;
+  max-width: min(78vw, 320px);
+  max-height: min(52vh, 360px);
+  display: flex;
+  flex-direction: column;
+}
+
+.pet-assistant__speech--scroll .pet-assistant__qq-body.is-scrollable {
+  flex: 1;
+  min-height: 0;
+  max-height: min(36vh, 220px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 0.15rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(140, 190, 255, 0.45) transparent;
+}
+
+.pet-assistant__speech--scroll .pet-assistant__qq-body.is-scrollable::-webkit-scrollbar {
+  width: 5px;
+}
+
+.pet-assistant__speech--scroll .pet-assistant__qq-body.is-scrollable::-webkit-scrollbar-thumb {
+  border-radius: 4px;
+  background: rgba(140, 190, 255, 0.45);
+}
+
 .pet-assistant__tail {
   position: absolute;
   bottom: -7px;
@@ -349,15 +401,22 @@ function onSpriteError(e: Event) {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 1.3rem;
+  gap: 0.1rem;
+  min-width: 1.3rem;
   height: 1.3rem;
-  padding: 0;
+  padding: 0 0.2rem;
   border: 1px solid rgba(140, 190, 255, 0.2);
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.06);
   color: var(--qq-accent);
   cursor: pointer;
   transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.pet-assistant__history-icon {
+  font-size: 0.62rem;
+  line-height: 1;
+  opacity: 0.85;
 }
 
 .pet-assistant__history-btn:hover {
@@ -386,6 +445,31 @@ function onSpriteError(e: Event) {
   background: rgba(8, 16, 32, 0.35);
   border: 1px solid rgba(140, 190, 255, 0.14);
   font-size: 0.72rem;
+}
+
+.pet-assistant__history-empty {
+  margin: 0;
+  padding: 0.2rem 0;
+  color: rgba(160, 190, 220, 0.65);
+  text-align: center;
+  font-size: 0.68rem;
+}
+
+.pet-assistant__history-clear {
+  display: block;
+  width: 100%;
+  margin-top: 0.35rem;
+  padding: 0.2rem 0;
+  border: none;
+  border-top: 1px solid rgba(140, 190, 255, 0.14);
+  background: transparent;
+  color: rgba(160, 190, 220, 0.65);
+  font-size: 0.65rem;
+  cursor: pointer;
+}
+
+.pet-assistant__history-clear:hover {
+  color: #f0a0a0;
 }
 
 .pet-assistant__history-item {
@@ -653,14 +737,32 @@ function onSpriteError(e: Event) {
   max-height: 0;
 }
 
-@media (max-width: 640px) {
-  .pet-assistant__speech--wide {
-    max-width: calc(100vw - 2.5rem);
+@media (max-width: 767px) {
+  .pet-assistant {
+    z-index: 35;
+  }
+
+  .pet-assistant__speech--wide,
+  .pet-assistant__speech--scroll {
+    max-width: min(18.5rem, calc(100vw - 5.5rem));
+  }
+
+  .pet-assistant__speech {
+    max-width: min(17rem, calc(100vw - 4.5rem));
   }
 
   .pet-assistant__body {
-    width: 96px !important;
-    height: 144px !important;
+    width: 88px !important;
+    height: 132px !important;
+  }
+
+  .pet-assistant__input,
+  .pet-assistant__send {
+    min-height: 40px;
+  }
+
+  .pet-assistant.is-chat-open {
+    z-index: 50;
   }
 }
 </style>
