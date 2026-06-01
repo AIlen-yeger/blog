@@ -29,6 +29,13 @@ def _mcp_app_args(d: str, bot: str, friends: str) -> list[str]:
     ]
     if friends:
         args.extend(["--friends", friends])
+    token = (
+        os.getenv("QQ_MCP_ACCESS_TOKEN")
+        or os.getenv("NAPCAT_ACCESS_TOKEN")
+        or ""
+    ).strip()
+    if token:
+        args.extend(["--access-token", token])
     return args
 
 
