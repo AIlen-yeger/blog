@@ -5,12 +5,39 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shutil
+import sys
+from pathlib import Path
 from typing import Any, Awaitable, Callable
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 logger = logging.getLogger(__name__)
+
+
+def _mcp_app_args(d: str, bot: str, friends: str) -> list[str]:
+    args = [
+        "--qq",
+        bot,
+        "--napcat-host",
+        os.getenv("QQ_MCP_NAPCAT_HOST", "127.0.0.1"),
+        "--napcat-port",
+        os.getenv("QQ_MCP_NAPCAT_PORT", "3000"),
+        "--ws-port",
+        os.getenv("QQ_MCP_WS_PORT", "3001"),
+    ]
+    if friends:
+        args.extend(["--friends", friends])
+    return args
+
+
+def _venv_python(mcp_dir: Path) -> Path | None:
+    if sys.platform == "win32":
+        py = mcp_dir / ".venv" / "Scripts" / "python.exe"
+    else:
+        py = mcp_dir / ".venv" / "bin" / "python"
+    return py if py.is_file() else None
 
 
 def _params() -> StdioServerParameters:
@@ -23,24 +50,29 @@ def _params() -> StdioServerParameters:
         raise RuntimeError("请配置 QQ_MCP_DIR、QQ_MCP_BOT_QQ")
 
     friends = (os.getenv("QQ_MCP_FRIENDS") or "").strip()
-    args = [
-        "run",
-        "--directory",
-        d,
-        "qq-agent-mcp",
-        "--qq",
-        bot,
-        "--napcat-host",
-        os.getenv("QQ_MCP_NAPCAT_HOST", "127.0.0.1"),
-        "--napcat-port",
-        os.getenv("QQ_MCP_NAPCAT_PORT", "3000"),
-        "--ws-port",
-        os.getenv("QQ_MCP_WS_PORT", "3001"),
-    ]
-    if friends:
-        args.extend(["--friends", friends])
+    app_args = _mcp_app_args(d, bot, friends)
+    mcp_dir = Path(d)
 
-    return StdioServerParameters(command="uv", args=args)
+    uv_bin = (os.getenv("QQ_MCP_UV_BIN") or "").strip() or shutil.which("uv")
+    if uv_bin:
+        logger.info("[qq_mcp] launch via uv: %s", uv_bin)
+        return StdioServerParameters(
+            command=uv_bin,
+            args=["run", "--directory", d, "qq-agent-mcp", *app_args],
+        )
+
+    venv_py = _venv_python(mcp_dir)
+    if venv_py:
+        logger.info("[qq_mcp] launch via venv python: %s", venv_py)
+        return StdioServerParameters(
+            command=str(venv_py),
+            args=["-m", "qq_agent_mcp", *app_args],
+        )
+
+    raise RuntimeError(
+        "找不到 uv，且 QQ_MCP_DIR/.venv 未就绪。"
+        "请在 Amadeus 目录执行 uv sync，或设置 QQ_MCP_UV_BIN=/path/to/uv"
+    )
 
 
 def _text(result: Any) -> str:
