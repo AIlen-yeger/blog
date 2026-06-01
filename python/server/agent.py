@@ -28,6 +28,26 @@ def _normalize_base_url(url: str) -> str:
     return base + "/v1"
 
 
+def _music_polish_user_content(question: str, draft: str, *, channel: str = "web") -> str:
+    ch = (channel or "web").strip().lower()
+    qq_extra = ""
+    if ch == "qq":
+        qq_extra = (
+            "- QQ 私聊：最多 2 句短话，总字数约 60 字内，禁止旁白描写，禁止换行分段\n"
+        )
+    return (
+        f"用户问题：{question.strip()}\n\n"
+        "以下是音乐助手根据工具查询得到的事实摘要（草稿）。"
+        "请用 Kohaku 的语气重新写给用户。\n"
+        "硬性要求：\n"
+        "- 保留草稿中的全部事实、数字、歌名、艺人、次数等，不得编造或删改\n"
+        "- 不要提到草稿、工具、模型等内部流程\n"
+        "- 风格自然、有温度，第一人称口语\n"
+        f"{qq_extra}\n"
+        f"【事实草稿】\n{draft.strip()}"
+    )
+
+
 class ChatModel:
     def __init__(self):
         config = AgentConfig()
@@ -60,7 +80,16 @@ class ChatModel:
         )
         self.history = ChatHistoryService(config)
 
-    def chat(self, question: str, session_id: str, user_id: int, limit: int | None = None, *, trace_id: str = ""):
+    def chat(
+        self,
+        question: str,
+        session_id: str,
+        user_id: int,
+        limit: int | None = None,
+        *,
+        trace_id: str = "",
+        channel: str = "web",
+    ):
         """流式对话：逐 token 产出 SSE delta，结束后写入历史。"""
         bind_trace_from_state(
             {"trace_id": trace_id, "session_id": session_id, "user_id": user_id},
@@ -69,7 +98,7 @@ class ChatModel:
         record_model(self.model)
         if limit is None:
             limit = AgentConfig().history_limit
-        system_prompt = build_system_prompt()
+        system_prompt = build_system_prompt(channel=channel)
 
         history_message = self.history.get_recent_history(
             session_id=session_id,
@@ -137,6 +166,7 @@ class ChatModel:
         limit: int | None = None,
         *,
         trace_id: str = "",
+        channel: str = "qq",
     ) -> str:
         """非流式对话：QQ 等渠道一次性拿全文。"""
         bind_trace_from_state(
@@ -147,7 +177,7 @@ class ChatModel:
         if limit is None:
             limit = AgentConfig().history_limit
         messages = [
-            SystemMessage(content=build_system_prompt()),
+            SystemMessage(content=build_system_prompt(channel=channel)),
             *self._to_lc_messages(
                 self.history.get_recent_history(
                     session_id=session_id,
@@ -199,6 +229,7 @@ class ChatModel:
         user_id: int,
         limit: int | None = None,
         trace_id: str = "",
+        channel: str = "web",
     ):
         """千问 ReAct 草稿 → DeepSeek 流式润色（保留事实、Kohaku 语气）。"""
         bind_trace_from_state(
@@ -209,17 +240,10 @@ class ChatModel:
         if limit is None:
             limit = AgentConfig().history_limit
 
-        system_prompt = build_system_prompt(intent="music", user_logged_in=True)
-        user_content = (
-            f"用户问题：{question.strip()}\n\n"
-            "以下是音乐助手根据工具查询得到的事实摘要（草稿）。"
-            "请用 Kohaku 的语气重新写给用户。\n"
-            "硬性要求：\n"
-            "- 保留草稿中的全部事实、数字、歌名、艺人、次数等，不得编造或删改\n"
-            "- 不要提到草稿、工具、模型等内部流程\n"
-            "- 风格自然、有温度\n\n"
-            f"【事实草稿】\n{draft.strip()}"
+        system_prompt = build_system_prompt(
+            intent="music", user_logged_in=True, channel=channel
         )
+        user_content = _music_polish_user_content(question, draft, channel=channel)
 
         history_message = self.history.get_recent_history(
             session_id=session_id,
@@ -277,6 +301,7 @@ class ChatModel:
         user_id: int,
         limit: int | None = None,
         trace_id: str = "",
+        channel: str = "web",
     ) -> str:
         """千问 ReAct 草稿 → DeepSeek 非流式润色。"""
         bind_trace_from_state(
@@ -287,17 +312,10 @@ class ChatModel:
         if limit is None:
             limit = AgentConfig().history_limit
 
-        system_prompt = build_system_prompt(intent="music", user_logged_in=True)
-        user_content = (
-            f"用户问题：{question.strip()}\n\n"
-            "以下是音乐助手根据工具查询得到的事实摘要（草稿）。"
-            "请用 Kohaku 的语气重新写给用户。\n"
-            "硬性要求：\n"
-            "- 保留草稿中的全部事实、数字、歌名、艺人、次数等，不得编造或删改\n"
-            "- 不要提到草稿、工具、模型等内部流程\n"
-            "- 风格自然、有温度\n\n"
-            f"【事实草稿】\n{draft.strip()}"
+        system_prompt = build_system_prompt(
+            intent="music", user_logged_in=True, channel=channel
         )
+        user_content = _music_polish_user_content(question, draft, channel=channel)
         history_message = self.history.get_recent_history(
             session_id=session_id,
             user_id=user_id,

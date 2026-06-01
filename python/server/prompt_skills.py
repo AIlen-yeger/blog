@@ -1,8 +1,6 @@
-"""提示词分层：角色设定（始终） + 按意图加载的技能片段。"""
+"""提示词分层：角色设定 + 渠道技能 + 意图技能。"""
 
 from __future__ import annotations
-
-from functools import lru_cache
 
 from utils.path_tools import get_abs_path
 
@@ -13,8 +11,13 @@ INTENT_SKILL_MAP: dict[str, str] = {
     "bug": "bug",
 }
 
+# 渠道 → 场景技能（QQ 日常陪伴 / Web 业务助手）
+CHANNEL_SKILL_MAP: dict[str, str] = {
+    "qq": "channel_qq",
+    "web": "channel_web",
+}
 
-@lru_cache(maxsize=8)
+
 def _read_text(relative_path: str) -> str:
     path = get_abs_path(relative_path)
     with open(path, "r", encoding="utf-8") as f:
@@ -25,12 +28,17 @@ def build_system_prompt(
     *,
     intent: str | None = None,
     user_logged_in: bool = False,
+    channel: str | None = None,
 ) -> str:
     """
-    组装 System 提示：先角色设定，再按需追加技能片段。
-    intent 为 music / add_son 时加载音乐技能；bug 为内部运维，不用 Kohaku 人设。
+    组装 System 提示：
+      1. prompt/system_prompt（身份 + 全员格式底线）
+      2. prompt/skills/channel_{qq|web}.txt（渠道场景）
+      3. prompt/skills/{music|bug}.txt（意图技能，按需）
     """
-    if (intent or "").strip().lower() == "bug":
+    intent_key = (intent or "").strip().lower()
+
+    if intent_key == "bug":
         parts: list[str] = [_read_text("prompt/bug_ops_system.txt")]
         skill_key = INTENT_SKILL_MAP.get("bug")
         if skill_key:
@@ -39,7 +47,12 @@ def build_system_prompt(
 
     parts: list[str] = [_read_text("prompt/system_prompt")]
 
-    skill_key = INTENT_SKILL_MAP.get((intent or "").strip().lower())
+    ch = (channel or "web").strip().lower()
+    channel_skill = CHANNEL_SKILL_MAP.get(ch)
+    if channel_skill:
+        parts.append(_read_text(f"prompt/skills/{channel_skill}.txt"))
+
+    skill_key = INTENT_SKILL_MAP.get(intent_key)
     if skill_key:
         parts.append(_read_text(f"prompt/skills/{skill_key}.txt"))
 

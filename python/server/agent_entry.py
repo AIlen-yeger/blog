@@ -109,6 +109,8 @@ class AgentEntry:
         limit = state.get("limit") or _DEFAULT_HISTORY_LIMIT
         trace_id = state.get("trace_id") or ""
 
+        channel = (state.get("channel") or "web").strip().lower()
+
         if intent == "chat":
             return self._chat_once(
                 question=question,
@@ -116,6 +118,7 @@ class AgentEntry:
                 user_id=user_id,
                 limit=limit,
                 trace_id=trace_id,
+                channel=channel,
             )
 
         if intent in ("music", "add_son"):
@@ -130,6 +133,7 @@ class AgentEntry:
                     user_id=user_id,
                     limit=limit,
                     trace_id=trace_id,
+                    channel=channel,
                 )
             return final
 
@@ -142,6 +146,7 @@ class AgentEntry:
             user_id=user_id,
             limit=limit,
             trace_id=trace_id,
+            channel=channel,
         )
 
     def run_once(
@@ -211,6 +216,8 @@ class AgentEntry:
         bind_trace_from_state(state, intent=intent)
         state["intent"] = intent
 
+        channel = (state.get("channel") or "web").strip().lower()
+
         if intent == "chat":
             yield from self._stream_chat(
                 question=question,
@@ -218,6 +225,7 @@ class AgentEntry:
                 user_id=user_id,
                 limit=limit,
                 trace_id=trace_id,
+                channel=channel,
             )
             return
 
@@ -233,6 +241,7 @@ class AgentEntry:
                     user_id=user_id,
                     limit=limit,
                     trace_id=trace_id,
+                    channel=channel,
                 )
                 return
             yield _format_sse({"type": "message", "content": final})
@@ -255,6 +264,7 @@ class AgentEntry:
             user_id=user_id,
             limit=limit,
             trace_id=trace_id,
+            channel=channel,
         )
 
     def _chat_once(
@@ -265,6 +275,7 @@ class AgentEntry:
         user_id: int,
         limit: int,
         trace_id: str = "",
+        channel: str = "qq",
     ) -> str:
         bind_trace_from_state(
             {"trace_id": trace_id, "session_id": session_id, "user_id": user_id},
@@ -277,6 +288,7 @@ class AgentEntry:
                 user_id=user_id,
                 limit=limit,
                 trace_id=trace_id,
+                channel=channel,
             )
         except Exception as exc:
             logger.exception("[agent] chat_once failed session_id=%s", session_id)
@@ -291,6 +303,7 @@ class AgentEntry:
         user_id: int,
         limit: int,
         trace_id: str = "",
+        channel: str = "web",
     ) -> str:
         bind_trace_from_state(
             {"trace_id": trace_id, "session_id": session_id, "user_id": user_id},
@@ -304,6 +317,7 @@ class AgentEntry:
                 user_id=user_id,
                 limit=limit,
                 trace_id=trace_id,
+                channel=channel,
             )
         except Exception as exc:
             logger.exception("[agent] music polish_once failed session_id=%s", session_id)
@@ -317,6 +331,7 @@ class AgentEntry:
         user_id: int,
         limit: int,
         trace_id: str = "",
+        channel: str = "web",
     ) -> Iterator[str]:
         bind_trace_from_state(
             {"trace_id": trace_id, "session_id": session_id, "user_id": user_id},
@@ -329,6 +344,7 @@ class AgentEntry:
                 user_id=user_id,
                 limit=limit,
                 trace_id=trace_id,
+                channel=channel,
             ):
                 if isinstance(chunk, dict):
                     yield _format_sse(chunk)
@@ -348,6 +364,7 @@ class AgentEntry:
         user_id: int,
         limit: int,
         trace_id: str = "",
+        channel: str = "web",
     ) -> Iterator[str]:
         """千问草稿 → DeepSeek 流式润色。"""
         bind_trace_from_state(
@@ -362,6 +379,7 @@ class AgentEntry:
                 user_id=user_id,
                 limit=limit,
                 trace_id=trace_id,
+                channel=channel,
             ):
                 if isinstance(chunk, dict):
                     yield _format_sse(chunk)

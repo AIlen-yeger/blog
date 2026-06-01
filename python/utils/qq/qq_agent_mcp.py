@@ -1,3 +1,4 @@
+
 """MCP 客户端：连接 qq-agent-mcp（stdio）。"""
 from __future__ import annotations
 
