@@ -53,7 +53,33 @@ def _params() -> StdioServerParameters:
     app_args = _mcp_app_args(d, bot, friends)
     mcp_dir = Path(d)
 
-    uv_bin = (os.getenv("QQ_MCP_UV_BIN") or "").strip() or shutil.which("uv")
+    explicit_py = (os.getenv("QQ_MCP_PYTHON") or "").strip()
+    if explicit_py:
+        if not os.path.isfile(explicit_py) or not os.access(explicit_py, os.X_OK):
+            raise RuntimeError(f"QQ_MCP_PYTHON 不可执行: {explicit_py}")
+        logger.info("[qq_mcp] launch via QQ_MCP_PYTHON: %s", explicit_py)
+        return StdioServerParameters(
+            command=explicit_py,
+            args=["-m", "qq_agent_mcp", *app_args],
+        )
+
+    venv_py = _venv_python(mcp_dir)
+    if venv_py:
+        logger.info("[qq_mcp] launch via venv: %s", venv_py)
+        return StdioServerParameters(
+            command=str(venv_py),
+            args=["-m", "qq_agent_mcp", *app_args],
+        )
+
+    uv_bin = (os.getenv("QQ_MCP_UV_BIN") or "").strip()
+    if uv_bin and not os.path.isabs(uv_bin):
+        logger.warning("[qq_mcp] QQ_MCP_UV_BIN=%r 须为绝对路径，已忽略", uv_bin)
+        uv_bin = ""
+    if uv_bin and not os.access(uv_bin, os.X_OK):
+        logger.warning("[qq_mcp] QQ_MCP_UV_BIN 不可执行: %s", uv_bin)
+        uv_bin = ""
+    if not uv_bin:
+        uv_bin = shutil.which("uv") or ""
     if uv_bin:
         logger.info("[qq_mcp] launch via uv: %s", uv_bin)
         return StdioServerParameters(
@@ -61,17 +87,10 @@ def _params() -> StdioServerParameters:
             args=["run", "--directory", d, "qq-agent-mcp", *app_args],
         )
 
-    venv_py = _venv_python(mcp_dir)
-    if venv_py:
-        logger.info("[qq_mcp] launch via venv python: %s", venv_py)
-        return StdioServerParameters(
-            command=str(venv_py),
-            args=["-m", "qq_agent_mcp", *app_args],
-        )
-
     raise RuntimeError(
-        "找不到 uv，且 QQ_MCP_DIR/.venv 未就绪。"
-        "请在 Amadeus 目录执行 uv sync，或设置 QQ_MCP_UV_BIN=/path/to/uv"
+        f"无法启动 qq-agent-mcp：{mcp_dir}/.venv 不存在。"
+        "请在 Amadeus 执行 uv sync，或在 .env 设置 "
+        "QQ_MCP_PYTHON=/opt/Amadeus-QQ-MCP/.venv/bin/python"
     )
 
 
@@ -155,7 +174,9 @@ class QqMcpSession:
     async def open(self) -> None:
         if self._session is not None:
             return
-        self._ctx = stdio_client(_params())
+        params = _params()
+        logger.info("[qq_mcp] spawn command=%s", params.command)
+        self._ctx = stdio_client(params)
         r, w = await self._ctx.__aenter__()
         self._session = ClientSession(r, w)
         await self._session.__aenter__()
