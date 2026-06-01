@@ -157,6 +157,14 @@ class AgentConfig:
         self.napcat_access_token = _env_str("NAPCAT_ACCESS_TOKEN", "")
         self.napcat_min_severity = (_env_str("NAPCAT_MIN_SEVERITY", "high") or "high").lower()
         self.napcat_alert_on_error = _env_bool("NAPCAT_ALERT_ON_ERROR", True)
+        self.qq_mcp_enabled = _env_bool("QQ_MCP_ENABLED", False)
+        self.qq_mcp_dir = _env_str("QQ_MCP_DIR", "")
+        self.qq_mcp_bot_qq = _env_str("QQ_MCP_BOT_QQ", "")
+        self.qq_mcp_friends = _env_str("QQ_MCP_FRIENDS", "")  # 逗号分隔
+        self.qq_mcp_poll_interval = _env_float("QQ_MCP_POLL_INTERVAL_SEC", 5.0)
+        self.qq_mcp_napcat_host = _env_str("QQ_MCP_NAPCAT_HOST", "127.0.0.1")
+        self.qq_mcp_napcat_port = _env_str("QQ_MCP_NAPCAT_PORT", "3000")
+        self.qq_mcp_ws_port = _env_str("QQ_MCP_WS_PORT", "3001")
 
 
 def _key_status(value: str) -> str:
@@ -194,7 +202,7 @@ def log_startup_config() -> None:
         cfg.react_base_url,
     )
     logger.info("[config] music_final_via_chat=%s", cfg.music_final_via_chat)
-    from utils.napcat_notify import napcat_configured
+    from utils.qq.napcat_notify import napcat_configured
 
     logger.info(
         "[config] napcat enabled=%s configured=%s url=%s qq=%s min_severity=%s",
@@ -203,6 +211,14 @@ def log_startup_config() -> None:
         cfg.napcat_http_url or "-",
         cfg.napcat_alert_qq or "MISSING",
         cfg.napcat_min_severity,
+    )
+    logger.info(
+        "[config] qq_mcp enabled=%s dir=%s bot=%s friends=%s interval=%.1fs",
+        cfg.qq_mcp_enabled,
+        cfg.qq_mcp_dir or "MISSING",
+        cfg.qq_mcp_bot_qq or "MISSING",
+        cfg.qq_mcp_friends or "-",
+        cfg.qq_mcp_poll_interval,
     )
     missing: list[str] = []
     if not cfg.mysql_password:

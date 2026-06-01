@@ -51,6 +51,14 @@ function isPC() {
   return window.matchMedia('(pointer: fine)').matches && window.innerWidth >= 768
 }
 
+/** 着陆页可滚动容器（与 mobile.css 中 .landing-wrap 滚动策略一致） */
+function findLandingScroller(): HTMLElement | null {
+  if (typeof document === 'undefined') return null
+  const wrap = document.querySelector('.landing-wrap') as HTMLElement | null
+  if (!wrap || wrap.classList.contains('is-leaving')) return null
+  return wrap
+}
+
 function openLogin() {
   if (!loggedIn.value && !showLogin.value) {
     showLogin.value = true
@@ -114,9 +122,24 @@ function onTouchStart(e: TouchEvent) {
 function onTouchEnd(e: TouchEvent) {
   if (inBlog.value || showLogin.value || isPC()) return
   const endY = e.changedTouches[0]?.clientY ?? 0
-  if (endY - touchStartY > 60) {
+  const deltaY = endY - touchStartY
+
+  const scroller = findLandingScroller()
+  const scrollable =
+    scroller != null && scroller.scrollHeight > scroller.clientHeight + 8
+
+  // 真机「手指上移看下方内容」会被误判为「向上进入博客」；仅在滚到顶/底时才响应滑动手势
+  if (scrollable && scroller) {
+    const atTop = scroller.scrollTop <= 8
+    const atBottom =
+      scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 8
+    if (deltaY > 60 && !atTop) return
+    if (deltaY < -60 && !atBottom) return
+  }
+
+  if (deltaY > 60) {
     enterAsGuest()
-  } else if (touchStartY - endY > 60) {
+  } else if (deltaY < -60) {
     if (loggedIn.value) enterBlogLoggedIn()
     else openLogin()
   }

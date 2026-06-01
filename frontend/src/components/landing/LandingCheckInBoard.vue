@@ -128,7 +128,9 @@ const weekdays = ['日', '一', '二', '三', '四', '五', '六']
 @media (max-width: 767px) {
   .check-in-board {
     padding: 0.5rem 0.55rem;
-    min-height: 7.5rem;
+    min-height: 6.25rem;
+    max-height: 8.5rem;
+    flex: 0 1 auto;
   }
   .board-title {
     font-size: 0.85rem;

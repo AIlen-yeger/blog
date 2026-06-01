@@ -121,7 +121,7 @@ def mark_napcat_sent(fp: str) -> None:
 def try_send_napcat_error_alert(payload: dict[str, Any], *, severity: str) -> dict[str, Any] | None:
     """严重错误时即时 QQ 私聊（与 Bug Ops 分析并行，同指纹只发一次）。"""
     from config.config import AgentConfig
-    from utils.napcat_notify import napcat_configured, send_developer_alert
+    from utils.qq.napcat_notify import napcat_configured, send_developer_alert
 
     cfg = AgentConfig()
     if not cfg.napcat_alert_on_error or not napcat_configured():

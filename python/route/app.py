@@ -142,7 +142,7 @@ def ops_napcat_test(x_ops_token: str | None = Header(default=None, alias="X-Ops-
     if denied:
         return denied
 
-    from utils.napcat_notify import napcat_configured, send_developer_alert
+    from utils.qq.napcat_notify import napcat_configured, send_developer_alert
 
     if not napcat_configured():
         return JSONResponse(

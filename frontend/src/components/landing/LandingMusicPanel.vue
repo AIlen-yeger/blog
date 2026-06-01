@@ -305,6 +305,9 @@ function onEmbedInteract() {
 @media (max-width: 767px) {
   .landing-music {
     padding: 0.35rem 0.45rem;
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 5.5rem;
   }
   .music-label {
     font-size: 0.68rem;
@@ -316,10 +319,12 @@ function onEmbedInteract() {
     min-height: 44px;
   }
   .music-embed-wrap {
-    min-height: 56px;
+    min-height: 62px;
+    flex-shrink: 0;
   }
   .music-embed-wrap :deep(.qq-music-embed__frame) {
-    height: 56px;
+    height: 62px;
+    min-height: 62px;
   }
 }
 

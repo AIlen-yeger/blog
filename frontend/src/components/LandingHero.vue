@@ -279,12 +279,10 @@ const landingVideo = resolveLandingVideoUrl()
 @media (max-width: 900px) {
   .hero {
     justify-content: flex-start;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
   }
   .hero-center {
     padding-top: var(--landing-gap-top);
-    padding-bottom: var(--mobile-landing-footer, 5.5rem);
+    padding-bottom: 1rem;
   }
   .hero-layout {
     grid-template-columns: 1fr;
@@ -321,11 +319,12 @@ const landingVideo = resolveLandingVideoUrl()
     max-height: none;
     min-height: 0;
     gap: 0.45rem;
+    overflow: visible;
   }
   .hero-widgets-row {
     flex-direction: row;
     flex-wrap: wrap;
-    min-height: 0;
+    min-height: 5.75rem;
     height: auto;
     gap: 0.45rem;
   }
@@ -350,18 +349,29 @@ const landingVideo = resolveLandingVideoUrl()
     width: 100%;
   }
   .avatar-frame {
-    width: min(56vw, 168px);
-    height: min(68vw, 204px);
+    width: min(52vw, 156px);
+    height: min(64vw, 192px);
     margin: 0 auto;
+  }
+  .hero-right :deep(.check-in-board) {
+    min-height: 6.5rem;
+    max-height: 8.5rem;
   }
   .hero-widgets-row {
     flex-direction: column;
+    min-height: 0;
   }
   .hero-widgets-row > :deep(.landing-clock),
   .hero-widgets-row > :deep(.landing-music) {
     flex: 1 1 auto;
     width: 100%;
     min-width: 0;
+  }
+  .hero-widgets-row > :deep(.landing-music) {
+    min-height: 5.5rem;
+  }
+  .hero-widgets-row > :deep(.landing-music .music-embed-wrap) {
+    min-height: 62px;
   }
 }
 </style>

@@ -8,7 +8,7 @@ import re
 
 from langchain_core.tools import tool
 
-from utils import qq_music_tools as qq
+from utils.qq import qq_music_tools as qq
 from utils.sogou_mcp_search import search_song_background_story_sync
 from utils.trace_log import log_event, preview
 

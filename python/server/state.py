@@ -20,4 +20,5 @@ class AgentState(TypedDict, total=False):
     user_id: int
     limit: int
     access_token: str
+    channel: str  # web | qq | internal
     messages: Annotated[list[AnyMessage], add_messages]

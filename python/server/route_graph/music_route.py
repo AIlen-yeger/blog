@@ -18,15 +18,12 @@ from server.prompt_skills import build_system_prompt
 from server.state import AgentState
 from server.tools.music_agent_tools import build_music_tools, detect_music_task_mode
 from service.chat_history import ChatHistoryService
-from utils.qq_music_tools import (
-    get_track_by_song_id,
-    parse_qq_music_url,
+from utils.qq.qq_music_tools import (
     parse_qq_share_with_meta,
     save_music_track,
 )
 from utils.trace_log import (
     answer_log_fields,
-    bind_trace,
     bind_trace_from_state,
     log_event,
     preview,

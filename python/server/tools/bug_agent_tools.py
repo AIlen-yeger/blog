@@ -69,7 +69,7 @@ def search_agent_logs(keyword: str, stream: str = "summary", limit: int = 30) ->
 @tool
 def notify_developer(title: str, message: str, severity: str = "medium") -> str:
     """向开发者 QQ 发送告警（NapCat OneBot HTTP 私聊）。"""
-    from utils.napcat_notify import send_developer_alert
+    from utils.qq.napcat_notify import send_developer_alert
 
     trace = current_trace()
     result = send_developer_alert(

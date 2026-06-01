@@ -1,11 +1,7 @@
 """QQ 音乐相关 MCP 工具（stdio 模式，供 Cursor 等客户端连接）."""
 from __future__ import annotations
 
-import re
-
 from mcp.server.fastmcp import FastMCP
-
-from utils.qq_music_tools import get_track_by_song_id
 
 mcp = FastMCP("blog-music")
 

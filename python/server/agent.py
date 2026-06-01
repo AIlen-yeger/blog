@@ -129,6 +129,67 @@ class ChatModel:
             **answer_log_fields(answer),
         )
 
+    def chat_once(
+        self,
+        question: str,
+        session_id: str,
+        user_id: int,
+        limit: int | None = None,
+        *,
+        trace_id: str = "",
+    ) -> str:
+        """非流式对话：QQ 等渠道一次性拿全文。"""
+        bind_trace_from_state(
+            {"trace_id": trace_id, "session_id": session_id, "user_id": user_id},
+            intent="chat",
+        )
+        record_model(self.model)
+        if limit is None:
+            limit = AgentConfig().history_limit
+        messages = [
+            SystemMessage(content=build_system_prompt()),
+            *self._to_lc_messages(
+                self.history.get_recent_history(
+                    session_id=session_id,
+                    user_id=user_id,
+                    limit=limit,
+                )
+            ),
+            HumanMessage(content=question),
+        ]
+        try:
+            resp = self.chat_llm.invoke(messages)
+            content = resp.content
+            if isinstance(content, str):
+                answer = content.strip()
+            elif isinstance(content, list):
+                answer = "".join(
+                    str(item.get("text", "")) for item in content if isinstance(item, dict)
+                ).strip()
+            else:
+                answer = str(content or "").strip()
+        except Exception as exc:
+            logger.exception("[agent] llm invoke failed session_id=%s", session_id)
+            return f"模型调用失败：{exc}。请检查 DP_AGENT_API_KEY 与网络。"
+
+        if not answer:
+            return "模型未返回内容，请检查 DP_MODEL 是否为 deepseek-chat 且 API 额度正常"
+
+        self.history.save_turn(
+            session_id=session_id,
+            user_id=user_id,
+            user_question=question,
+            assistant_answer=answer,
+        )
+        log_event(
+            "chat.done",
+            model=self.model,
+            session_id=session_id,
+            user_id=user_id,
+            **answer_log_fields(answer),
+        )
+        return answer
+
     def rewrite_music_stream(
         self,
         *,
@@ -206,6 +267,78 @@ class ChatModel:
             draft_length=len(draft),
             **answer_log_fields(answer),
         )
+
+    def rewrite_music_once(
+        self,
+        *,
+        question: str,
+        draft: str,
+        session_id: str,
+        user_id: int,
+        limit: int | None = None,
+        trace_id: str = "",
+    ) -> str:
+        """千问 ReAct 草稿 → DeepSeek 非流式润色。"""
+        bind_trace_from_state(
+            {"trace_id": trace_id, "session_id": session_id, "user_id": user_id},
+            intent="music",
+        )
+        record_model(self.model)
+        if limit is None:
+            limit = AgentConfig().history_limit
+
+        system_prompt = build_system_prompt(intent="music", user_logged_in=True)
+        user_content = (
+            f"用户问题：{question.strip()}\n\n"
+            "以下是音乐助手根据工具查询得到的事实摘要（草稿）。"
+            "请用 Kohaku 的语气重新写给用户。\n"
+            "硬性要求：\n"
+            "- 保留草稿中的全部事实、数字、歌名、艺人、次数等，不得编造或删改\n"
+            "- 不要提到草稿、工具、模型等内部流程\n"
+            "- 风格自然、有温度\n\n"
+            f"【事实草稿】\n{draft.strip()}"
+        )
+        history_message = self.history.get_recent_history(
+            session_id=session_id,
+            user_id=user_id,
+            limit=limit,
+        )
+        messages = [
+            SystemMessage(content=system_prompt),
+            *self._to_lc_messages(history_message),
+            HumanMessage(content=user_content),
+        ]
+        try:
+            resp = self.chat_llm.invoke(messages)
+            content = resp.content
+            if isinstance(content, str):
+                answer = content.strip()
+            elif isinstance(content, list):
+                answer = "".join(
+                    str(item.get("text", "")) for item in content if isinstance(item, dict)
+                ).strip()
+            else:
+                answer = str(content or "").strip()
+        except Exception as exc:
+            logger.exception("[agent] music polish invoke failed session_id=%s", session_id)
+            return draft.strip() or f"回复润色失败：{exc}"
+
+        answer = answer or draft.strip()
+        self.history.save_turn(
+            session_id=session_id,
+            user_id=user_id,
+            user_question=question,
+            assistant_answer=answer,
+        )
+        log_event(
+            "music.polish.done",
+            model=self.model,
+            session_id=session_id,
+            user_id=user_id,
+            draft_length=len(draft),
+            **answer_log_fields(answer),
+        )
+        return answer
 
     @staticmethod
     def _to_lc_messages(history_messages: list[dict[str, str]]) -> list[Any]:

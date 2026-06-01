@@ -1,8 +1,8 @@
 """
 Agent 统一入口（方案 A）：
   1. LangGraph 路由器只做意图识别
-  2. chat → 直接流式 ChatModel.chat（SSE）
-  3. 其它意图 → 暂返回提示，后续再接工具子图 / invoke
+  2. chat → 流式 ChatModel.chat（SSE）或非流式 chat_once（QQ 等）
+  3. 其它意图 → 工具子图 / invoke
 """
 
 import json
@@ -13,7 +13,15 @@ from config.config import AgentConfig
 from server.application_graph import AgentLangGraph, intent_from_question
 from server.route_graph.music_route import run_music_react
 from server.state import AgentState
-from utils.trace_log import bind_trace, bind_trace_from_state, log_event, record_model, span
+from utils.trace_log import (
+    bind_trace,
+    bind_trace_from_state,
+    log_event,
+    new_trace_id,
+    preview,
+    record_model,
+    span,
+)
 
 _DEFAULT_HISTORY_LIMIT = AgentConfig().history_limit
 
@@ -40,35 +48,34 @@ class AgentEntry:
     def classify_intent(self, state: AgentState) -> str:
         return self._graph_agent.classify_intent(state)
 
-    def stream_sse(
+    def _build_state(
         self,
         *,
         question: str,
         session_id: str,
         user_id: int,
-        limit: int = _DEFAULT_HISTORY_LIMIT,
-        access_token: str = "",
-        trace_id: str = "",
-    ) -> Iterator[str]:
-        """供 FastAPI StreamingResponse 使用。"""
-        state: AgentState = {
+        limit: int,
+        access_token: str,
+        trace_id: str,
+        channel: str,
+    ) -> AgentState:
+        return {
             "question": question,
             "session_id": session_id,
             "user_id": user_id,
             "limit": limit,
             "access_token": access_token,
             "trace_id": trace_id,
+            "channel": channel,
         }
-        bind_trace(
-            trace_id=trace_id or None,
-            session_id=session_id,
-            user_id=user_id,
-        )
 
-        intent = "chat"
+    def _classify_with_fallback(self, state: AgentState) -> str:
+        question = state.get("question") or ""
+        session_id = state.get("session_id") or ""
+        trace_id = state.get("trace_id") or ""
         with span("intent.classify"):
             try:
-                intent = self.classify_intent(state) or "chat"
+                return self.classify_intent(state) or "chat"
             except Exception:
                 logger.exception(
                     "[agent] classify_intent failed session_id=%s trace_id=%s",
@@ -80,21 +87,129 @@ class AgentEntry:
                     "intent.fallback",
                     reason="classify_exception",
                     intent=intent,
-                    question_preview=(question or "")[:120],
+                    question_preview=preview(question, 120),
                 )
+                return intent
 
+    def _log_intent_classified(self, intent: str, question: str) -> None:
         bind_trace(intent=intent)
-        judge_model = AgentConfig().judge_model_name
-        record_model(judge_model)
+        record_model(AgentConfig().judge_model_name)
         log_event(
             "intent.classified",
             intent=intent,
-            model=judge_model,
-            question_preview=(question or "")[:120],
+            model=AgentConfig().judge_model_name,
+            question_preview=preview(question, 120),
         )
+
+    def _resolve_reply(self, state: AgentState, *, intent: str) -> str:
+        """非流式总出口：QQ / 脚本等 channel!=web 时使用。"""
+        question = state["question"]
+        session_id = state["session_id"]
+        user_id = state["user_id"]
+        limit = state.get("limit") or _DEFAULT_HISTORY_LIMIT
+        trace_id = state.get("trace_id") or ""
+
+        if intent == "chat":
+            return self._chat_once(
+                question=question,
+                session_id=session_id,
+                user_id=user_id,
+                limit=limit,
+                trace_id=trace_id,
+            )
+
+        if intent in ("music", "add_son"):
+            result = run_music_react(state)
+            final = (result.get("final_answer") or "").strip() or "处理完成"
+            if result.get("polish"):
+                log_event("music.polish.start", draft_length=len(final))
+                return self._music_polish_once(
+                    question=question,
+                    draft=final,
+                    session_id=session_id,
+                    user_id=user_id,
+                    limit=limit,
+                    trace_id=trace_id,
+                )
+            return final
+
+        if intent == "commit_user":
+            return "笔记回复功能开发中，敬请期待。"
+
+        return self._chat_once(
+            question=question,
+            session_id=session_id,
+            user_id=user_id,
+            limit=limit,
+            trace_id=trace_id,
+        )
+
+    def run_once(
+        self,
+        *,
+        question: str,
+        session_id: str,
+        user_id: int = 0,
+        limit: int | None = None,
+        access_token: str = "",
+        trace_id: str = "",
+        channel: str = "qq",
+    ) -> str:
+        """非流式一次性回复；QQ 桥接使用 channel=qq。"""
+        tid = trace_id or new_trace_id()
+        lim = limit or _DEFAULT_HISTORY_LIMIT
+        state = self._build_state(
+            question=question,
+            session_id=session_id,
+            user_id=user_id,
+            limit=lim,
+            access_token=access_token,
+            trace_id=tid,
+            channel=channel,
+        )
+        bind_trace(
+            trace_id=tid,
+            session_id=session_id,
+            user_id=user_id,
+        )
+        intent = self._classify_with_fallback(state)
+        state["intent"] = intent
+        self._log_intent_classified(intent, question)
+        bind_trace_from_state(state, intent=intent)
+        return self._resolve_reply(state, intent=intent)
+
+    def stream_sse(
+        self,
+        *,
+        question: str,
+        session_id: str,
+        user_id: int,
+        limit: int = _DEFAULT_HISTORY_LIMIT,
+        access_token: str = "",
+        trace_id: str = "",
+    ) -> Iterator[str]:
+        """供 FastAPI StreamingResponse 使用（桌宠等 web 渠道）。"""
+        state = self._build_state(
+            question=question,
+            session_id=session_id,
+            user_id=user_id,
+            limit=limit,
+            access_token=access_token,
+            trace_id=trace_id,
+            channel="web",
+        )
+        bind_trace(
+            trace_id=trace_id or None,
+            session_id=session_id,
+            user_id=user_id,
+        )
+
+        intent = self._classify_with_fallback(state)
+        self._log_intent_classified(intent, question)
         yield _format_sse({"type": "meta", "intent": intent})
 
         bind_trace_from_state(state, intent=intent)
+        state["intent"] = intent
 
         if intent == "chat":
             yield from self._stream_chat(
@@ -141,6 +256,58 @@ class AgentEntry:
             limit=limit,
             trace_id=trace_id,
         )
+
+    def _chat_once(
+        self,
+        *,
+        question: str,
+        session_id: str,
+        user_id: int,
+        limit: int,
+        trace_id: str = "",
+    ) -> str:
+        bind_trace_from_state(
+            {"trace_id": trace_id, "session_id": session_id, "user_id": user_id},
+            intent="chat",
+        )
+        try:
+            return self.chat_model.chat_once(
+                question=question,
+                session_id=session_id,
+                user_id=user_id,
+                limit=limit,
+                trace_id=trace_id,
+            )
+        except Exception as exc:
+            logger.exception("[agent] chat_once failed session_id=%s", session_id)
+            return f"对话失败：{exc}"
+
+    def _music_polish_once(
+        self,
+        *,
+        question: str,
+        draft: str,
+        session_id: str,
+        user_id: int,
+        limit: int,
+        trace_id: str = "",
+    ) -> str:
+        bind_trace_from_state(
+            {"trace_id": trace_id, "session_id": session_id, "user_id": user_id},
+            intent="music",
+        )
+        try:
+            return self.chat_model.rewrite_music_once(
+                question=question,
+                draft=draft,
+                session_id=session_id,
+                user_id=user_id,
+                limit=limit,
+                trace_id=trace_id,
+            )
+        except Exception as exc:
+            logger.exception("[agent] music polish_once failed session_id=%s", session_id)
+            return draft.strip() or f"回复润色失败：{exc}"
 
     def _stream_chat(
         self,

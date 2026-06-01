@@ -6,7 +6,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from config.config import ensure_env_loaded, log_startup_config
+from config.config import AgentConfig, ensure_env_loaded, log_startup_config
 from route.app import router
 from utils.agent_log_scheduler import start_agent_log_prune_scheduler
 from utils.bug_agent_scheduler import start_bug_agent_scheduler
@@ -23,6 +23,17 @@ logger = logging.getLogger(__name__)
 async def lifespan(_app: FastAPI):
     start_agent_log_prune_scheduler()
     start_bug_agent_scheduler()
+    cfg = AgentConfig()
+    if cfg.qq_mcp_enabled:
+        friends = [x.strip() for x in cfg.qq_mcp_friends.split(",") if x.strip()]
+        if friends and cfg.qq_mcp_dir:
+            from utils.qq.qq_inbox_poller import start_qq_inbox_poller
+
+            start_qq_inbox_poller(friends=friends, interval=cfg.qq_mcp_poll_interval)
+        else:
+            logger.warning(
+                "[qq_mcp] enabled but QQ_MCP_DIR or QQ_MCP_FRIENDS missing, poller skipped"
+            )
     yield
 
 

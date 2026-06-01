@@ -4,6 +4,14 @@ export function isMobileViewport(): boolean {
   return window.innerWidth < 768
 }
 
+/** 着陆页是否由 .landing-wrap 承担纵向滚动 */
+export function isLandingPageScrollable(): boolean {
+  if (!isMobileViewport() || typeof document === 'undefined') return false
+  const wrap = document.querySelector('.landing-wrap') as HTMLElement | null
+  if (!wrap) return false
+  return wrap.scrollHeight > wrap.clientHeight + 8
+}
+
 /** 桌宠默认位置需避开的底部区域（px，含滑动提示 / 底栏） */
 export function mobileBottomReservePx(inBlog: boolean): number {
   const safe = 0
