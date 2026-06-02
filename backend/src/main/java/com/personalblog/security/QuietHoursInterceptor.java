@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * 夜间静默：开发者 JWT 全放行；POST /auth/login 交 Service 校验邮箱；其余 userId+IP 或白名单 IP 的 /auth。
+ * 夜间静默：游客可读公开 GET/头像/uploads；开发者 JWT 全放行；POST /auth/login 交 Service 校验邮箱。
  */
 @Component
 @RequiredArgsConstructor
@@ -46,6 +46,10 @@ public class QuietHoursInterceptor implements HandlerInterceptor {
 
         String path = request.getServletPath();
         if (matchesAny(path, quietHoursProperties.getBypassPathPatterns())) {
+            return true;
+        }
+
+        if (PublicApiPaths.isAnonymousReadable(path, request.getMethod())) {
             return true;
         }
 

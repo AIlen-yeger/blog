@@ -8,7 +8,7 @@ import java.util.List;
 
 /**
  * 夜间静默：云主机不关机，仅限制对外 API 访问。
- * 静默时段内：开发者邮箱可登录且 JWT 全放行；POST /auth/login 在 Service 校验邮箱；
+ * 静默时段内：公开只读 GET、/uploads 静态资源仍放行（img 无 JWT）；开发者可登录且 JWT 全放行；
  * 另支持白名单 userId+IP、白名单 IP 的其它 /auth（见 allow-auth-from-whitelist-ip）。
  */
 @Data

@@ -30,7 +30,7 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
         log.info("当前请求是：{}", requestURL.toString());
 
         String servletPath = request.getServletPath();
-        if (isPublicPath(servletPath, request.getMethod())) {
+        if (PublicApiPaths.isPublicPath(servletPath, request.getMethod())) {
             jwtAuth.resolvePrincipal(request).ifPresentOrElse(jwtAuth::setAuthentication, jwtAuth::clearAuthentication);
             return true;
         }
@@ -59,56 +59,4 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
         jwtAuth.clearAuthentication();
     }
 
-    private boolean isPublicPath(String servletPath, String method) {
-        if (servletPath.startsWith("/auth/")) {
-            return true;
-        }
-        if (HttpMethod.POST.matches(method) && isViewRecordPath(servletPath)) {
-            return true;
-        }
-        if (HttpMethod.POST.matches(method) && servletPath.startsWith("/agent/ops/")) {
-            return true;
-        }
-        if (HttpMethod.POST.matches(method) && "/music/parse".equals(servletPath)) {
-            return true;
-        }
-        if (HttpMethod.POST.matches(method) && servletPath.matches("/music/tracks/[^/]+/play")) {
-            return true;
-        }
-        if (servletPath.startsWith("/uploads/") && HttpMethod.GET.matches(method)) {
-            return true;
-        }
-        // 公开只读：游客可浏览已发布内容与管理员资料
-        return isPublicReadPath(servletPath, method);
-    }
-
-    /** GET 只读接口：可选 JWT，无 token 时按游客处理 */
-    private boolean isPublicReadPath(String servletPath, String method) {
-        if (!HttpMethod.GET.matches(method)) {
-            return false;
-        }
-        if ("/profile/public".equals(servletPath)
-                || servletPath.matches("/profile/users/\\d+")
-                || "/check-ins/site-owner".equals(servletPath)
-                || "/music/site-owner".equals(servletPath)
-                || "/topics".equals(servletPath)
-                || "/timeline".equals(servletPath)
-                || "/search".equals(servletPath)
-                || "/notes".equals(servletPath)
-                || "/life".equals(servletPath)) {
-            return true;
-        }
-        if (servletPath.startsWith("/meta/")) {
-            return true;
-        }
-        if (servletPath.matches("/notes/[^/]+") && !servletPath.endsWith("/views")) {
-            return true;
-        }
-        return servletPath.matches("/life/[^/]+") && !servletPath.endsWith("/views");
-    }
-
-    /** 记录浏览：可选 JWT，未登录按匿名访客去重 */
-    private boolean isViewRecordPath(String servletPath) {
-        return servletPath.matches("/notes/[^/]+/views") || servletPath.matches("/life/[^/]+/views");
-    }
 }
