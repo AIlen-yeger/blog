@@ -15,7 +15,7 @@ Environment=JAVA_OPTS=-Xms256m -Xmx512m
 ExecStart=/usr/bin/java \
   ${JAVA_OPTS} \
   -jar /opt/blog/backend/target/personal-blog-api-1.0.0.jar \
-  --spring.config.additional-location=file:/opt/blog/config/application-prod.yml
+  --spring.profiles.active=prod
 
 Restart=on-failure
 RestartSec=5
