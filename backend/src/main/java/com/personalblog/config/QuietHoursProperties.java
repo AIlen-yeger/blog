@@ -8,7 +8,8 @@ import java.util.List;
 
 /**
  * 夜间静默：云主机不关机，仅限制对外 API 访问。
- * 静默时段内仅「白名单 userId + 白名单 IP」同时满足才放行（/auth 登录除外，见 allow-auth-from-whitelist-ip）。
+ * 静默时段内：开发者邮箱可登录且 JWT 全放行；POST /auth/login 在 Service 校验邮箱；
+ * 另支持白名单 userId+IP、白名单 IP 的其它 /auth（见 allow-auth-from-whitelist-ip）。
  */
 @Data
 @ConfigurationProperties(prefix = "app.quiet-hours")

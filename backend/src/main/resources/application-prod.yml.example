@@ -2,6 +2,10 @@
 # 服务器：cp application-prod.yml.example application-prod.yml 后修改，再 mvn package
 # systemd 使用：--spring.profiles.active=prod
 
+# 夜间静默时仅该 QQ 邮箱可登录（与 AuthServiceImpl 注册限制共用）
+developer:
+  email: 你的QQ号@qq.com
+
 server:
   port: 8080
   servlet:
@@ -29,8 +33,9 @@ app:
   dev:
     fixed-verification-code: ''
   upload:
-    avatar-dir: /opt/blog/data/uploads/avatars
-    content-dir: /opt/blog/data/uploads/content
+    # 与 systemd WorkingDirectory=/opt/blog/backend 一致；勿改到 /opt/blog/data 除非已迁移文件
+    avatar-dir: /opt/blog/backend/uploads/avatars
+    content-dir: /opt/blog/backend/uploads/content
   agent:
     ops-token: CHANGE_ME_SAME_AS_PYTHON
     base-url: http://127.0.0.1:8000

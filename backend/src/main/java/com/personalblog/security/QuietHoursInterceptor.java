@@ -19,13 +19,10 @@ import org.springframework.util.AntPathMatcher;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.io.IOException;
-import java.time.LocalTime;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
 import java.util.List;
 
 /**
- * 夜间静默：userId + IP 双白名单；OPTIONS / bypass / 白名单 IP 的 /auth 除外。
+ * 夜间静默：开发者 JWT 全放行；POST /auth/login 交 Service 校验邮箱；其余 userId+IP 或白名单 IP 的 /auth。
  */
 @Component
 @RequiredArgsConstructor
@@ -33,6 +30,7 @@ import java.util.List;
 public class QuietHoursInterceptor implements HandlerInterceptor {
 
     private final QuietHoursProperties quietHoursProperties;
+    private final QuietHoursGuard quietHoursGuard;
     private final ObjectMapper objectMapper;
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
@@ -42,12 +40,20 @@ public class QuietHoursInterceptor implements HandlerInterceptor {
         if (HttpMethod.OPTIONS.matches(request.getMethod())) {
             return true;
         }
-        if (!quietHoursProperties.isEnabled() || !isWithinQuietHours()) {
+        if (!quietHoursGuard.isActive()) {
             return true;
         }
 
         String path = request.getServletPath();
         if (matchesAny(path, quietHoursProperties.getBypassPathPatterns())) {
+            return true;
+        }
+
+        if (isDeveloperPrincipal()) {
+            return true;
+        }
+
+        if (HttpMethod.POST.matches(request.getMethod()) && "/auth/login".equals(path)) {
             return true;
         }
 
@@ -73,36 +79,12 @@ public class QuietHoursInterceptor implements HandlerInterceptor {
         return writeQuietHours(response);
     }
 
-    private boolean isWithinQuietHours() {
-        ZoneId zone;
-        try {
-            zone = ZoneId.of(quietHoursProperties.getZoneId());
-        } catch (Exception ex) {
-            zone = ZoneId.systemDefault();
-        }
-        LocalTime now = ZonedDateTime.now(zone).toLocalTime();
-        LocalTime start = parseTime(quietHoursProperties.getStart(), LocalTime.of(23, 0));
-        LocalTime end = parseTime(quietHoursProperties.getEnd(), LocalTime.of(8, 0));
-
-        if (start.equals(end)) {
+    private boolean isDeveloperPrincipal() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof AuthUserPrincipal principal)) {
             return false;
         }
-        if (start.isBefore(end)) {
-            return !now.isBefore(start) && now.isBefore(end);
-        }
-        // 跨午夜，如 23:00–08:00
-        return !now.isBefore(start) || now.isBefore(end);
-    }
-
-    private static LocalTime parseTime(String raw, LocalTime fallback) {
-        if (raw == null || raw.isBlank()) {
-            return fallback;
-        }
-        try {
-            return LocalTime.parse(raw.trim());
-        } catch (Exception ex) {
-            return fallback;
-        }
+        return quietHoursGuard.isDeveloperEmail(principal.getEmail());
     }
 
     private boolean matchesAny(String path, List<String> patterns) {

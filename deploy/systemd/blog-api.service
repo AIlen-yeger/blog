@@ -10,18 +10,17 @@ Group=blog
 WorkingDirectory=/opt/blog/backend
 
 EnvironmentFile=-/opt/blog/config/blog-api.env
-Environment=JAVA_OPTS=-Xms256m -Xmx512m
+Environment="JAVA_OPTS=-Xms256m -Xmx512m"
 
-ExecStart=/usr/bin/java \
-  ${JAVA_OPTS} \
-  -jar /opt/blog/backend/target/personal-blog-api-1.0.0.jar \
-  --spring.profiles.active=prod
+ExecStart=/usr/bin/java $JAVA_OPTS -jar /opt/blog/backend/target/personal-blog-api-1.0.0.jar --spring.profiles.active=prod
 
 Restart=on-failure
 RestartSec=5
 SuccessExitStatus=143
 
-ReadWritePaths=/opt/blog/data /opt/blog/backend
+# 上传目录（默认在 backend 下，与 application-prod.yml 中 avatar-dir 一致）：
+#   mkdir -p /opt/blog/backend/uploads/{avatars,content}
+#   chown -R blog:blog /opt/blog/backend/uploads
 
 [Install]
 WantedBy=multi-user.target

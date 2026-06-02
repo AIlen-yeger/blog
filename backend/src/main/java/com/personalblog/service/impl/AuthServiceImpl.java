@@ -9,6 +9,7 @@ import com.personalblog.entity.UserEntity;
 import com.personalblog.entity.UserRole;
 import com.personalblog.mapper.UserMapper;
 import com.personalblog.security.JwtService;
+import com.personalblog.security.QuietHoursGuard;
 import com.personalblog.service.AuthService;
 import com.personalblog.service.MailService;
 import com.personalblog.service.ProfileService;
@@ -33,6 +34,7 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final ProfileService profileService;
+    private final QuietHoursGuard quietHoursGuard;
 
     @Value("${developer.email:}")
     private String developerEmail;
@@ -46,6 +48,7 @@ public class AuthServiceImpl implements AuthService {
     public LoginResultDto login(LoginRequest request) {
         String email = EmailValidator.normalize(request.getEmail());
         EmailValidator.validatePassword(request.getPassword());
+        quietHoursGuard.requireDeveloperLogin(email);
 
         UserEntity user = userMapper.selectByEmail(email);
         if (user == null) {

@@ -43,6 +43,9 @@ mybatis:
   configuration:
     map-underscore-to-camel-case: true
 
+developer:
+  email: ${DEVELOPER_EMAIL:}
+
 app:
   # 启动时写入演示数据（用户/笔记/生活记录等）；默认 false，需要时改 true 启动一次即可
   seed:

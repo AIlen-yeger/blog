@@ -142,8 +142,8 @@ app:
     from: ${QQ_SMTP_USER}
     reply-to: ${QQ_SMTP_USER}
   upload:
-    avatar-dir: /opt/blog/data/uploads/avatars
-    content-dir: /opt/blog/data/uploads/content
+    avatar-dir: /opt/blog/backend/uploads/avatars
+    content-dir: /opt/blog/backend/uploads/content
   agent:
     base-url: http://127.0.0.1:8000
     chat-path: /ai/chat
@@ -152,8 +152,8 @@ app:
 ```
 
 ```bash
-sudo mkdir -p /opt/blog/data/uploads/{avatars,content}
-sudo chown -R blog:blog /opt/blog/data /opt/blog/config
+sudo mkdir -p /opt/blog/backend/uploads/{avatars,content}
+sudo chown -R blog:blog /opt/blog/backend/uploads /opt/blog/config
 sudo chmod 600 /opt/blog/config/application-prod.yml
 ```
 
