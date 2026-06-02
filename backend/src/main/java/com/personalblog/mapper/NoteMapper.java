@@ -55,4 +55,19 @@ public interface NoteMapper {
     int updatePinned(@Param("id") String id, @Param("pinned") boolean pinned);
 
     int updateAgentReply(@Param("id") String id, @Param("agentReply") String agentReply);
+
+    int updateAgentReplyMeta(
+            @Param("id") String id,
+            @Param("status") String status,
+            @Param("jobId") String jobId);
+
+    int updateAgentReplyComplete(
+            @Param("id") String id,
+            @Param("agentReply") String agentReply,
+            @Param("jobId") String jobId);
+
+    int resetAgentReplyForRegeneration(
+            @Param("id") String id,
+            @Param("status") String status,
+            @Param("jobId") String jobId);
 }

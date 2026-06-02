@@ -12,8 +12,14 @@ public class AgentProperties {
 
     private String chatPath = "/ai/chat";
 
+    /** 笔记发布后 Kohaku 评论（内网，非 SSE） */
+    private String noteCommentPath = "/ai/internal/note-comment";
+
     private int connectTimeoutMs = 5_000;
 
     /** 流式对话读超时（毫秒） */
     private int readTimeoutMs = 120_000;
+
+    /** 笔记评论生成读超时（毫秒） */
+    private int noteCommentReadTimeoutMs = 90_000;
 }

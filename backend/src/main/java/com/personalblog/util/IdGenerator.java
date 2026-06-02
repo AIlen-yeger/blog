@@ -22,4 +22,8 @@ public final class IdGenerator {
     public static String musicTrackId() {
         return "m_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 6);
     }
+
+    public static String agentCommentJobId() {
+        return "j_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 8);
+    }
 }

@@ -16,4 +16,6 @@ public class NoteWriteRequest {
     private List<String> images;
     /** published | draft，默认 published */
     private String status;
+    /** 桌宠会话 ID，用于拉近期聊天上下文生成 Kohaku 笔记回复 */
+    private String agentSessionId;
 }

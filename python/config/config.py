@@ -12,10 +12,6 @@ _ENV_LOADED = False
 _ENV_PATH = Path(__file__).resolve().parents[1] / ".env"
 
 
-def env_file_path() -> Path:
-    return _ENV_PATH
-
-
 def ensure_env_loaded() -> None:
     """加载 python/.env；重复调用安全。"""
     global _ENV_LOADED
@@ -96,24 +92,30 @@ class AgentConfig:
         self.temperature = _env_float("DP_CHAT_TEMPERATURE", 0.7)
         self.history_limit = _env_int("DP_CHAT_HISTORY_LIMIT", 10)
 
-        # ── 意图识别 judge（千问 DashScope；兼容旧名 DP_EXECUTE_*）──
-        self.judge_model_name = (
-            _read_env("DP_JUDGE_MODEL", "DP_EXECUTE_MODEL", "dp-judge-model") or "qwen-plus"
-        )
-        self.judge_api_key = (
-            _read_env("DP_JUDGE_API_KEY", "dp-judge-api-key")
-            or _read_env("DP_EXECUTE_API_KEY", "dp-execute-api-key")
-            or _read_env("DP_AGENT_API_KEY", "dp-agent-api-key")
-            or ""
-        )
-        self.judge_base_url = (
-            _read_env("DP_JUDGE_API_URL", "DP_EXECUTE_API_URL", "dp-judge-api-url")
-            or "https://dashscope.aliyuncs.com/compatible-mode/v1"
-        )
-        self.judge_temperature = _env_float(
-            "DP_JUDGE_TEMPERATURE",
-            _env_float("DP_EXECUTE_TEMPERATURE", 0.0),
-        )
+        # ── 意图识别 judge（默认与闲聊同 DeepSeek）──
+        # 仅当 DP_JUDGE_ENABLED=true 时读取 DP_JUDGE_* / DP_EXECUTE_*（避免 .env 残留千问配置）
+        if _env_bool("DP_JUDGE_ENABLED", False):
+            _judge_model = _read_env("DP_JUDGE_MODEL", "DP_EXECUTE_MODEL", "dp-judge-model")
+            _judge_key = _read_env("DP_JUDGE_API_KEY", "dp-judge-api-key") or _read_env(
+                "DP_EXECUTE_API_KEY", "dp-execute-api-key"
+            )
+            _judge_url = _read_env(
+                "DP_JUDGE_API_URL", "DP_EXECUTE_API_URL", "dp-judge-api-url"
+            )
+            self.judge_model_name = _judge_model or "qwen-plus"
+            self.judge_api_key = _judge_key or ""
+            self.judge_base_url = (
+                _judge_url or "https://dashscope.aliyuncs.com/compatible-mode/v1"
+            )
+            self.judge_temperature = _env_float(
+                "DP_JUDGE_TEMPERATURE",
+                _env_float("DP_EXECUTE_TEMPERATURE", 0.0),
+            )
+        else:
+            self.judge_model_name = self.chat_model_name
+            self.judge_api_key = self.chat_api_key
+            self.judge_base_url = self.chat_base_url
+            self.judge_temperature = 0.0
 
         # ── ReAct / 工具调用（默认 DeepSeek，与闲聊同 Key）──
         self.react_model_name = _read_env("DP_REACT_MODEL", "dp-react-model") or self.chat_model_name
@@ -131,8 +133,12 @@ class AgentConfig:
         self.execute_base_url = self.judge_base_url
         self.execute_temperature = self.judge_temperature
 
-        # music 千问草稿 → DeepSeek 二次润色（ReAct 已是 DeepSeek 时建议 false）
-        self.music_final_via_chat = _env_bool("MUSIC_FINAL_VIA_CHAT", False)
+        # 搜狗 MCP 查歌曲背景（外网 SSE，不稳定时可关）
+        self.sogou_mcp_enabled = _env_bool("SOGOU_MCP_ENABLED", True)
+        self.sogou_mcp_sse_url = _env_str(
+            "SOGOU_MCP_SSE_URL",
+            "https://phoenixdna-sogou-search.ms.show/gradio_api/mcp/sse",
+        )
 
         # ── MySQL ──
         self.mysql_host = _env_str("MYSQL_HOST", "localhost")
@@ -165,6 +171,9 @@ class AgentConfig:
         self.qq_mcp_napcat_host = _env_str("QQ_MCP_NAPCAT_HOST", "127.0.0.1")
         self.qq_mcp_napcat_port = _env_str("QQ_MCP_NAPCAT_PORT", "3000")
         self.qq_mcp_ws_port = _env_str("QQ_MCP_WS_PORT", "3001")
+        # 新设备/无状态文件时：首轮只同步水位线，不对历史私聊自动回复
+        self.qq_mcp_bootstrap_on_start = _env_bool("QQ_MCP_BOOTSTRAP_ON_START", True)
+        self.agent_ops_token = _env_str("AGENT_OPS_TOKEN", "")
 
 
 def _key_status(value: str) -> str:
@@ -201,8 +210,13 @@ def log_startup_config() -> None:
         _key_status(cfg.react_api_key),
         cfg.react_base_url,
     )
-    logger.info("[config] music_final_via_chat=%s", cfg.music_final_via_chat)
+    logger.info(
+        "[config] judge_via_qwen=%s sogou_mcp_enabled=%s",
+        _env_bool("DP_JUDGE_ENABLED", False),
+        cfg.sogou_mcp_enabled,
+    )
     from utils.qq.napcat_notify import napcat_configured
+    from utils.agent_log_config import resolve_log_dir
 
     logger.info(
         "[config] napcat enabled=%s configured=%s url=%s qq=%s min_severity=%s",
@@ -220,12 +234,20 @@ def log_startup_config() -> None:
         cfg.qq_mcp_friends or "-",
         cfg.qq_mcp_poll_interval,
     )
+    logger.info(
+        "[config] agent_ops_token=%s (QQ 桥接 JWT 须与 Java app.agent.ops-token 相同)",
+        _key_status(cfg.agent_ops_token),
+    )
+    logger.info(
+        "[config] agent_log_dir=%s (active *.jsonl; rotated in archive/)",
+        resolve_log_dir(),
+    )
     missing: list[str] = []
     if not cfg.mysql_password:
         missing.append("MYSQL_PASSWORD")
-    if not cfg.judge_api_key:
-        missing.append("DP_JUDGE_API_KEY / DP_EXECUTE_API_KEY")
-    if not cfg.react_api_key:
-        missing.append("DP_AGENT_API_KEY / DP_REACT_API_KEY")
+    if not cfg.chat_api_key:
+        missing.append("DP_AGENT_API_KEY / DP_CHAT_API_KEY")
+    if cfg.qq_mcp_enabled and not cfg.agent_ops_token:
+        missing.append("AGENT_OPS_TOKEN (QQ 私聊登录态工具)")
     if missing:
         logger.warning("[config] 缺少必填项: %s", ", ".join(missing))

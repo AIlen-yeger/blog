@@ -26,6 +26,11 @@ const { shouldShowReply } = useAgentReplySettings()
 
 const showAgentReply = computed(() => shouldShowReply('note', props.item.agentReply))
 
+const agentReplyGenerating = computed(() => {
+  const st = (props.item.agentReplyStatus || '').toLowerCase()
+  return (st === 'pending' || st === 'running') && !props.item.agentReply?.trim()
+})
+
 function openReader() {
   readerOpen.value = true
 }
@@ -65,6 +70,7 @@ function onPin() {
       </div>
       <h3 class="card-title" :class="{ 'is-pinned': item.pinned }">{{ item.title }}</h3>
       <p class="excerpt">{{ item.excerpt }}</p>
+      <p v-if="agentReplyGenerating" class="agent-reply-pending">Kohaku 正在写回复…</p>
       <AgentReplyBlock
         v-if="showAgentReply && item.agentReply"
         kind="note"
@@ -181,5 +187,11 @@ time {
 }
 .read-btn:hover {
   text-decoration: underline;
+}
+.agent-reply-pending {
+  margin: 0.5rem 0 0;
+  font-size: 0.78rem;
+  color: #7c3aed;
+  font-style: italic;
 }
 </style>

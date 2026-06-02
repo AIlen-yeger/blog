@@ -10,13 +10,12 @@ from typing import Any
 
 from server.route_graph.bug_route import run_bug_react
 from server.state import AgentState
-from utils.agent_log_config import resolve_log_dir
+from utils.agent_log_config import resolve_log_dir, state_dir
 from utils.agent_log_reader import list_recent_errors
 from utils.trace_log import log_event, new_trace_id, preview
 
 logger = logging.getLogger(__name__)
 
-# 出现即视为「严重」，可立即触发 Bug Ops（error_alert）
 _SEVERE_EVENTS = frozenset(
     {
         "react.error",
@@ -31,7 +30,17 @@ _STATE_FILE = "bug_agent_state.json"
 
 
 def _state_path() -> Path:
-    return resolve_log_dir() / _STATE_FILE
+    d = state_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    legacy = resolve_log_dir() / _STATE_FILE
+    path = d / _STATE_FILE
+    if legacy.is_file() and not path.is_file():
+        try:
+            legacy.rename(path)
+            logger.info("[bug_agent] migrated state -> %s", path)
+        except OSError:
+            return legacy
+    return path
 
 
 def _load_state() -> dict[str, Any]:

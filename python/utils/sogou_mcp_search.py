@@ -15,14 +15,15 @@ from utils.trace_log import log_event
 
 logger = logging.getLogger(__name__)
 
-SOGOU_MCP_SSE_URL = os.getenv(
-    "SOGOU_MCP_SSE_URL",
-    "https://phoenixdna-sogou-search.ms.show/gradio_api/mcp/sse",
-)
-# Gradio MCP 暴露的工具名是 API 端点名 predict，不是文档里的 sogou_search
+_DEFAULT_SSE_URL = "https://phoenixdna-sogou-search.ms.show/gradio_api/mcp/sse"
 SOGOU_TOOL_NAME = os.getenv("SOGOU_MCP_TOOL_NAME", "predict")
-
 _tool_name_cache: str | None = None
+
+
+def sogou_sse_url() -> str:
+    from config.config import AgentConfig
+
+    return AgentConfig().sogou_mcp_sse_url or _DEFAULT_SSE_URL
 
 
 def text_from_mcp_result(result: Any) -> str:
@@ -34,7 +35,6 @@ def text_from_mcp_result(result: Any) -> str:
 
 
 async def _resolve_tool_name(session: ClientSession) -> str:
-    """优先环境变量；否则 list_tools，在 predict / sogou_search 中择一。"""
     global _tool_name_cache
     if _tool_name_cache:
         return _tool_name_cache
@@ -56,39 +56,37 @@ async def _resolve_tool_name(session: ClientSession) -> str:
 
 
 async def sogou_search_async(query: str, num_results: int = 5) -> str:
+    from config.config import AgentConfig
+
+    if not AgentConfig().sogou_mcp_enabled:
+        log_event("mcp.sogou.disabled", level=logging.INFO, query=query[:120])
+        return ""
+
     try:
-        async with sse_client(SOGOU_MCP_SSE_URL) as (read_stream, write_stream):
+        async with sse_client(sogou_sse_url()) as (read_stream, write_stream):
             async with ClientSession(read_stream, write_stream) as session:
                 await session.initialize()
                 tool_name = await _resolve_tool_name(session)
                 result = await session.call_tool(
                     tool_name,
-                    arguments={
-                        "query": query,
-                        "num_results": num_results,
-                    },
+                    arguments={"query": query, "num_results": num_results},
                 )
         text = text_from_mcp_result(result)
         if not text:
-            log_event(
-                "mcp.sogou.empty",
-                level=logging.WARNING,
-                query=query[:120],
-            )
-            raise RuntimeError("搜狗搜索返回为空")
+            log_event("mcp.sogou.empty", level=logging.WARNING, query=query[:120])
+            return ""
         return text
     except Exception as exc:
         log_event(
             "mcp.sogou.error",
-            level=logging.ERROR,
+            level=logging.WARNING,
             query=query[:120],
-            error=str(exc),
+            error=str(exc)[:500],
         )
-        raise
+        return ""
 
 
 def sogou_search_sync(query: str, num_results: int = 5) -> str:
-    """供 LangGraph ToolNode（线程池）调用，避免 asyncio.run 与已有事件循环冲突。"""
     try:
         asyncio.get_running_loop()
     except RuntimeError:
@@ -100,29 +98,16 @@ def sogou_search_sync(query: str, num_results: int = 5) -> str:
         ).result()
 
 
-def build_song_story_query(title: str, artist: str) -> str:
-    artist = (artist or "").strip()
-    title = (title or "").strip()
-    if artist:
-        return f"{artist} {title} 歌曲 创作背景 故事 灵感"
-    return f"{title} 歌曲 创作背景 故事 灵感"
-
-
-async def search_song_background_story(
-    title: str,
-    artist: str,
-    *,
-    num_results: int = 5,
-) -> str:
-    query = build_song_story_query(title, artist)
-    return await sogou_search_async(query, num_results=num_results)
-
-
 def search_song_background_story_sync(
     title: str,
     artist: str,
     *,
     num_results: int = 5,
 ) -> str:
-    query = build_song_story_query(title, artist)
+    artist = (artist or "").strip()
+    title = (title or "").strip()
+    if artist:
+        query = f"{artist} {title} 歌曲 创作背景 故事 灵感"
+    else:
+        query = f"{title} 歌曲 创作背景 故事 灵感"
     return sogou_search_sync(query, num_results=num_results)

@@ -8,3 +8,5 @@ export const AUTH_CODE_NOT_REGISTERED = 40403
 export const AUTH_CODE_SEND_TOO_FREQUENT = 42901
 /** 未登录或 token 失效 */
 export const AUTH_CODE_UNAUTHORIZED = 40101
+/** 夜间静默，非白名单 userId+IP */
+export const AUTH_CODE_QUIET_HOURS = 40302

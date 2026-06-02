@@ -98,7 +98,7 @@ public class GlobalExceptionHandler {
     private HttpStatus mapStatus(ErrorCode ec) {
         return switch (ec) {
             case UNAUTHORIZED -> HttpStatus.UNAUTHORIZED;
-            case FORBIDDEN -> HttpStatus.FORBIDDEN;
+            case FORBIDDEN, QUIET_HOURS -> HttpStatus.FORBIDDEN;
             case NOTE_NOT_FOUND, LIFE_NOT_FOUND, ACCOUNT_NOT_REGISTERED -> HttpStatus.NOT_FOUND;
             case EMAIL_ALREADY_REGISTERED -> HttpStatus.CONFLICT;
             case CODE_SEND_TOO_FREQUENT, CODE_DAILY_LIMIT -> HttpStatus.TOO_MANY_REQUESTS;

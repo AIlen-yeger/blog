@@ -51,12 +51,35 @@ CREATE TABLE IF NOT EXISTS notes (
     images_json  MEDIUMTEXT,
     view_count   INT          NOT NULL DEFAULT 0,
     pinned       TINYINT(1)   NOT NULL DEFAULT 0,
-    status       VARCHAR(16)  NOT NULL DEFAULT 'published',
-    agent_reply  MEDIUMTEXT   NULL COMMENT 'Kohaku 自动回复全文',
+    status              VARCHAR(16)  NOT NULL DEFAULT 'published',
+    agent_reply_status  VARCHAR(16)  NOT NULL DEFAULT 'none' COMMENT 'none|pending|running|done|failed',
+    agent_reply         MEDIUMTEXT   NULL COMMENT 'Kohaku 自动回复全文',
+    agent_reply_job_id  VARCHAR(64)  NULL COMMENT '关联 content_agent_comment_job.job_id',
     KEY idx_notes_topic (topic_id),
     KEY idx_notes_date (record_date),
     KEY idx_notes_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS content_agent_comment_job (
+    id                BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    content_type      VARCHAR(16)  NOT NULL COMMENT 'note | life',
+    content_id        VARCHAR(64)  NOT NULL,
+    job_id            VARCHAR(64)  NOT NULL,
+    idempotency_key   VARCHAR(128) NOT NULL,
+    content_hash      CHAR(64)     NOT NULL,
+    session_id        VARCHAR(128) NULL,
+    user_id           BIGINT       NOT NULL DEFAULT 0,
+    status            VARCHAR(16)  NOT NULL DEFAULT 'pending',
+    agent_reply       MEDIUMTEXT   NULL,
+    error_message     VARCHAR(512) NULL,
+    trace_id          VARCHAR(64)  NULL,
+    requested_at      DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    started_at        DATETIME(3)  NULL,
+    completed_at      DATETIME(3)  NULL,
+    UNIQUE KEY uk_agent_comment_idempotency (idempotency_key),
+    KEY idx_agent_comment_content (content_type, content_id, status),
+    KEY idx_agent_comment_job (job_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Kohaku 内容评价生成任务';
 
 CREATE TABLE IF NOT EXISTS life_records (
     id           VARCHAR(64)  PRIMARY KEY,

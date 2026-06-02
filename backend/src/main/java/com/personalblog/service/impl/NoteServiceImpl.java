@@ -14,8 +14,10 @@ import com.personalblog.mapper.ContentViewMapper;
 import com.personalblog.mapper.NoteMapper;
 import com.personalblog.mapper.TopicMapper;
 import com.personalblog.security.AdminGuard;
+import com.personalblog.service.AgentNoteCommentService;
 import com.personalblog.service.NoteService;
 import com.personalblog.service.TopicService;
+import com.personalblog.util.AgentContentHash;
 import com.personalblog.util.AgentReplySupport;
 import com.personalblog.util.ExcerptUtil;
 import com.personalblog.util.IdGenerator;
@@ -40,6 +42,7 @@ public class NoteServiceImpl implements NoteService {
     private final ContentViewCache contentViewCache;
     private final AdminGuard adminGuard;
     private final AgentReplyProperties agentReplyProperties;
+    private final AgentNoteCommentService agentNoteCommentService;
 
     @Override
     public PageResult<NoteDto> listNotes(
@@ -89,6 +92,7 @@ public class NoteServiceImpl implements NoteService {
         entity.setDate(LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE));
         ensureStatus(entity);
         noteMapper.insert(entity);
+        agentNoteCommentService.enqueueAfterNoteCreated(entity, request.getAgentSessionId());
         return toDto(entity);
     }
 
@@ -101,9 +105,15 @@ public class NoteServiceImpl implements NoteService {
             throw new BusinessException(ErrorCode.NOTE_NOT_FOUND);
         }
         validateWriteRequest(request, false);
+        String hashBefore = AgentContentHash.sha256NoteContent(entity.getTitle(), entity.getContent());
         applyWrite(entity, request);
         ensureStatus(entity);
+        String hashAfter = AgentContentHash.sha256NoteContent(entity.getTitle(), entity.getContent());
+        boolean contentChanged = !hashBefore.equals(hashAfter);
         noteMapper.update(entity);
+        if (ContentStatus.PUBLISHED.equals(entity.getStatus()) && contentChanged) {
+            agentNoteCommentService.enqueueAfterNoteCreated(entity, request.getAgentSessionId());
+        }
         return toDto(entity);
     }
 
@@ -255,6 +265,8 @@ public class NoteServiceImpl implements NoteService {
         dto.setPinned(entity.isPinned());
         dto.setStatus(entity.getStatus() != null ? entity.getStatus() : ContentStatus.PUBLISHED);
         dto.setAgentReply(AgentReplySupport.presentForNote(agentReplyProperties, entity.getAgentReply()));
+        dto.setAgentReplyStatus(
+                entity.getAgentReplyStatus() != null ? entity.getAgentReplyStatus() : "none");
         return dto;
     }
 

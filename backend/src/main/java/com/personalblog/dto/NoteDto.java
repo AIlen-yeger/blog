@@ -19,4 +19,6 @@ public class NoteDto {
     private String status;
     /** Kohaku 根据正文生成的自动回复 */
     private String agentReply;
+    /** none | pending | running | done | failed */
+    private String agentReplyStatus;
 }

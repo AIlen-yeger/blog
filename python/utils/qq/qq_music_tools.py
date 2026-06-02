@@ -404,13 +404,5 @@ def get_music_plays_with_fallback(*, access_token: str) -> list[dict]:
 
 
 
-if __name__ == "__main__":
-    meta = get_track_by_song_id(230559417)
-    print(meta)
-
-
-
-
-
 
 

@@ -66,6 +66,9 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
         if (HttpMethod.POST.matches(method) && isViewRecordPath(servletPath)) {
             return true;
         }
+        if (HttpMethod.POST.matches(method) && servletPath.startsWith("/agent/ops/")) {
+            return true;
+        }
         if (HttpMethod.POST.matches(method) && "/music/parse".equals(servletPath)) {
             return true;
         }

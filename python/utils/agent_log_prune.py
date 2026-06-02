@@ -2,13 +2,21 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from utils.agent_log_config import resolve_log_dir, retention_days_for_stream
+from utils.agent_log_config import (
+    ARCHIVE_SUBDIR,
+    STATE_SUBDIR,
+    resolve_log_dir,
+    retention_days_for_stream,
+)
 
-# TimedRotatingFileHandler 默认：summary.jsonl.2026-05-22
+logger = logging.getLogger(__name__)
+
+# TimedRotatingFileHandler：trace.jsonl.2026-05-22
 _ROTATED = re.compile(r"^(?P<stream>[a-z_]+)\.jsonl\.(?P<date>\d{4}-\d{2}-\d{2})$")
 
 
@@ -23,38 +31,68 @@ def _parse_rotated_name(name: str) -> tuple[str, datetime] | None:
     return m.group("stream"), day
 
 
+def migrate_log_layout(log_dir: Path) -> None:
+    """确保 archive/、state/ 存在，并把根目录下旧轮转文件挪进 archive/。"""
+    log_dir.mkdir(parents=True, exist_ok=True)
+    archive = log_dir / ARCHIVE_SUBDIR
+    archive.mkdir(parents=True, exist_ok=True)
+    (log_dir / STATE_SUBDIR).mkdir(parents=True, exist_ok=True)
+
+    for path in list(log_dir.iterdir()):
+        if not path.is_file():
+            continue
+        if not _ROTATED.match(path.name):
+            continue
+        dest = archive / path.name
+        if dest.exists():
+            continue
+        try:
+            path.rename(dest)
+            logger.info("[agent_log] migrated %s -> archive/", path.name)
+        except OSError as exc:
+            logger.warning("[agent_log] migrate %s failed: %s", path.name, exc)
+
+
 def prune_log_dir(log_dir: Path, *, dry_run: bool = False) -> list[str]:
-    """删除超过保留期的轮转文件；当前正在写入的 *.jsonl 不删。"""
+    """删除超过保留期的轮转文件；正在写入的 *.jsonl 不删。"""
     actions: list[str] = []
     if not log_dir.is_dir():
         actions.append(f"skip: directory missing {log_dir}")
         return actions
 
+    migrate_log_layout(log_dir)
+
     now = datetime.now(timezone.utc)
     cutoff_cache: dict[str, datetime] = {}
 
-    for path in sorted(log_dir.iterdir()):
-        if not path.is_file():
+    scan_dirs = [log_dir / ARCHIVE_SUBDIR, log_dir]
+    for scan_dir in scan_dirs:
+        if not scan_dir.is_dir():
             continue
+        for path in sorted(scan_dir.iterdir()):
+            if not path.is_file():
+                continue
+            if path.suffix == ".jsonl" and _ROTATED.match(path.name) is None:
+                continue
+            parsed = _parse_rotated_name(path.name)
+            if not parsed:
+                continue
 
-        parsed = _parse_rotated_name(path.name)
-        if not parsed:
-            continue
+            stream, file_day = parsed
+            if stream not in cutoff_cache:
+                days = retention_days_for_stream(stream)
+                cutoff_cache[stream] = now - timedelta(days=days)
 
-        stream, file_day = parsed
-        if stream not in cutoff_cache:
-            days = retention_days_for_stream(stream)
-            cutoff_cache[stream] = now - timedelta(days=days)
+            if file_day >= cutoff_cache[stream]:
+                continue
 
-        if file_day >= cutoff_cache[stream]:
-            continue
-
-        age_days = (now - file_day).days
-        retain = retention_days_for_stream(stream)
-        msg = f"delete: {path.name} (age={age_days}d, retain={retain}d)"
-        actions.append(msg)
-        if not dry_run:
-            path.unlink(missing_ok=True)
+            age_days = (now - file_day).days
+            retain = retention_days_for_stream(stream)
+            rel = path.relative_to(log_dir)
+            msg = f"delete: {rel} (age={age_days}d, retain={retain}d)"
+            actions.append(msg)
+            if not dry_run:
+                path.unlink(missing_ok=True)
 
     return actions
 

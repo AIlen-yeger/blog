@@ -14,6 +14,7 @@ import java.util.List;
 @AllArgsConstructor
 public class AuthUserPrincipal implements UserDetails {
 
+    private final long userId;
     private final String email;
     private final UserRole role;
 

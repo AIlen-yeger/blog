@@ -15,6 +15,8 @@ public enum ErrorCode {
     TOPIC_NOT_FOUND(40006, "专题不存在"),
     UNAUTHORIZED(40101, "未登录或登录已过期"),
     FORBIDDEN(40301, "无权限执行此操作"),
+    /** 夜间静默时段，非白名单 userId+IP */
+    QUIET_HOURS(40302, "夜间维护时段，当前不可访问"),
     NOTE_NOT_FOUND(40401, "笔记不存在"),
     LIFE_NOT_FOUND(40402, "生活记录不存在"),
     PROFILE_NOT_FOUND(40404, "资料不存在"),

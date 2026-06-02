@@ -17,6 +17,8 @@ export interface NoteItem {
   status?: ContentPublishStatus
   /** Kohaku 根据正文生成的回复（后端字段 agentReply） */
   agentReply?: string | null
+  /** none | pending | running | done | failed */
+  agentReplyStatus?: string | null
 }
 
 export interface TopicItem {

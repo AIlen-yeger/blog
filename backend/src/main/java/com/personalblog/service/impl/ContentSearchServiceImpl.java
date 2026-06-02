@@ -80,6 +80,8 @@ public class ContentSearchServiceImpl implements ContentSearchService {
         dto.setPinned(entity.isPinned());
         dto.setStatus(entity.getStatus() != null ? entity.getStatus() : ContentStatus.PUBLISHED);
         dto.setAgentReply(AgentReplySupport.presentForNote(agentReplyProperties, entity.getAgentReply()));
+        dto.setAgentReplyStatus(
+                entity.getAgentReplyStatus() != null ? entity.getAgentReplyStatus() : "none");
         return dto;
     }
 

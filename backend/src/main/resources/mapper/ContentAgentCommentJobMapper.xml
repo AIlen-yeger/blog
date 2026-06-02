@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.personalblog.mapper.ContentAgentCommentJobMapper">
+
+    <resultMap id="JobMap" type="com.personalblog.entity.ContentAgentCommentJobEntity">
+        <id column="id" property="id"/>
+        <result column="content_type" property="contentType"/>
+        <result column="content_id" property="contentId"/>
+        <result column="job_id" property="jobId"/>
+        <result column="idempotency_key" property="idempotencyKey"/>
+        <result column="content_hash" property="contentHash"/>
+        <result column="session_id" property="sessionId"/>
+        <result column="user_id" property="userId"/>
+        <result column="status" property="status"/>
+        <result column="agent_reply" property="agentReply"/>
+        <result column="error_message" property="errorMessage"/>
+        <result column="trace_id" property="traceId"/>
+        <result column="requested_at" property="requestedAt"/>
+        <result column="started_at" property="startedAt"/>
+        <result column="completed_at" property="completedAt"/>
+    </resultMap>
+
+    <sql id="JobColumns">
+        id, content_type, content_id, job_id, idempotency_key, content_hash,
+        session_id, user_id, status, agent_reply, error_message, trace_id,
+        requested_at, started_at, completed_at
+    </sql>
+
+    <select id="selectByIdempotencyKey" resultMap="JobMap">
+        SELECT <include refid="JobColumns"/>
+        FROM content_agent_comment_job
+        WHERE idempotency_key = #{idempotencyKey}
+        LIMIT 1
+    </select>
+
+    <select id="selectByJobId" resultMap="JobMap">
+        SELECT <include refid="JobColumns"/>
+        FROM content_agent_comment_job
+        WHERE job_id = #{jobId}
+        LIMIT 1
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO content_agent_comment_job (
+            content_type, content_id, job_id, idempotency_key, content_hash,
+            session_id, user_id, status, trace_id, requested_at
+        ) VALUES (
+            #{contentType}, #{contentId}, #{jobId}, #{idempotencyKey}, #{contentHash},
+            #{sessionId}, #{userId}, #{status}, #{traceId}, #{requestedAt}
+        )
+    </insert>
+
+    <update id="resetFailedToPending">
+        UPDATE content_agent_comment_job
+        SET job_id = #{jobId},
+            status = #{status},
+            error_message = NULL,
+            agent_reply = NULL,
+            trace_id = #{traceId},
+            started_at = NULL,
+            completed_at = NULL,
+            requested_at = #{requestedAt}
+        WHERE idempotency_key = #{idempotencyKey}
+          AND status = 'failed'
+    </update>
+
+    <update id="markRunning">
+        UPDATE content_agent_comment_job
+        SET status = 'running',
+            started_at = CURRENT_TIMESTAMP(3)
+        WHERE job_id = #{jobId}
+          AND status IN ('pending', 'failed')
+    </update>
+
+    <update id="markDone">
+        UPDATE content_agent_comment_job
+        SET status = 'done',
+            agent_reply = #{agentReply},
+            completed_at = CURRENT_TIMESTAMP(3),
+            error_message = NULL
+        WHERE job_id = #{jobId}
+          AND status = 'running'
+    </update>
+
+    <update id="markFailed">
+        UPDATE content_agent_comment_job
+        SET status = 'failed',
+            error_message = #{errorMessage},
+            completed_at = CURRENT_TIMESTAMP(3)
+        WHERE job_id = #{jobId}
+          AND status IN ('pending', 'running')
+    </update>
+</mapper>

@@ -47,7 +47,12 @@ public class JwtAuthenticationSupport {
                 return Optional.empty();
             }
             UserRole role = UserRole.valueOf(roleStr);
-            return Optional.of(new AuthUserPrincipal(email, role));
+            long userId = 0L;
+            Object uid = claims.get("userId");
+            if (uid instanceof Number number) {
+                userId = number.longValue();
+            }
+            return Optional.of(new AuthUserPrincipal(userId, email, role));
         } catch (JwtException | IllegalArgumentException ex) {
             return Optional.empty();
         }

@@ -97,6 +97,7 @@ export async function createNoteApi(
   body: Omit<NoteItem, 'id' | 'date' | 'topicId'> & {
     topicId?: string
     topicTitle?: string
+    agentSessionId?: string
   },
 ): Promise<NoteItem> {
   return post<NoteItem>('/notes', body)
@@ -104,7 +105,7 @@ export async function createNoteApi(
 
 export async function updateNoteApi(
   id: string,
-  body: Partial<NoteItem> & { topicTitle?: string },
+  body: Partial<NoteItem> & { topicTitle?: string; agentSessionId?: string },
 ): Promise<NoteItem> {
   return put<NoteItem>(`/notes/${id}`, body)
 }

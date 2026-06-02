@@ -15,6 +15,7 @@ export interface ReaderItem {
   images?: string[]
   viewCount?: number
   agentReply?: string | null
+  agentReplyStatus?: string | null
 }
 
 const props = defineProps<{
@@ -34,6 +35,12 @@ const { shouldShowReply } = useAgentReplySettings()
 const showAgentReply = computed(() =>
   props.item ? shouldShowReply(props.kind, props.item.agentReply) : false,
 )
+
+const agentReplyGenerating = computed(() => {
+  if (!props.item) return false
+  const st = (props.item.agentReplyStatus || '').toLowerCase()
+  return (st === 'pending' || st === 'running') && !props.item.agentReply?.trim()
+})
 
 const { viewCount } = useContentViewTracking(
   props.kind,
@@ -81,6 +88,7 @@ watch(viewCount, (n) => emit('view-count', n))
           </header>
           <div class="reader-body">
             <div class="content">{{ item.content }}</div>
+            <p v-if="agentReplyGenerating" class="agent-reply-pending">Kohaku 正在写回复…</p>
             <AgentReplyBlock
               v-if="showAgentReply && item.agentReply"
               :kind="kind"
@@ -179,5 +187,11 @@ h2 {
   color: var(--color-text);
   white-space: pre-wrap;
   word-break: break-word;
+}
+.agent-reply-pending {
+  margin: 1rem 0 0;
+  font-size: 0.85rem;
+  color: #7c3aed;
+  font-style: italic;
 }
 </style>

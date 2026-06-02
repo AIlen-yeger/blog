@@ -21,4 +21,7 @@ public class NoteEntity {
     private String status = "published";
     /** Kohaku 自动回复全文 */
     private String agentReply;
+    /** none | pending | running | done | failed */
+    private String agentReplyStatus = "none";
+    private String agentReplyJobId;
 }

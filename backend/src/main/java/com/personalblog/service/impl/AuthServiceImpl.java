@@ -156,7 +156,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private LoginResultDto buildLoginResult(UserEntity user) {
-        String token = jwtService.generateToken(user.getEmail(), user.getRole());
+        String token = jwtService.generateToken(user.getEmail(), user.getRole(), user.getId());
         LoginResultDto.UserInfoDto userInfo = new LoginResultDto.UserInfoDto(user.getEmail(), user.getRole());
         return new LoginResultDto(token, jwtService.getExpirationSeconds(), userInfo);
     }

@@ -5,9 +5,8 @@
   python scripts/prune_agent_logs.py --dry-run
 
 保留策略（可通过 .env 覆盖）:
-  summary.jsonl.*     AGENT_LOG_SUMMARY_RETAIN_DAYS  默认 90
-  error.jsonl.*       AGENT_LOG_ERROR_RETAIN_DAYS    默认 180（供后续 bug agent）
-  trace / intent 等   AGENT_LOG_TRACE_RETAIN_DAYS    默认 14
+  目录结构: log/agent/*.jsonl（当前） + log/agent/archive/*.jsonl.日期（历史）
+  summary / error / trace / intent 等保留天数见 AGENT_LOG_*_RETAIN_DAYS
 """
 
 from __future__ import annotations
@@ -41,7 +40,7 @@ def main() -> int:
     parser.add_argument(
         "--log-dir",
         default=None,
-        help="日志目录，默认 AGENT_LOG_DIR 或 log/agent.log",
+        help="日志目录，默认 AGENT_LOG_DIR 或 log/agent",
     )
     parser.add_argument(
         "--dry-run",

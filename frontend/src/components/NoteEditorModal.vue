@@ -92,7 +92,7 @@ async function submit(publishStatus: 'published' | 'draft') {
 <template>
   <Teleport to="body">
     <Transition name="fade">
-      <div v-if="open" class="backdrop" @click.self="!submitting && emit('close')">
+      <div v-if="open" class="backdrop">
         <div class="modal" role="dialog">
           <h2>{{ editing ? '编辑文章' : '发布文章' }}</h2>
           <form class="form" @submit.prevent="submit('published')">

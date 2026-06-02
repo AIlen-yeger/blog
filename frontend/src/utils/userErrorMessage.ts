@@ -1,6 +1,7 @@
 import { ApiError } from '@/api/http'
 import {
   AUTH_CODE_NOT_REGISTERED,
+  AUTH_CODE_QUIET_HOURS,
   AUTH_CODE_SEND_TOO_FREQUENT,
   AUTH_CODE_UNAUTHORIZED,
   AUTH_CODE_WRONG_PASSWORD,
@@ -14,6 +15,7 @@ const KNOWN_API_MESSAGES: Record<number, string> = {
   [AUTH_CODE_NOT_REGISTERED]: '该邮箱尚未注册',
   [AUTH_CODE_SEND_TOO_FREQUENT]: '验证码发送过于频繁，请稍后再试',
   [AUTH_CODE_UNAUTHORIZED]: '登录已过期，请重新登录',
+  [AUTH_CODE_QUIET_HOURS]: '夜间维护时段，当前不可访问',
 }
 
 /** 根据 HTTP 状态生成文案（不含状态码字面量） */

@@ -22,6 +22,7 @@ import { toUserErrorMessage } from '@/utils/userErrorMessage'
 import { hasValidSession } from '@/composables/useSession'
 import { useMockApi } from '@/api/http'
 import * as blogApi from '@/api/blog'
+import { getAgentSessionId } from '@/utils/agentSession'
 import type { ContentListParams } from '@/api/blog'
 
 const STORAGE_KEY = 'personal-blog-data'
@@ -381,7 +382,10 @@ export function useBlogStore() {
   ) {
     if (payload.id) {
       if (!useMockApi()) {
-        const updated = await blogApi.updateNoteApi(payload.id, payload)
+        const updated = await blogApi.updateNoteApi(payload.id, {
+          ...payload,
+          agentSessionId: getAgentSessionId(),
+        })
         const idx = state.notes.findIndex((n) => n.id === payload.id)
         if (idx >= 0) state.notes[idx] = updated
         state.topics = await blogApi.fetchTopics()
@@ -410,6 +414,7 @@ export function useBlogStore() {
         content: payload.content,
         images: payload.images ?? [],
         status: payload.status,
+        agentSessionId: getAgentSessionId(),
       })
       state.notes.unshift(created)
       state.topics = await blogApi.fetchTopics()

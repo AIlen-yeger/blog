@@ -9,7 +9,6 @@ from config.config import AgentConfig
 
 logger = logging.getLogger(__name__)
 
-
 class MysqlRepo:
     def __init__(self, config: AgentConfig | None = None):
         cfg = config or AgentConfig()

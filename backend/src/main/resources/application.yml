@@ -73,15 +73,16 @@ app:
     daily-key-ttl-days: 8
     # Agent 查询全量累计播放排行时返回的最大条数
     all-plays-top-limit: 30
-  agent:
-    # Python Agent 仅内网访问，由 Spring Boot 转发
-    base-url: http://127.0.0.1:8000
-    chat-path: /ai/chat
-    connect-timeout-ms: 5000
-    read-timeout-ms: 120000
-    reply:
-      note-enabled: true
-      life-enabled: true
-      preview-max-chars: 120
+
   cors:
     allowed-origins: "http://localhost:5173,http://127.0.0.1:5173"
+  quiet-hours:
+    enabled: false
+    start: "23:00"
+    end: "08:00"
+    zone-id: Asia/Shanghai
+    allow-user-ids: []
+    allow-ips: []
+    allow-auth-from-whitelist-ip: true
+    bypass-path-patterns:
+      - /agent/ops/**

@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 
 # 当前写入的日志基名（不含 .jsonl）
 LOG_STREAMS = ("summary", "trace", "error", "music", "chat", "commit_user", "bug")
+
+ARCHIVE_SUBDIR = "archive"
+STATE_SUBDIR = "state"
 
 # 长留：请求摘要 + 错误（后续 bug agent / MCP 告警用）
 SUMMARY_RETAIN_DAYS = int(os.getenv("AGENT_LOG_SUMMARY_RETAIN_DAYS", "90"))
@@ -19,7 +23,8 @@ INTENT_RETAIN_DAYS = int(os.getenv("AGENT_LOG_INTENT_RETAIN_DAYS", "14"))
 # 兼容旧版 access.jsonl 轮转文件清理
 LEGACY_ACCESS_RETAIN_DAYS = TRACE_RETAIN_DAYS
 
-DEFAULT_LOG_DIR = os.getenv("AGENT_LOG_DIR", "log/agent.log")
+DEFAULT_LOG_DIR = os.getenv("AGENT_LOG_DIR", "log/agent")
+_LEGACY_LOG_DIR = "log/agent.log"
 
 # summary.jsonl 中 final_preview 最大字符数（完整回复见 MySQL/Redis 历史或 trace.jsonl）
 SUMMARY_ANSWER_PREVIEW_LEN = int(os.getenv("AGENT_LOG_ANSWER_PREVIEW_LEN", "800"))
@@ -36,17 +41,53 @@ BUG_AGENT_ON_STARTUP = os.getenv("BUG_AGENT_ON_STARTUP", "true").lower() != "fal
 BUG_AGENT_INTERVAL_HOURS = float(os.getenv("BUG_AGENT_INTERVAL_HOURS", "6"))
 BUG_AGENT_STARTUP_DELAY_SEC = float(os.getenv("BUG_AGENT_STARTUP_DELAY_SEC", "120"))
 BUG_AGENT_ALERT_ON_ERROR = os.getenv("BUG_AGENT_ALERT_ON_ERROR", "true").lower() != "false"
-# scheduled_scan / error_alert 触发的最低严重度：low | medium | high | critical
 BUG_AGENT_MIN_SEVERITY = (os.getenv("BUG_AGENT_MIN_SEVERITY", "high") or "high").strip().lower()
+
+_logger = logging.getLogger(__name__)
+_legacy_dir_warned = False
+
+
+def _project_root() -> Path:
+    return Path(__file__).resolve().parents[1]
 
 
 def resolve_log_dir(log_dir: str | None = None) -> Path:
-    raw = (log_dir or DEFAULT_LOG_DIR).strip()
-    path = Path(raw)
-    if not path.is_absolute():
-        root = Path(__file__).resolve().parents[1]
-        path = root / path
-    return path
+    """日志根目录：默认 log/agent（正在写的 *.jsonl）；历史轮转在 archive/。"""
+    global _legacy_dir_warned
+    root = _project_root()
+
+    if log_dir and str(log_dir).strip():
+        path = Path(str(log_dir).strip())
+        if not path.is_absolute():
+            path = root / path
+        return path
+
+    env = (os.getenv("AGENT_LOG_DIR") or "").strip()
+    if env:
+        path = Path(env)
+        if not path.is_absolute():
+            path = root / path
+        return path
+
+    preferred = root / DEFAULT_LOG_DIR
+    legacy = root / _LEGACY_LOG_DIR
+    if legacy.is_dir() and not preferred.is_dir():
+        if not _legacy_dir_warned:
+            _logger.warning(
+                "[agent_log] 使用旧目录 %s，建议在 .env 设 AGENT_LOG_DIR=log/agent",
+                legacy,
+            )
+            _legacy_dir_warned = True
+        return legacy
+    return preferred
+
+
+def archive_dir(log_dir: Path | None = None) -> Path:
+    return resolve_log_dir() if log_dir is None else Path(log_dir) / ARCHIVE_SUBDIR
+
+
+def state_dir(log_dir: Path | None = None) -> Path:
+    return resolve_log_dir() if log_dir is None else Path(log_dir) / STATE_SUBDIR
 
 
 def retention_days_for_stream(name: str) -> int:

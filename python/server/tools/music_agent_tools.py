@@ -81,32 +81,34 @@ def search_song_story_on_web(title: str, artist: str = "") -> str:
     """搜索歌曲创作背景、灵感或轶事。
     仅当用户明确询问背景、故事、灵感、听歌简报或情绪分析时调用。
     禁止在：仅添加歌曲、仅发 QQ 链接、仅说「加歌/保存」时调用。"""
-    try:
-        text = search_song_background_story_sync(title, artist, num_results=5)
-        if not (text or "").strip():
-            log_event(
-                "tool.search_story.empty",
-                level=logging.WARNING,
-                title=preview(title, 80),
-                artist=preview(artist, 80),
-            )
-            return json.dumps(
-                {"message": "未检索到可靠背景信息", "title": title, "artist": artist},
-                ensure_ascii=False,
-            )
-        return text
-    except Exception as exc:
-        log_event(
-            "tool.search_story.error",
-            level=logging.ERROR,
-            title=preview(title, 80),
-            artist=preview(artist, 80),
-            error=str(exc),
-        )
+    from config.config import AgentConfig
+
+    if not AgentConfig().sogou_mcp_enabled:
         return json.dumps(
-            {"message": f"搜狗搜索失败：{exc}", "title": title, "artist": artist},
+            {
+                "message": "网络搜索未启用（SOGOU_MCP_ENABLED=false），请根据已有知识回答",
+                "title": title,
+                "artist": artist,
+            },
             ensure_ascii=False,
         )
+    text = search_song_background_story_sync(title, artist, num_results=5)
+    if not (text or "").strip():
+        log_event(
+            "tool.search_story.empty",
+            level=logging.WARNING,
+            title=preview(title, 80),
+            artist=preview(artist, 80),
+        )
+        return json.dumps(
+            {
+                "message": "未检索到可靠背景信息（搜狗无结果或暂时不可用）",
+                "title": title,
+                "artist": artist,
+            },
+            ensure_ascii=False,
+        )
+    return text
 
 
 # 不依赖登录态的工具（模型可直接调用）

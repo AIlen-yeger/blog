@@ -9,7 +9,7 @@ from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from config.config import AgentConfig
 from server.agent_entry import get_agent_entry
-from utils.trace_log import bind_trace, new_trace_id, preview, span
+from utils.trace_log import new_trace_id, preview, span
 
 _DEFAULT_HISTORY_LIMIT = AgentConfig().history_limit
 
@@ -90,31 +90,6 @@ def _parse_chat_request(raw: object) -> ChatRequest | JSONResponse:
     )
 
 
-def _safe_chat_stream(body: ChatRequest, trace_id: str) -> Iterator[str]:
-    """Graph 判意图 → chat 走流式，其它分支暂返回占位文案。"""
-    with span("request", question_preview=preview(body.question)):
-        bind_trace(
-            trace_id=trace_id,
-            session_id=body.session_id,
-            user_id=body.user_id,
-        )
-        try:
-            entry = get_agent_entry()
-            yield from entry.stream_sse(
-                question=body.question,
-                session_id=body.session_id,
-                user_id=body.user_id,
-                limit=body.limit,
-                access_token=body.access_token,
-                trace_id=trace_id,
-            )
-        except Exception as exc:
-            logger.exception("[ai/chat] failed session_id=%s trace_id=%s", body.session_id, trace_id)
-            payload = json.dumps({"code": 50000, "message": f"服务异常：{exc}"}, ensure_ascii=False)
-            yield f"data: {payload}\n\n"
-            yield "data: [DONE]\n\n"
-
-
 def _require_ops_token(x_ops_token: str | None) -> JSONResponse | None:
     expected = (os.getenv("AGENT_OPS_TOKEN") or "").strip()
     if not expected or x_ops_token != expected:
@@ -192,8 +167,126 @@ async def llm_chat(request: Request):
             content={"code": 40000, "message": "用户不存在！"},
         )
 
+    def sse_stream() -> Iterator[str]:
+        with span("request", question_preview=preview(body.question)):
+            try:
+                result = get_agent_entry().run(
+                    question=body.question,
+                    session_id=body.session_id,
+                    user_id=body.user_id,
+                    limit=body.limit,
+                    access_token=body.access_token,
+                    trace_id=trace_id,
+                    channel="web",
+                )
+                yield from result.iter_sse()
+            except Exception as exc:
+                logger.exception(
+                    "[ai/chat] failed session_id=%s trace_id=%s",
+                    body.session_id,
+                    trace_id,
+                )
+                payload = json.dumps(
+                    {"code": 50000, "message": f"服务异常：{exc}"},
+                    ensure_ascii=False,
+                )
+                yield f"data: {payload}\n\n"
+                yield "data: [DONE]\n\n"
+
     return StreamingResponse(
-        _safe_chat_stream(body, trace_id),
+        sse_stream(),
         media_type="text/event-stream; charset=utf-8",
         headers={**SSE_HEADERS, "X-Trace-Id": trace_id},
     )
+
+
+class NoteCommentRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    note_id: str = Field(validation_alias=AliasChoices("note_id", "noteId"))
+    job_id: str = Field(default="", validation_alias=AliasChoices("job_id", "jobId"))
+    question: str
+    note_title: str = Field(default="", validation_alias=AliasChoices("note_title", "noteTitle"))
+    session_id: str = Field(default="", validation_alias=AliasChoices("session_id", "sessionId"))
+    user_id: int = Field(default=0, validation_alias=AliasChoices("user_id", "userId"))
+    limit: int = Field(default=_DEFAULT_HISTORY_LIMIT, ge=1, le=50)
+
+
+@router.post("/ai/internal/note-comment")
+async def internal_note_comment(
+    request: Request,
+    x_ops_token: str | None = Header(default=None, alias="X-Ops-Token"),
+):
+    """
+    笔记发布后由 Java 内网调用：强制 commit_user，生成回复并写入 notes.agent_reply。
+    """
+    denied = _require_ops_token(x_ops_token)
+    if denied:
+        return denied
+
+    try:
+        raw = await request.json()
+    except Exception as exc:
+        logger.warning("[ai/internal/note-comment] invalid json: %s", exc)
+        return JSONResponse(
+            status_code=422,
+            content={"code": 42200, "message": "JSON 格式错误"},
+        )
+
+    if not isinstance(raw, dict):
+        return JSONResponse(status_code=422, content={"code": 42200, "message": "请求体必须是 JSON 对象"})
+
+    note_id = _pick_str(raw, "note_id", "noteId")
+    job_id = _pick_str(raw, "job_id", "jobId")
+    question = _pick_str(raw, "question")
+    if not note_id or not question:
+        return JSONResponse(
+            status_code=422,
+            content={"code": 42200, "message": "note_id 与 question 不能为空"},
+        )
+    if not job_id:
+        return JSONResponse(
+            status_code=422,
+            content={"code": 42200, "message": "job_id 不能为空"},
+        )
+
+    body = NoteCommentRequest(
+        note_id=note_id,
+        job_id=job_id,
+        question=question,
+        note_title=_pick_str(raw, "note_title", "noteTitle"),
+        session_id=_pick_str(raw, "session_id", "sessionId"),
+        user_id=_pick_int(raw, "user_id", "userId"),
+        limit=max(1, min(50, _pick_int(raw, "limit", default=_DEFAULT_HISTORY_LIMIT))),
+    )
+
+    trace_id = new_trace_id()
+    with span("note.comment.request", note_id=body.note_id, question_preview=preview(body.question)):
+        try:
+            result = get_agent_entry().run_note_comment_job(
+                note_id=body.note_id,
+                job_id=body.job_id,
+                question=body.question,
+                note_title=body.note_title,
+                session_id=body.session_id,
+                user_id=body.user_id,
+                limit=body.limit,
+                trace_id=trace_id,
+            )
+            return {
+                "ok": True,
+                "trace_id": trace_id,
+                "note_id": body.note_id,
+                "saved": bool(result.get("saved")),
+                "reply": result.get("final_answer") or "",
+            }
+        except Exception as exc:
+            logger.exception(
+                "[ai/internal/note-comment] failed note_id=%s trace_id=%s",
+                body.note_id,
+                trace_id,
+            )
+            return JSONResponse(
+                status_code=500,
+                content={"code": 50000, "message": f"笔记评论生成失败：{exc}"},
+            )

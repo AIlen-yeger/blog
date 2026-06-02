@@ -16,10 +16,13 @@
         <result column="pinned" property="pinned"/>
         <result column="status" property="status"/>
         <result column="agent_reply" property="agentReply"/>
+        <result column="agent_reply_status" property="agentReplyStatus"/>
+        <result column="agent_reply_job_id" property="agentReplyJobId"/>
     </resultMap>
 
     <sql id="NoteColumns">
-        id, title, excerpt, tag, topic_id, content, record_date, images_json, view_count, pinned, status, agent_reply
+        id, title, excerpt, tag, topic_id, content, record_date, images_json, view_count, pinned, status,
+        agent_reply, agent_reply_status, agent_reply_job_id
     </sql>
 
     <sql id="listWhere">
@@ -117,13 +120,35 @@
             content = #{content},
             record_date = #{date},
             images_json = #{imagesJson},
-            status = #{status},
-            agent_reply = #{agentReply}
+            status = #{status}
+        WHERE id = #{id}
+    </update>
+
+    <update id="resetAgentReplyForRegeneration">
+        UPDATE notes
+        SET agent_reply = NULL,
+            agent_reply_status = #{status},
+            agent_reply_job_id = #{jobId}
         WHERE id = #{id}
     </update>
 
     <update id="updateAgentReply">
         UPDATE notes SET agent_reply = #{agentReply} WHERE id = #{id}
+    </update>
+
+    <update id="updateAgentReplyMeta">
+        UPDATE notes
+        SET agent_reply_status = #{status},
+            agent_reply_job_id = #{jobId}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateAgentReplyComplete">
+        UPDATE notes
+        SET agent_reply = #{agentReply},
+            agent_reply_status = 'done',
+            agent_reply_job_id = #{jobId}
+        WHERE id = #{id}
     </update>
 
     <delete id="deleteById">

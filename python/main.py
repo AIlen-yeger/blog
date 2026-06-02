@@ -15,7 +15,7 @@ from utils.trace_log import setup_agent_logging
 ensure_env_loaded()
 log_startup_config()
 
-setup_agent_logging("log/agent.log")
+setup_agent_logging()
 logger = logging.getLogger(__name__)
 
 

@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from utils.agent_log_config import LOG_STREAMS, resolve_log_dir
+from utils.agent_log_config import ARCHIVE_SUBDIR, resolve_log_dir
 
 
 def _iter_log_files(stream: str, log_dir: Path | None = None) -> list[Path]:
@@ -16,7 +16,11 @@ def _iter_log_files(stream: str, log_dir: Path | None = None) -> list[Path]:
         return []
 
     active = directory / f"{stream}.jsonl"
+    archive = directory / ARCHIVE_SUBDIR
     rotated = sorted(directory.glob(f"{stream}.jsonl.*"), reverse=True)
+    if archive.is_dir():
+        rotated = sorted(archive.glob(f"{stream}.jsonl.*"), reverse=True) + rotated
+
     paths: list[Path] = []
     if active.is_file():
         paths.append(active)

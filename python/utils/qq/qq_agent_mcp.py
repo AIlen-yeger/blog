@@ -8,7 +8,7 @@ import os
 import shutil
 import sys
 from pathlib import Path
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -121,54 +121,6 @@ def _parse_messages(raw: str) -> list[dict]:
             if isinstance(val, list):
                 return val
     return []
-
-
-async def with_session(fn: Callable[[ClientSession], Awaitable[Any]]) -> Any:
-    async with stdio_client(_params()) as (r, w):
-        async with ClientSession(r, w) as session:
-            await session.initialize()
-            return await fn(session)
-
-
-async def check_status() -> dict:
-    async def _run(s: ClientSession) -> dict:
-        raw = _text(await s.call_tool("check_status", arguments={}))
-        return json.loads(raw or "{}")
-
-    return await with_session(_run)
-
-
-async def get_recent_private(friend_qq: str, limit: int = 20) -> list[dict]:
-    async def _run(s: ClientSession) -> list[dict]:
-        raw = _text(
-            await s.call_tool(
-                "get_recent_context",
-                arguments={
-                    "target": friend_qq,
-                    "target_type": "private",
-                    "limit": limit,
-                },
-            )
-        )
-        return _parse_messages(raw)
-
-    return await with_session(_run)
-
-
-async def send_private(friend_qq: str, content: str) -> str:
-    async def _run(s: ClientSession) -> str:
-        return _text(
-            await s.call_tool(
-                "send_message",
-                arguments={
-                    "target": friend_qq,
-                    "content": content[:4000],
-                    "target_type": "private",
-                },
-            )
-        )
-
-    return await with_session(_run)
 
 
 class QqMcpSession:
