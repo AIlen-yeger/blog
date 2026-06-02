@@ -7,7 +7,6 @@ import com.personalblog.security.QuietHoursInterceptor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
-import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
@@ -19,12 +18,6 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Value("${app.cors.allowed-origins}")
     private String allowedOrigins;
-
-    @Value("${app.upload.avatar-dir}")
-    private String avatarDir;
-
-    @Value("${app.upload.content-dir}")
-    private String contentDir;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
@@ -43,13 +36,5 @@ public class WebConfig implements WebMvcConfigurer {
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(true);
-    }
-
-    @Override
-    public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        String location = "file:" + avatarDir.replace("\\", "/") + "/";
-        registry.addResourceHandler("/uploads/avatars/**").addResourceLocations(location);
-        String contentLocation = "file:" + contentDir.replace("\\", "/") + "/";
-        registry.addResourceHandler("/uploads/content/**").addResourceLocations(contentLocation);
     }
 }

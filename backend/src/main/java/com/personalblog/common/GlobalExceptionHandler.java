@@ -5,6 +5,7 @@ import com.personalblog.util.AgentSseWriter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -18,6 +19,7 @@ import java.io.IOException;
 
 @RestControllerAdvice
 @RequiredArgsConstructor
+@Slf4j
 public class GlobalExceptionHandler {
 
     private final ObjectMapper objectMapper;
@@ -55,6 +57,7 @@ public class GlobalExceptionHandler {
             Exception ex,
             HttpServletRequest request,
             HttpServletResponse response) throws IOException {
+        log.error("Unhandled {} {}: {}", request.getMethod(), request.getRequestURI(), ex.toString());
         if (prefersEventStream(request) && !response.isCommitted()) {
             writeSseBusinessError(
                     response,
