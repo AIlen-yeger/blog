@@ -73,6 +73,7 @@ class MysqlRepo:
                     ORDER BY id DESC
                     LIMIT %s
                 """
+                # session_id 已区分 qq:private:{qq} 与 web；channel 列供统计/筛选
                 cur.execute(sql, (session_id, user_id, limit * 2))
                 rows = cur.fetchall() or []
             rows.reverse()
@@ -143,6 +144,8 @@ class MysqlRepo:
         user_question: str,
         assistant_answer: str,
         user_id: int = 0,
+        *,
+        channel: str = "web",
     ) -> bool:
         if not session_id:
             return False
@@ -150,14 +153,15 @@ class MysqlRepo:
         if conn is None:
             return False
 
+        ch = (channel or "web").strip().lower()[:16] or "web"
         sql = """
-            INSERT INTO ai_chat_message (session_id, user_id, role, content, create_time)
-            VALUES (%s, %s, %s, %s, NOW())
+            INSERT INTO ai_chat_message (session_id, user_id, channel, role, content, create_time)
+            VALUES (%s, %s, %s, %s, %s, NOW())
         """
         try:
             with conn.cursor() as cur:
-                cur.execute(sql, (session_id, user_id, "user", user_question))
-                cur.execute(sql, (session_id, user_id, "assistant", assistant_answer))
+                cur.execute(sql, (session_id, user_id, ch, "user", user_question))
+                cur.execute(sql, (session_id, user_id, ch, "assistant", assistant_answer))
             return True
         except Exception as e:
             logger.warning("[history] save turn failed session_id=%s err=%s", session_id, e)

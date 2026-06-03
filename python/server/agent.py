@@ -123,6 +123,7 @@ class ChatModel:
             user_id=user_id,
             user_question=question,
             assistant_answer=answer,
+            channel=(channel or "web").strip().lower() or "web",
         )
         log_event(
             "chat.done",
@@ -189,6 +190,7 @@ class ChatModel:
             user_id=user_id,
             user_question=question,
             assistant_answer=answer,
+            channel=(channel or "qq").strip().lower() or "qq",
         )
         log_event(
             "chat.done",

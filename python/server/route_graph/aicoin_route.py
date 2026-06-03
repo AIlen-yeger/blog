@@ -147,12 +147,14 @@ def run_aicoin_react(
     session_id = state.get("session_id") or ""
     user_id = int(state.get("user_id") or 0)
     if session_id:
+        ch = (channel or "web").strip().lower()
         ChatHistoryService().save_turn(
             session_id=session_id,
             user_id=user_id,
             user_question=question,
             assistant_answer=final,
+            channel=ch,
         )
-        log_event("history.saved", session_id=session_id, channel="aicoin")
+        log_event("history.saved", session_id=session_id, channel=ch)
 
     return {"final_answer": final, "messages": messages}

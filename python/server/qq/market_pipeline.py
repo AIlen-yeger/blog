@@ -195,8 +195,9 @@ def run_aicoin_qq_two_phase(state: AgentState, chat_model: ChatModel) -> dict:
                 user_id=user_id,
                 user_question=question,
                 assistant_answer=final,
+                channel="qq",
             )
-            log_event("history.saved", session_id=session_id, channel="qq_aicoin")
+            log_event("history.saved", session_id=session_id, channel="qq")
 
         return {
             "final_answer": final,

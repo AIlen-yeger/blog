@@ -89,13 +89,15 @@ def run_music_react(state: AgentState) -> dict:
 
     session_id = state.get("session_id") or ""
     user_id = int(state.get("user_id") or 0)
+    ch = (state.get("channel") or "web").strip().lower()
     if session_id:
         ChatHistoryService().save_turn(
             session_id=session_id,
             user_id=user_id,
             user_question=question,
             assistant_answer=final,
+            channel=ch,
         )
-        log_event("history.saved", session_id=session_id, channel="music")
+        log_event("history.saved", session_id=session_id, channel=ch)
 
     return {"final_answer": final, "messages": messages}

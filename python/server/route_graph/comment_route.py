@@ -101,6 +101,7 @@ def run_note_comment(state: AgentState) -> dict:
             user_id=user_id,
             user_question=question[:2000],
             assistant_answer=reply,
+            channel="internal",
         )
 
     log_event(

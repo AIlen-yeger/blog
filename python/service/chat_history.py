@@ -39,11 +39,11 @@ class ChatHistoryService:
         if len(cached) >= need:
             return cached
 
-        # 游客：只用 Redis，没有则返回已有片段
-        if user_id <= 0:
+        # 游客 Web：只用 Redis
+        if user_id <= 0 and not (session_id or "").startswith("qq:"):
             return cached
 
-        # 已登录：Redis 不足时从 MySQL 拉最近记录并回填 List
+        # 已登录或 QQ 私聊（session_id=qq:private:…）：Redis 不足时从 MySQL 拉取
         rows = self.mysql.get_recent_history(
             session_id=session_id,
             user_id=user_id,
@@ -105,6 +105,8 @@ class ChatHistoryService:
         user_id: int,
         user_question: str,
         assistant_answer: str,
+        *,
+        channel: str = "web",
     ) -> None:
         if not session_id:
             return
@@ -114,12 +116,15 @@ class ChatHistoryService:
         if not question and not answer:
             return
 
-        if user_id > 0:
+        ch = (channel or "web").strip().lower() or "web"
+        # QQ 私聊：即使用户未绑定博客（user_id=0）也写入 MySQL，便于跨轮上下文
+        if user_id > 0 or ch == "qq":
             self.mysql.save_turn(
                 session_id=session_id,
                 user_question=question,
                 assistant_answer=answer,
                 user_id=user_id,
+                channel=ch,
             )
 
         self.redis.append_turn(session_id, question, answer)

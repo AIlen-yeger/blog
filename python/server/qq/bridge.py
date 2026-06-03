@@ -6,6 +6,7 @@ import logging
 
 from config.config import AgentConfig
 from server.qq.daily_brief import try_handle_daily_brief_qq
+from server.qq.history import persist_qq_turn
 from utils.qq.qq_blog_auth import resolve_qq_blog_identity
 
 logger = logging.getLogger(__name__)
@@ -41,9 +42,12 @@ def handle_qq_private_message_sync(friend_qq: str, text: str) -> str:
 
     from service.btc_dca_position import try_handle_qq_message
 
+    session_id = f"qq:private:{''.join(c for c in friend_qq if c.isdigit()) or friend_qq}"
+
     dca_reply = try_handle_qq_message(text)
     if dca_reply:
         logger.info("[qq_bridge] btc_dca handled friend=%s", friend_qq)
+        persist_qq_turn(friend_qq, user_id, text, dca_reply)
         return dca_reply[:4000]
 
     daily_reply = try_handle_daily_brief_qq(
@@ -54,11 +58,12 @@ def handle_qq_private_message_sync(friend_qq: str, text: str) -> str:
     )
     if daily_reply:
         logger.info("[qq_bridge] daily_brief handled friend=%s", friend_qq)
+        persist_qq_turn(friend_qq, user_id, text, daily_reply)
         return daily_reply[:4000]
 
     result = entry.run(
         question=text,
-        session_id=f"qq:private:{friend_qq}",
+        session_id=session_id,
         user_id=user_id,
         limit=cfg.history_limit,
         access_token=access_token,
