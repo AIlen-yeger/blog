@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from utils.path_tools import get_abs_path
+from utils.world_lexicon import WORLD_LEXICON_PROMPT
+
+_AICOIN_SECTION_RE = re.compile(r"<!--\s*@section\s+(\w+)\s*-->", re.I)
 
 INTENT_SKILL_MAP: dict[str, str] = {
     "music": "music",
@@ -51,9 +55,12 @@ def build_system_prompt(
 
     skill_key = INTENT_SKILL_MAP.get(intent_key)
     if skill_key:
-        parts.append(_read_prompt(f"prompt/skills/{skill_key}.md"))
-        if skill_key == "aicoin" and ch == "qq":
-            parts.append(_read_prompt("prompt/skills/aicoin_qq.md"))
+        if skill_key == "aicoin":
+            parts.append(read_aicoin_skill("web"))
+            if ch == "qq":
+                parts.append(read_aicoin_skill("qq_tone", include_preamble=False))
+        else:
+            parts.append(_read_prompt(f"prompt/skills/{skill_key}.md"))
 
     if skill_key == "music" and user_logged_in:
         parts.append(
@@ -86,6 +93,30 @@ def _session_context(developer_name: str | None) -> str:
 
 def read_prompt(relative_path: str) -> str:
     return _read_prompt(relative_path)
+
+
+def read_aicoin_skill(section: str | None = None, *, include_preamble: bool = True) -> str:
+    """读取合并后的 aicoin.md；section 为 web | qq_tone | qq_data | dca_daily。"""
+    raw = _read_prompt("prompt/skills/aicoin.md")
+    chunks = _AICOIN_SECTION_RE.split(raw)
+    preamble = "\n\n".join(
+        p.strip() for p in (chunks[0].strip(), WORLD_LEXICON_PROMPT) if p.strip()
+    )
+    sections: dict[str, str] = {}
+    for i in range(1, len(chunks), 2):
+        if i + 1 < len(chunks):
+            sections[chunks[i].strip().lower()] = chunks[i + 1].strip()
+
+    if section is None:
+        return raw.strip()
+
+    key = section.strip().lower()
+    body = sections.get(key, "")
+    if not body:
+        raise KeyError(f"unknown aicoin skill section: {section!r}")
+    if include_preamble:
+        return "\n\n---\n\n".join(p for p in (preamble, body) if p)
+    return body
 
 
 def _read_prompt(relative_path: str) -> str:

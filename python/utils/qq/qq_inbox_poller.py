@@ -215,7 +215,7 @@ def _should_process_message(
 
 async def _poll_friend(mcp, friend_qq: str) -> None:
     from config.config import AgentConfig
-    from server.qq_chat_bridge import handle_qq_private_message_sync
+    from server.qq.bridge import handle_qq_private_message_sync
     from utils.qq.napcat_history import fetch_friend_private_history
 
     cfg = AgentConfig()

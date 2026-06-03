@@ -77,7 +77,7 @@ class AicoinAgentTools:
             log_event("aicoin.tools.skip", level=logging.INFO, reason="mcp_disabled")
             return []
 
-        from server.qq_reply_format import (
+        from server.qq.reply_format import (
             is_ahr999_question,
             is_broad_market_question,
             is_single_coin_price_question,

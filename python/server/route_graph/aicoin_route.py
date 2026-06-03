@@ -8,11 +8,12 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from server.agent import ChatModel
 from server.prompt_skills import build_system_prompt
-from server.qq_reply_format import (
+from server.qq.market_pipeline import env_two_phase_enabled
+from server.qq.reply_format import (
     build_qq_aicoin_system_append,
+    format_qq_market_reply,
     qq_aicoin_max_rounds,
 )
-from server.qq_market_pipeline import _env_two_phase_enabled
 from server.route_graph.react_subgraph import (
     DEFAULT_MAX_REACT_ROUNDS,
     compile_react_graph,
@@ -23,6 +24,7 @@ from server.state import AgentState
 from server.tools.aicoin_agent_tools import build_aicoin_tools
 from service.chat_history import ChatHistoryService
 from utils.trace_log import bind_trace, log_event, preview, span
+from utils.world_lexicon import apply_world_lexicon
 
 _DEFAULT_AICOIN_HISTORY_LIMIT = 4
 
@@ -78,8 +80,8 @@ def run_aicoin_react(
 
     channel = (state.get("channel") or "web").strip().lower()
 
-    if channel == "qq" and _env_two_phase_enabled() and chat_model is not None:
-        from server.qq_market_pipeline import run_aicoin_qq_two_phase
+    if channel == "qq" and env_two_phase_enabled() and chat_model is not None:
+        from server.qq.market_pipeline import run_aicoin_qq_two_phase
 
         return run_aicoin_qq_two_phase(state, chat_model)
 
@@ -129,7 +131,8 @@ def run_aicoin_react(
         log_event("react.error", subgraph="aicoin", level=logging.ERROR)
         return {"final_answer": "行情助手暂时不可用，请稍后再试。"}
 
-    final = extract_final_answer(messages) or "处理完成。"
+    raw = extract_final_answer(messages) or "处理完成。"
+    final = format_qq_market_reply(raw) if channel == "qq" else apply_world_lexicon(raw)
     log_event(
         "react.done",
         subgraph="aicoin",

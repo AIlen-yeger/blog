@@ -112,6 +112,20 @@ def ops_bug_scan(x_ops_token: str | None = Header(default=None, alias="X-Ops-Tok
     return {"ok": True, "handled": len(ran), "items": ran}
 
 
+@router.post("/ai/ops/btc-daily-test")
+def ops_btc_daily_test(x_ops_token: str | None = Header(default=None, alias="X-Ops-Token")):
+    """立即发送一条 BTC 定投日报到 NAPCAT_ALERT_QQ（测定时推送与持仓盈亏）。"""
+    denied = _require_ops_token(x_ops_token)
+    if denied:
+        return denied
+
+    from service.btc_daily_brief import send_daily_brief_to_developer
+
+    result = send_daily_brief_to_developer(force=True)
+    status = 200 if result.get("ok") else 502
+    return JSONResponse(status_code=status, content=result)
+
+
 @router.post("/ai/ops/napcat-test")
 def ops_napcat_test(x_ops_token: str | None = Header(default=None, alias="X-Ops-Token")):
     """向 NAPCAT_ALERT_QQ 发送一条测试私聊（验证 NapCat HTTP 与登录状态）。"""

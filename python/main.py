@@ -10,6 +10,7 @@ from config.config import AgentConfig, ensure_env_loaded, log_startup_config
 from route.app import router
 from utils.agent_log_scheduler import start_agent_log_prune_scheduler
 from utils.bug_agent_scheduler import start_bug_agent_scheduler
+from utils.btc_dca_scheduler import start_btc_dca_scheduler
 from utils.trace_log import setup_agent_logging
 
 ensure_env_loaded()
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(_app: FastAPI):
     start_agent_log_prune_scheduler()
     start_bug_agent_scheduler()
+    start_btc_dca_scheduler()
     cfg = AgentConfig()
     if cfg.qq_mcp_enabled:
         friends = [x.strip() for x in cfg.qq_mcp_friends.split(",") if x.strip()]

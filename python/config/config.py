@@ -183,6 +183,16 @@ class AgentConfig:
             _dev_qq = _env_str("NAPCAT_ALERT_QQ", "")
         self.developer_qq = "".join(c for c in _dev_qq if c.isdigit())
 
+        # ── BTC 定投日报（QQ 私聊推送 + 持仓记账）──
+        self.btc_dca_daily_enabled = _env_bool("BTC_DCA_DAILY_ENABLED", True)
+        self.btc_dca_daily_tz = _env_str("BTC_DCA_DAILY_TZ", "Asia/Shanghai")
+        self.btc_dca_daily_hour = _env_int("BTC_DCA_DAILY_HOUR", 9)
+        self.btc_dca_daily_minute = _env_int("BTC_DCA_DAILY_MINUTE", 0)
+        self.btc_dca_check_interval_sec = _env_float("BTC_DCA_CHECK_INTERVAL_SEC", 60.0)
+        self.btc_dca_initial_btc_qty = _env_float("BTC_DCA_INITIAL_BTC_QTY", 0.00288579)
+        self.btc_dca_initial_cost_usdt = _env_float("BTC_DCA_INITIAL_COST_USDT", 0)
+        self.btc_dca_initial_avg_usdt = _env_float("BTC_DCA_INITIAL_AVG_USDT", 92212.5651)
+
 
 def _key_status(value: str) -> str:
     return "ok" if (value or "").strip() else "MISSING"
