@@ -79,14 +79,8 @@ def polish_daily_qq_message(facts: dict[str, Any]) -> str:
     if not facts.get("quote_ok"):
         return _fallback_qq_text(facts)
 
-    cfg = AgentConfig()
     try:
-        model = ChatModel(
-            api_key=cfg.chat_api_key,
-            base_url=cfg.chat_base_url,
-            model=cfg.chat_model_name,
-            temperature=min(cfg.chat_temperature, 0.6),
-        )
+        model = ChatModel()
         system = build_system_prompt(intent="chat", channel="qq", developer_name="开发者")
         extra = read_aicoin_skill("dca_daily")
         system = "\n\n---\n\n".join(p for p in (system, extra) if p)
