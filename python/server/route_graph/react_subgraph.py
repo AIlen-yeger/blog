@@ -21,6 +21,18 @@ logger = logging.getLogger(__name__)
 DEFAULT_MAX_REACT_ROUNDS = 6
 
 
+def _tool_call_name(tc: Any) -> str:
+    if isinstance(tc, dict):
+        return str(tc.get("name") or "unknown")
+    return str(getattr(tc, "name", None) or "unknown")
+
+
+def _tool_call_args(tc: Any) -> Any:
+    if isinstance(tc, dict):
+        return tc.get("args") or {}
+    return getattr(tc, "args", None) or {}
+
+
 def build_bound_model(tools: list) -> Any:
     """ReAct 用模型（默认 DeepSeek）+ bind_tools。"""
     cfg = AgentConfig()
@@ -73,16 +85,16 @@ def make_logging_tool_node(tools: list, *, subgraph: str) -> Callable[[AgentStat
 
         tool_msgs = out.get("messages") or []
         for i, tm in enumerate(tool_msgs):
-            name = pending[i].get("name") if i < len(pending) else "unknown"
+            name = _tool_call_name(pending[i]) if i < len(pending) else "unknown"
             raw = getattr(tm, "content", "") or ""
             text = raw if isinstance(raw, str) else str(raw)
-            status = tool_result_status(text)
+            ok, tool_log_level = tool_result_status(text)
             log_event(
                 "tool.end",
+                tool_log_level,
                 subgraph=subgraph,
                 tool=name,
-                ok=status.get("ok", True),
-                status=status.get("status"),
+                ok=ok,
                 result_preview=preview(text, 400),
                 duration_ms=elapsed_ms if i == 0 else None,
             )
@@ -138,8 +150,8 @@ def make_react_agent_node(
             log_event(
                 "tool.start",
                 subgraph=subgraph,
-                tool=tc.get("name"),
-                args_preview=preview(str(redact_args(tc.get("args") or {}))),
+                tool=_tool_call_name(tc),
+                args_preview=preview(str(redact_args(_tool_call_args(tc)))),
             )
 
         log_event(
@@ -147,7 +159,7 @@ def make_react_agent_node(
             subgraph=subgraph,
             round=round_no,
             has_tool_calls=bool(tool_calls),
-            tool_names=[tc.get("name") for tc in tool_calls],
+            tool_names=[_tool_call_name(tc) for tc in tool_calls],
             content_preview=preview(str(ai_msg.content)),
         )
         return {"messages": [ai_msg]}

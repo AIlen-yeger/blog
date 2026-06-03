@@ -17,7 +17,7 @@ from utils.trace_log import log_event, record_model
 
 logger = logging.getLogger(__name__)
 
-_VALID_INTENTS = frozenset({"chat", "music", "add_son", "commit_user"})
+_VALID_INTENTS = frozenset({"chat", "music", "add_son", "commit_user", "aicoin"})
 
 _MUSIC_QUESTION_SIGNALS = (
     "听歌报告",
@@ -46,6 +46,26 @@ _MUSIC_QUESTION_SIGNALS = (
 _MUSIC_QUERY_WORDS = ("查询", "查一下", "看看", "统计", "分析", "报告", "数据", "记录", "排行")
 _MUSIC_TOPIC_WORDS = ("听歌", "歌曲", "音乐", "播放")
 
+_AICOIN_SIGNALS = (
+    "btc",
+    "eth",
+    "比特币",
+    "以太坊",
+    "加密货币",
+    "数字货币",
+    "币价",
+    "行情",
+    "定投",
+    "恐惧贪婪",
+    "资金费率",
+    "快讯",
+    "上所",
+    "大盘",
+    "k线",
+    "k 线",
+)
+_AICOIN_TOPIC_WORDS = ("币", "代币", "山寨", "合约", "现货")
+
 
 def intent_from_question(question: str) -> str | None:
     """用户原文强信号（模型误判时覆盖）。"""
@@ -65,6 +85,12 @@ def intent_from_question(question: str) -> str | None:
         return "music"
     if "笔记" in q and any(k in q for k in ("发布", "写了", "刚发", "我的笔记")):
         return "commit_user"
+    if any(s in lower or s in q for s in _AICOIN_SIGNALS):
+        return "aicoin"
+    if any(k in q for k in _AICOIN_TOPIC_WORDS) and any(
+        k in q for k in ("价格", "涨跌", "新闻", "走势", "市值", "买入", "定投")
+    ):
+        return "aicoin"
     return None
 
 
@@ -94,6 +120,8 @@ def normalize_intent(raw: str) -> str:
         return "music"
     if "commit_user" in lowered or "笔记" in text:
         return "commit_user"
+    if "aicoin" in lowered or "行情" in text or "币价" in text:
+        return "aicoin"
     if "chat" in lowered:
         return "chat"
 

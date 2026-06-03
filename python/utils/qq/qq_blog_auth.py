@@ -23,6 +23,7 @@ class QqBlogIdentity:
     user_id: int
     access_token: str
     email: str = ""
+    role: str = ""
 
 
 def _ops_token() -> str:
@@ -94,8 +95,20 @@ def _fetch_identity(friend_qq: str) -> QqBlogIdentity | None:
         return None
 
     email = (data.get("email") or "").strip()
-    logger.info("[qq_blog_auth] issued blog session qq=%s user_id=%s", qq, user_id)
-    return QqBlogIdentity(user_id=user_id, access_token=token, email=email)
+    role_raw = data.get("role")
+    if isinstance(role_raw, str):
+        role = role_raw.strip().lower()
+    elif role_raw is not None:
+        role = str(role_raw).strip().lower()
+    else:
+        role = ""
+    logger.info(
+        "[qq_blog_auth] issued blog session qq=%s user_id=%s role=%s",
+        qq,
+        user_id,
+        role or "user",
+    )
+    return QqBlogIdentity(user_id=user_id, access_token=token, email=email, role=role)
 
 
 def resolve_qq_blog_identity(friend_qq: str) -> QqBlogIdentity | None:

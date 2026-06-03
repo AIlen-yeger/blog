@@ -58,7 +58,11 @@ def run_note_comment(state: AgentState) -> dict:
     limit = int(state.get("limit") or _DEFAULT_HISTORY_LIMIT)
     channel = (state.get("channel") or "internal").strip().lower()
 
-    system = build_system_prompt(intent="commit_user", channel=channel)
+    system = build_system_prompt(
+        intent="commit_user",
+        channel=channel,
+        developer_name=(state.get("user_name") or "").strip() or None,
+    )
     history_svc = ChatHistoryService()
     messages = [
         SystemMessage(content=system),

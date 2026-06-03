@@ -21,6 +21,10 @@ class AgentState(TypedDict, total=False):
     limit: int
     access_token: str
     channel: str  # web | qq | internal
+    friend_qq: str  # QQ 私聊对方 QQ 号（仅 channel=qq）
+    user_name: str
+    account: str  # 登录邮箱，与 Java 透传 account 一致
+    user_role: str  # admin | user
     note_id: str
     note_title: str
     job_id: str

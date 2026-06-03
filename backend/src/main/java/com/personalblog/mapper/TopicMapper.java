@@ -18,4 +18,6 @@ public interface TopicMapper {
     TopicEntity selectByTitleIgnoreCase(@Param("title") String title);
 
     int insert(TopicEntity topic);
+
+    int deleteById(@Param("id") String id);
 }

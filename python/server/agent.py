@@ -60,6 +60,7 @@ class ChatModel:
         *,
         trace_id: str = "",
         channel: str = "web",
+        developer_name: str = "",
     ):
         """流式对话：逐 token 产出 SSE delta，结束后写入历史。"""
         bind_trace_from_state(
@@ -69,7 +70,9 @@ class ChatModel:
         record_model(self.model)
         if limit is None:
             limit = AgentConfig().history_limit
-        system_prompt = build_system_prompt(channel=channel)
+        system_prompt = build_system_prompt(
+            channel=channel, developer_name=developer_name or None
+        )
 
         history_message = self.history.get_recent_history(
             session_id=session_id,
@@ -138,6 +141,7 @@ class ChatModel:
         *,
         trace_id: str = "",
         channel: str = "qq",
+        developer_name: str = "",
     ) -> str:
         """非流式对话：QQ 等渠道一次性拿全文。"""
         bind_trace_from_state(
@@ -148,7 +152,11 @@ class ChatModel:
         if limit is None:
             limit = AgentConfig().history_limit
         messages = [
-            SystemMessage(content=build_system_prompt(channel=channel)),
+            SystemMessage(
+                content=build_system_prompt(
+                    channel=channel, developer_name=developer_name or None
+                )
+            ),
             *self._to_lc_messages(
                 self.history.get_recent_history(
                     session_id=session_id,

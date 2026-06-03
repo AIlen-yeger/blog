@@ -33,4 +33,8 @@
         INSERT INTO topics (id, title, excerpt, tag, record_date)
         VALUES (#{id}, #{title}, #{excerpt}, #{tag}, #{date})
     </insert>
+
+    <delete id="deleteById">
+        DELETE FROM topics WHERE id = #{id}
+    </delete>
 </mapper>

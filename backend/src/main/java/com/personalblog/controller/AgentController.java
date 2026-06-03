@@ -8,7 +8,9 @@ import com.personalblog.dto.AgentPythonChatRequest;
 import com.personalblog.entity.UserEntity;
 import com.personalblog.mapper.UserMapper;
 import com.personalblog.security.AuthUserPrincipal;
+import com.personalblog.dto.ProfileDto;
 import com.personalblog.service.AgentProxyService;
+import com.personalblog.service.ProfileService;
 import com.personalblog.util.AgentSseWriter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -34,6 +36,7 @@ import java.io.UncheckedIOException;
 public class AgentController {
 
     private final AgentProxyService agentProxyService;
+    private final ProfileService profileService;
     private final UserMapper userMapper;
     private final ObjectMapper objectMapper;
 
@@ -48,12 +51,14 @@ public class AgentController {
                 throw new BusinessException(ErrorCode.UNAUTHORIZED, "用户不存在");
             }
 
+            String role = user.getRole() != null ? user.getRole().name() : "user";
             AgentPythonChatRequest upstream = new AgentPythonChatRequest(
                     request.getQuestion().trim(),
                     request.getSessionId().trim(),
                     user.getId(),
                     user.getEmail(),
-                    displayName(user.getEmail()),
+                    displayName(user),
+                    role,
                     request.getLimit(),
                     resolveBearerToken(httpRequest)
             );
@@ -116,7 +121,22 @@ public class AgentController {
         return "";
     }
 
-    private String displayName(String email) {
+    private String displayName(UserEntity user) {
+        if (user == null) {
+            return "guest";
+        }
+        try {
+            ProfileDto profile = profileService.getProfileByUserId(user.getId());
+            if (profile != null && profile.getName() != null && !profile.getName().isBlank()) {
+                return profile.getName().trim();
+            }
+        } catch (Exception ex) {
+            log.debug("[agent/chat] profile name unavailable userId={}", user.getId());
+        }
+        return displayNameFromEmail(user.getEmail());
+    }
+
+    private String displayNameFromEmail(String email) {
         if (email == null || email.isBlank()) {
             return "guest";
         }

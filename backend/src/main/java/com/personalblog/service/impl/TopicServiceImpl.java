@@ -51,6 +51,20 @@ public class TopicServiceImpl implements TopicService {
         return toDto(topic);
     }
 
+    @Override
+    @Transactional
+    public void deleteIfEmpty(String topicId) {
+        if (topicId == null || topicId.isBlank()) {
+            return;
+        }
+        if (noteMapper.countByTopicId(topicId) > 0) {
+            return;
+        }
+        if (topicMapper.countById(topicId) > 0) {
+            topicMapper.deleteById(topicId);
+        }
+    }
+
     private TopicDto toDto(TopicEntity entity) {
         TopicDto dto = new TopicDto();
         dto.setId(entity.getId());

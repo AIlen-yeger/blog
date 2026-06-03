@@ -133,7 +133,7 @@ class AgentConfig:
         self.execute_base_url = self.judge_base_url
         self.execute_temperature = self.judge_temperature
 
-        # 搜狗 MCP 查歌曲背景（外网 SSE，不稳定时可关）
+        # 搜狗 MCP：见 config/mcp_servers.json（SOGOU_MCP_* 环境变量注入）
         self.sogou_mcp_enabled = _env_bool("SOGOU_MCP_ENABLED", True)
         self.sogou_mcp_sse_url = _env_str(
             "SOGOU_MCP_SSE_URL",
@@ -174,6 +174,14 @@ class AgentConfig:
         # 新设备/无状态文件时：首轮只同步水位线，不对历史私聊自动回复
         self.qq_mcp_bootstrap_on_start = _env_bool("QQ_MCP_BOOTSTRAP_ON_START", True)
         self.agent_ops_token = _env_str("AGENT_OPS_TOKEN", "")
+        # 与 Java application.yml 的 developer.email 保持一致；用于 AiCoin 行情路由鉴权
+        self.developer_email = (
+            _read_env("DEVELOPER_EMAIL", "developer.email", "DEVELOPER.EMAIL") or ""
+        ).strip().lower()
+        _dev_qq = _env_str("DEVELOPER_QQ", "")
+        if not _dev_qq:
+            _dev_qq = _env_str("NAPCAT_ALERT_QQ", "")
+        self.developer_qq = "".join(c for c in _dev_qq if c.isdigit())
 
 
 def _key_status(value: str) -> str:
@@ -211,10 +219,16 @@ def log_startup_config() -> None:
         cfg.react_base_url,
     )
     logger.info(
-        "[config] judge_via_qwen=%s sogou_mcp_enabled=%s",
+        "[config] judge_via_qwen=%s",
         _env_bool("DP_JUDGE_ENABLED", False),
-        cfg.sogou_mcp_enabled,
     )
+    try:
+        from utils.mcp.registry import is_mcp_enabled, list_mcp_names
+
+        for mcp_name in list_mcp_names():
+            logger.info("[config] mcp %s enabled=%s", mcp_name, is_mcp_enabled(mcp_name))
+    except Exception as exc:
+        logger.warning("[config] mcp registry load failed: %s", exc)
     from utils.qq.napcat_notify import napcat_configured
     from utils.agent_log_config import resolve_log_dir
 

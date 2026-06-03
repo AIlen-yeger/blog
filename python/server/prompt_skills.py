@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from utils.path_tools import get_abs_path
 
 INTENT_SKILL_MAP: dict[str, str] = {
@@ -9,6 +12,7 @@ INTENT_SKILL_MAP: dict[str, str] = {
     "add_son": "music",
     "bug": "bug",
     "commit_user": "comment",
+    "aicoin": "aicoin",
 }
 
 CHANNEL_SKILL_MAP: dict[str, str] = {
@@ -22,6 +26,7 @@ def build_system_prompt(
     intent: str | None = None,
     user_logged_in: bool = False,
     channel: str | None = None,
+    developer_name: str | None = None,
 ) -> str:
     intent_key = (intent or "").strip().lower()
 
@@ -35,6 +40,7 @@ def build_system_prompt(
         channel_skill = CHANNEL_SKILL_MAP.get(ch)
         if channel_skill:
             parts.insert(1, _read_prompt(f"prompt/skills/{channel_skill}.md"))
+        parts.append(_session_context(developer_name))
         return "\n\n---\n\n".join(p for p in parts if p)
 
     parts = [_read_prompt("prompt/system.md")]
@@ -46,6 +52,8 @@ def build_system_prompt(
     skill_key = INTENT_SKILL_MAP.get(intent_key)
     if skill_key:
         parts.append(_read_prompt(f"prompt/skills/{skill_key}.md"))
+        if skill_key == "aicoin" and ch == "qq":
+            parts.append(_read_prompt("prompt/skills/aicoin_qq.md"))
 
     if skill_key == "music" and user_logged_in:
         parts.append(
@@ -54,6 +62,26 @@ def build_system_prompt(
         )
 
     return "\n\n---\n\n".join(p for p in parts if p)
+
+
+def _session_context(developer_name: str | None) -> str:
+    """当前对话对象与时间，供 Kohaku 回答「我是谁 / 几点了」。"""
+    name = (developer_name or "").strip()
+    try:
+        now = datetime.now(ZoneInfo("Asia/Shanghai"))
+        time_line = now.strftime("%Y-%m-%d %H:%M") + "（Asia/Shanghai）"
+    except Exception:
+        time_line = "未知"
+
+    lines = ["# 当前会话", f"- 当前时间：{time_line}"]
+    if name:
+        lines.append(
+            f"- 正在与你对话的是开发者；用户问「我叫什么 / 我的名字」时，"
+            f"回答「{name}」（这是开发者在本站的称呼，不要改成「主人」或泛称「你」）。"
+        )
+    else:
+        lines.append("- 用户是开发者；若未提供具体称呼，可亲切叫「你」，但不要称「主人」。")
+    return "\n".join(lines)
 
 
 def read_prompt(relative_path: str) -> str:

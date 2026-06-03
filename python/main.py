@@ -13,6 +13,9 @@ from utils.bug_agent_scheduler import start_bug_agent_scheduler
 from utils.trace_log import setup_agent_logging
 
 ensure_env_loaded()
+from utils.mcp.registry import reload_mcp_configs
+
+reload_mcp_configs()
 log_startup_config()
 
 setup_agent_logging()

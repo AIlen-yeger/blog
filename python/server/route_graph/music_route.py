@@ -26,13 +26,18 @@ logger = logging.getLogger(__name__)
 
 def _build_initial_messages(state: AgentState) -> list:
     logged_in = bool((state.get("access_token") or "").strip())
-    system = build_system_prompt(intent="music", user_logged_in=logged_in)
+    system = build_system_prompt(
+        intent="music",
+        user_logged_in=logged_in,
+        channel=(state.get("channel") or "web").strip().lower(),
+        developer_name=(state.get("user_name") or "").strip() or None,
+    )
     msgs: list = [SystemMessage(content=system)]
     session_id = state.get("session_id") or ""
     user_id = int(state.get("user_id") or 0)
     limit = int(state.get("limit") or _DEFAULT_HISTORY_LIMIT)
     if session_id and user_id:
-        history_rows = ChatHistoryService().get_history(
+        history_rows = ChatHistoryService().get_recent_history(
             session_id=session_id,
             user_id=user_id,
             limit=limit,

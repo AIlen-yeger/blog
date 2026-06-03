@@ -13,6 +13,8 @@ from typing import Literal
 from config.config import AgentConfig
 from server.intent_router import IntentRouter, intent_from_question
 from server.route_graph.comment_route import run_note_comment
+from server.aicoin_access import aicoin_allowed_for_state
+from server.route_graph.aicoin_route import run_aicoin_react
 from server.route_graph.music_route import run_music_react
 from server.state import AgentState
 from utils.trace_log import (
@@ -103,6 +105,10 @@ class AgentEntry:
         force_intent: str = "",
         note_id: str = "",
         note_title: str = "",
+        user_name: str = "",
+        account: str = "",
+        user_role: str = "",
+        friend_qq: str = "",
     ) -> AgentReplyResult:
         ch = (channel or "web").strip().lower()
         tid = trace_id or new_trace_id()
@@ -114,6 +120,10 @@ class AgentEntry:
             "access_token": access_token,
             "trace_id": tid,
             "channel": ch,
+            "user_name": (user_name or "").strip(),
+            "account": (account or "").strip(),
+            "user_role": (user_role or "").strip().lower(),
+            "friend_qq": "".join(c for c in (friend_qq or "").strip() if c.isdigit()),
             "note_id": (note_id or "").strip(),
             "note_title": (note_title or "").strip(),
         }
@@ -146,6 +156,17 @@ class AgentEntry:
                         intent=intent,
                         question_preview=preview(question, 120),
                     )
+
+        if intent == "aicoin" and not aicoin_allowed_for_state(state):
+            log_event(
+                "intent.downgrade",
+                from_intent="aicoin",
+                intent="chat",
+                reason="aicoin_not_allowed",
+                account_preview=preview((state.get("account") or ""), 40),
+                user_role=state.get("user_role") or "",
+            )
+            intent = "chat"
 
         state["intent"] = intent
         bind_trace_from_state(state, intent=intent)
@@ -188,6 +209,7 @@ class AgentEntry:
                 limit=int(state.get("limit") or _DEFAULT_HISTORY_LIMIT),
                 trace_id=state.get("trace_id") or "",
                 channel=(state.get("channel") or "qq").strip().lower(),
+                developer_name=(state.get("user_name") or "").strip(),
             )
         except Exception as exc:
             logger.exception("[agent] chat failed session_id=%s", state.get("session_id"))
@@ -235,16 +257,29 @@ class AgentEntry:
         bind_trace(trace_id=tid, session_id=session_id, user_id=user_id, intent="commit_user")
         return run_note_comment(state)
 
+    def _once_aicoin(self, state: AgentState) -> str:
+        bind_trace_from_state(state, intent="aicoin")
+        try:
+            result = run_aicoin_react(state, chat_model=self.chat_model)
+            return (result.get("final_answer") or "").strip() or "处理完成"
+        except Exception:
+            logger.exception("[agent] aicoin failed session_id=%s", state.get("session_id"))
+            return "行情助手暂时不可用，请稍后再试。"
 
-
-
-
-
-
-
-
-
-
+    def _stream_aicoin(self, state: AgentState) -> Iterator[str]:
+        bind_trace_from_state(state, intent="aicoin")
+        try:
+            result = run_aicoin_react(state, chat_model=self.chat_model)
+            final = (result.get("final_answer") or "").strip() or "处理完成"
+            body = (final or "").strip()
+            for i in range(0, len(body), _STREAM_CHUNK_CHARS):
+                yield _format_sse({"type": "delta", "content": body[i : i + _STREAM_CHUNK_CHARS]})
+            if not body:
+                yield _format_sse({"type": "delta", "content": ""})
+        except Exception as exc:
+            logger.exception("[agent] aicoin stream failed session_id=%s", state.get("session_id"))
+            yield _format_sse({"code": 50000, "message": f"行情助手失败：{exc}"})
+        yield _sse_done()
 
     def _stream_chat(self, state: AgentState) -> Iterator[str]:
         bind_trace_from_state(state, intent="chat")
@@ -256,6 +291,7 @@ class AgentEntry:
                 limit=int(state.get("limit") or _DEFAULT_HISTORY_LIMIT),
                 trace_id=state.get("trace_id") or "",
                 channel=(state.get("channel") or "web").strip().lower(),
+                developer_name=(state.get("user_name") or "").strip(),
             ):
                 if isinstance(chunk, dict):
                     yield _format_sse(chunk)
@@ -285,11 +321,13 @@ class AgentEntry:
         "chat": _once_chat,
         "music": _once_music,
         "commit_user": _once_commit_user,
+        "aicoin": _once_aicoin,
     }
 
     _STREAM_HANDLERS: dict[str, Callable[["AgentEntry", AgentState], Iterator[str]]] = {
         "chat": _stream_chat,
         "music": _stream_music,
+        "aicoin": _stream_aicoin,
     }
 
 

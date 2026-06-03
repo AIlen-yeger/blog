@@ -9,7 +9,8 @@ import re
 from langchain_core.tools import tool
 
 from utils.qq import qq_music_tools as qq
-from utils.sogou_mcp_search import search_song_background_story_sync
+from utils.mcp.registry import is_mcp_enabled
+from utils.mcp.web_search import search_song_background_story_sync
 from utils.trace_log import log_event, preview
 
 _QQ_URL_RE = re.compile(r"(y\.qq\.com|i\.qq\.com)", re.I)
@@ -83,10 +84,10 @@ def search_song_story_on_web(title: str, artist: str = "") -> str:
     禁止在：仅添加歌曲、仅发 QQ 链接、仅说「加歌/保存」时调用。"""
     from config.config import AgentConfig
 
-    if not AgentConfig().sogou_mcp_enabled:
+    if not is_mcp_enabled("sogou"):
         return json.dumps(
             {
-                "message": "网络搜索未启用（SOGOU_MCP_ENABLED=false），请根据已有知识回答",
+                "message": "网络搜索未启用（config/mcp_servers.json 中 sogou.enabled=false），请根据已有知识回答",
                 "title": title,
                 "artist": artist,
             },

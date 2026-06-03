@@ -17,10 +17,14 @@ def handle_qq_private_message_sync(friend_qq: str, text: str) -> str:
 
     user_id = 0
     access_token = ""
+    account = ""
+    user_role = ""
     identity = resolve_qq_blog_identity(friend_qq)
     if identity:
         user_id = identity.user_id
         access_token = identity.access_token
+        account = identity.email or ""
+        user_role = identity.role or ""
         logger.info(
             "[qq_bridge] friend=%s blog_user_id=%s email=%s",
             friend_qq,
@@ -37,6 +41,16 @@ def handle_qq_private_message_sync(friend_qq: str, text: str) -> str:
         user_id=user_id,
         limit=cfg.history_limit,
         access_token=access_token,
+        account=account,
+        user_role=user_role,
+        friend_qq=friend_qq,
         channel="qq",
+    )
+    logger.info(
+        "[qq_bridge] done friend=%s intent=%s role=%s account=%s",
+        friend_qq,
+        result.intent,
+        user_role or "-",
+        (account or "-")[:40],
     )
     return (result.plain_text() or "").strip()[:4000]

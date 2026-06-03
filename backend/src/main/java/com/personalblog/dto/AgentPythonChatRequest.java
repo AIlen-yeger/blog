@@ -15,6 +15,7 @@ public class AgentPythonChatRequest {
     private long userId;
     private String account;
     private String userName;
+    private String userRole;
     private int limit;
     private String accessToken;
 }

@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "sogou": {
+      "transport": "sse",
+      "url": "https://phoenixdna-sogou-search.ms.show/gradio_api/mcp/sse",
+      "enabled": "${SOGOU_MCP_ENABLED}",
+      "defaultTool": "predict"
+    },
+    "aicoin": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@aicoin/aicoin-mcp"],
+      "enabled": "${AICOIN_MCP_ENABLED}"
+    }
+  }
+}

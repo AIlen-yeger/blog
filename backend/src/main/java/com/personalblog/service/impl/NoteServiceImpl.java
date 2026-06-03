@@ -121,11 +121,14 @@ public class NoteServiceImpl implements NoteService {
     @Transactional
     public void deleteNote(String id) {
         adminGuard.requireAdmin();
-        if (noteMapper.countById(id) == 0) {
+        NoteEntity entity = noteMapper.selectById(id);
+        if (entity == null) {
             throw new BusinessException(ErrorCode.NOTE_NOT_FOUND);
         }
+        String topicId = entity.getTopicId();
         contentViewMapper.deleteByContent("note", id);
         noteMapper.deleteById(id);
+        topicService.deleteIfEmpty(topicId);
     }
 
     @Override

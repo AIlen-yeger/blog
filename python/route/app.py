@@ -33,6 +33,7 @@ class ChatRequest(BaseModel):
     user_name: str = Field(default="", validation_alias=AliasChoices("user_name", "userName"))
     user_id: int = Field(default=0, validation_alias=AliasChoices("user_id", "userId"))
     access_token: str = Field(default="", validation_alias=AliasChoices("access_token", "accessToken"))
+    user_role: str = Field(default="", validation_alias=AliasChoices("user_role", "userRole"))
 
 
 def _pick_str(raw: dict[str, Any], *keys: str) -> str:
@@ -87,6 +88,7 @@ def _parse_chat_request(raw: object) -> ChatRequest | JSONResponse:
         user_name=_pick_str(raw, "user_name", "userName"),
         limit=limit,
         access_token=_pick_str(raw, "access_token", "accessToken"),
+        user_role=_pick_str(raw, "user_role", "userRole"),
     )
 
 
@@ -178,6 +180,9 @@ async def llm_chat(request: Request):
                     access_token=body.access_token,
                     trace_id=trace_id,
                     channel="web",
+                    user_name=body.user_name,
+                    account=body.account,
+                    user_role=body.user_role,
                 )
                 yield from result.iter_sse()
             except Exception as exc:
