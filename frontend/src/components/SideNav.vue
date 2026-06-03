@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import type { SectionId } from '@/data/mockContent'
 import { navSections } from '@/data/mockContent'
 import { logout, useSession } from '@/composables/useSession'
-import { goHome } from '@/utils/goHome'
+import AppConfirmDialog from '@/components/AppConfirmDialog.vue'
 
 defineProps<{
   active: SectionId
@@ -16,13 +17,20 @@ const emit = defineEmits<{
   publish: []
   requestLogin: []
   leaveGuest: []
+  enterManage: []
   returnLanding: []
 }>()
 
-const { currentUser } = useSession()
+const { currentUser, isAdmin: sessionIsAdmin } = useSession()
+
+const logoutConfirmOpen = ref(false)
 
 function handleLogout() {
-  if (!confirm('确定要退出登录吗？')) return
+  logoutConfirmOpen.value = true
+}
+
+function confirmLogout() {
+  logoutConfirmOpen.value = false
   logout()
 }
 </script>
@@ -78,15 +86,28 @@ function handleLogout() {
         {{ currentUser.email }}
       </p>
       <template v-if="guestMode">
-        <button type="button" class="btn-logout btn-login" @click="emit('requestLogin')">
+        <button
+          v-if="sessionIsAdmin"
+          type="button"
+          class="btn-logout btn-login"
+          @click="emit('enterManage')"
+        >
+          进入管理
+        </button>
+        <button
+          v-else-if="!currentUser"
+          type="button"
+          class="btn-logout btn-login"
+          @click="emit('requestLogin')"
+        >
           登录
         </button>
-        <button type="button" class="btn-logout btn-leave" @mousedown.prevent.stop="goHome">
+        <button type="button" class="btn-logout btn-leave" @click="emit('returnLanding')">
           返回首页
         </button>
       </template>
       <template v-else-if="currentUser">
-        <button type="button" class="btn-logout btn-leave" @mousedown.prevent.stop="goHome">
+        <button type="button" class="btn-logout btn-leave" @click="emit('returnLanding')">
           返回首页
         </button>
         <button type="button" class="btn-logout" @click="handleLogout">
@@ -95,6 +116,18 @@ function handleLogout() {
       </template>
       <p class="nav-foot">记录 · 整理 · 复盘</p>
     </div>
+
+    <AppConfirmDialog
+      :open="logoutConfirmOpen"
+      title="退出登录"
+      message="退出后将返回首页，需要重新登录才能管理内容。"
+      confirm-label="退出"
+      cancel-label="留下"
+      danger
+      @confirm="confirmLogout"
+      @cancel="logoutConfirmOpen = false"
+      @close="logoutConfirmOpen = false"
+    />
   </aside>
 </template>
 

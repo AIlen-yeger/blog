@@ -93,6 +93,10 @@ export async function fetchNotes(params?: ContentListParams): Promise<NoteItem[]
   return unwrapList(data)
 }
 
+export async function fetchNoteApi(id: string): Promise<NoteItem> {
+  return get<NoteItem>(`/notes/${encodeURIComponent(id)}`)
+}
+
 export async function createNoteApi(
   body: Omit<NoteItem, 'id' | 'date' | 'topicId'> & {
     topicId?: string

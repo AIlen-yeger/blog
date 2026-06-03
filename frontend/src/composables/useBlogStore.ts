@@ -45,6 +45,7 @@ const state = reactive<BlogState>({
 
 const loading = ref(false)
 const loadError = ref('')
+const freshNoteIds = ref(new Set<string>())
 const tagCloud = ref<TagCountItem[]>([])
 const archiveMonths = ref<ArchiveMonthItem[]>([])
 const searchResult = ref<SearchResult | null>(null)
@@ -115,6 +116,31 @@ function normalizeNote(n: NoteItem): NoteItem {
     pinned: Boolean(n.pinned),
     status: (n.status ?? 'published') as ContentPublishStatus,
   }
+}
+
+export function patchNoteInStore(note: NoteItem) {
+  const normalized = normalizeNote(note)
+  const idx = state.notes.findIndex((n) => n.id === normalized.id)
+  if (idx >= 0) state.notes[idx] = normalized
+  if (searchResult.value) {
+    const si = searchResult.value.notes.findIndex((n) => n.id === normalized.id)
+    if (si >= 0) searchResult.value.notes[si] = normalized
+  }
+}
+
+export function markNoteFresh(noteId: string) {
+  const next = new Set(freshNoteIds.value)
+  next.add(noteId)
+  freshNoteIds.value = next
+  window.setTimeout(() => {
+    const trimmed = new Set(freshNoteIds.value)
+    trimmed.delete(noteId)
+    freshNoteIds.value = trimmed
+  }, 2600)
+}
+
+export function isNoteFresh(noteId: string): boolean {
+  return freshNoteIds.value.has(noteId)
 }
 
 function normalizeLife(l: LifeItem): LifeItem {
@@ -405,7 +431,7 @@ export function useBlogStore() {
       }
     }
     if (!useMockApi()) {
-      const created = await blogApi.createNoteApi({
+      const raw = await blogApi.createNoteApi({
         title: payload.title,
         excerpt: payload.excerpt,
         tag: payload.tag,
@@ -416,8 +442,19 @@ export function useBlogStore() {
         status: payload.status,
         agentSessionId: getAgentSessionId(),
       })
+      const isPublished = (payload.status ?? 'published') === 'published'
+      const created = normalizeNote({
+        ...raw,
+        agentReplyStatus:
+          raw.agentReplyStatus ||
+          (isPublished && !raw.agentReply?.trim() ? 'pending' : raw.agentReplyStatus),
+      })
       state.notes.unshift(created)
       state.topics = await blogApi.fetchTopics()
+      if (isPublished) {
+        const { watchNoteAgentReply } = await import('@/composables/useNoteAgentReplyPoll')
+        watchNoteAgentReply(created.id, { scrollToCard: true })
+      }
       return created.id
     }
     const topicId = resolveMockTopicId(payload.topicId, payload.topicTitle)

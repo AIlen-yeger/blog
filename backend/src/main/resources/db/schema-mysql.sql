@@ -133,8 +133,10 @@ CREATE TABLE IF NOT EXISTS ai_chat_message (
     id           BIGINT AUTO_INCREMENT PRIMARY KEY,
     session_id   VARCHAR(128) NOT NULL,
     user_id      BIGINT       NOT NULL DEFAULT 0,
+    channel      VARCHAR(16)  NOT NULL DEFAULT 'web' COMMENT 'web | qq | internal',
     role         VARCHAR(16)  NOT NULL,
     content      MEDIUMTEXT   NOT NULL,
     create_time  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    KEY idx_chat_session (session_id, user_id, id)
+    KEY idx_chat_session (session_id, user_id, id),
+    KEY idx_chat_session_channel (session_id, user_id, channel, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

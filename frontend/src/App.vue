@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useGradient } from '@/composables/useGradient'
 import LandingHero from '@/components/LandingHero.vue'
 import LoginModal from '@/components/LoginModal.vue'
@@ -17,13 +17,26 @@ import { clearMusicPlayback } from '@/utils/musicPlaybackStorage'
 import QqMusicPersistentHost from '@/components/QqMusicPersistentHost.vue'
 import { handoffLandingMusicToBlog } from '@/composables/useAboutMusic'
 import { applyQqTeleportSlot, useGlobalQqPlayer } from '@/composables/useGlobalQqPlayer'
-import { goHome } from '@/utils/goHome'
+import { isBlogHash, readBlogRouteFromUrl } from '@/utils/blogRoute'
+import {
+  clearBlogViewStorage,
+  getPreferLanding,
+  getStoredGuestMode,
+  markSkipEnterAnim,
+  setPreferLanding,
+  setStoredGuestMode,
+  takeSkipEnterAnim,
+} from '@/utils/blogViewStorage'
 
 const { gradientStyle } = useGradient()
 const loggedIn = ref(initSessionFromStorage())
-const guestMode = ref(false)
-/** 已登录用户主动进入博客（非游客预览） */
-const blogViewActive = ref(false)
+const guestMode = ref(getStoredGuestMode())
+const preferLanding = ref(getPreferLanding())
+const blogHashActive = ref(
+  typeof window !== 'undefined' ? readBlogRouteFromUrl() === 'blog' : false,
+)
+/** 用户主动进入博客后为 true；刷新时仅当 URL 为 #/blog 时恢复 */
+const blogViewActive = ref(blogHashActive.value)
 const showLogin = ref(false)
 const animating = ref(false)
 /** 进入博客过渡（着陆页下滑淡出） */
@@ -32,9 +45,64 @@ const enteringBlog = ref(false)
 const pendingBlog = ref(false)
 
 const ENTER_MS = 1240
+/** 递增以作废尚未完成的进入博客定时器（返回首页时避免旧回调改乱状态） */
+let enterAnimGeneration = 0
+/** 着陆层 remount，确保离开动画 class 能再次触发 */
+const landingMountKey = ref(0)
 
-const inBlog = computed(() => guestMode.value || blogViewActive.value)
+function canAccessBlog() {
+  return loggedIn.value || guestMode.value
+}
+
+function enterBlogUrl() {
+  if (typeof window !== 'undefined' && window.location.hash !== '#/blog') {
+    window.location.hash = '/blog'
+  }
+  blogHashActive.value = true
+}
+
+function enterLandingUrl() {
+  if (typeof window !== 'undefined' && window.location.hash) {
+    history.replaceState(
+      null,
+      '',
+      window.location.pathname + window.location.search,
+    )
+  }
+  blogHashActive.value = false
+}
+
+function resolveInBlog(): boolean {
+  if (!canAccessBlog()) return false
+  if (preferLanding.value) return false
+  if (blogViewActive.value || guestMode.value) return true
+  return isBlogHash() || blogHashActive.value
+}
+
+const inBlog = computed(() => resolveInBlog())
 const showBlog = computed(() => inBlog.value || pendingBlog.value)
+
+watch(
+  () =>
+    [
+      preferLanding.value,
+      showBlog.value,
+      pendingBlog.value,
+      animating.value,
+      enteringBlog.value,
+    ] as const,
+  ([prefer, show, pending, anim, entering]) => {
+    if (prefer) {
+      enterLandingUrl()
+      return
+    }
+    if (show || pending || anim || entering) {
+      enterBlogUrl()
+    }
+  },
+  { immediate: true },
+)
+
 const landingVisible = computed(() => !inBlog.value || animating.value)
 
 /** 进入博客时提前切到主题底色，避免渐变与 inline 样式切换闪白 */
@@ -66,6 +134,23 @@ function openLogin() {
 }
 
 function startBlogEnter(onComplete: () => void) {
+  if (animating.value) return
+  const generation = ++enterAnimGeneration
+  preferLanding.value = false
+  setPreferLanding(false)
+  enterBlogUrl()
+  if (takeSkipEnterAnim()) {
+    void (async () => {
+      try {
+        await handoffLandingMusicToBlog()
+      } catch {
+        /* ignore */
+      }
+      void reloadBlogData().catch(() => {})
+    })()
+    onComplete()
+    return
+  }
   enteringBlog.value = true
   animating.value = true
   pendingBlog.value = true
@@ -80,9 +165,11 @@ function startBlogEnter(onComplete: () => void) {
     })
   })()
   window.setTimeout(() => {
+    if (generation !== enterAnimGeneration) return
     onComplete()
     pendingBlog.value = false
     window.setTimeout(() => {
+      if (generation !== enterAnimGeneration) return
       enteringBlog.value = false
       animating.value = false
       const g = useGlobalQqPlayer()
@@ -91,24 +178,45 @@ function startBlogEnter(onComplete: () => void) {
   }, ENTER_MS)
 }
 
+/** 向下滑动 /「向下滑动预览」：只读预览（游客模式），与上滑进入管理区分离 */
 function enterAsGuest() {
-  if (guestMode.value || animating.value) return
+  if (animating.value) return
   guestMode.value = true
-  startBlogEnter(() => {})
+  setStoredGuestMode(true)
+  startBlogEnter(() => {
+    blogViewActive.value = true
+  })
 }
 
 function enterBlogLoggedIn() {
-  if (!loggedIn.value || guestMode.value || animating.value) return
+  if (!loggedIn.value || animating.value) return
+  guestMode.value = false
+  setStoredGuestMode(false)
   void triggerDailyCheckIn()
   startBlogEnter(() => {
     blogViewActive.value = true
   })
 }
 
+function enterPreviewDown() {
+  enterAsGuest()
+}
+
+/** 预览模式下已登录管理员切回完整管理 */
+function exitGuestPreview() {
+  if (!loggedIn.value) {
+    openLogin()
+    return
+  }
+  guestMode.value = false
+  setStoredGuestMode(false)
+  void reloadBlogData().catch(() => {})
+}
+
 function onWheel(e: WheelEvent) {
-  if (inBlog.value || showLogin.value || !isPC()) return
+  if (inBlog.value || showLogin.value || animating.value || !isPC()) return
   if (e.deltaY > 25) {
-    enterAsGuest()
+    enterPreviewDown()
   } else if (e.deltaY < -25) {
     if (loggedIn.value) enterBlogLoggedIn()
     else openLogin()
@@ -120,7 +228,7 @@ function onTouchStart(e: TouchEvent) {
 }
 
 function onTouchEnd(e: TouchEvent) {
-  if (inBlog.value || showLogin.value || isPC()) return
+  if (inBlog.value || showLogin.value || animating.value || isPC()) return
   const endY = e.changedTouches[0]?.clientY ?? 0
   const deltaY = endY - touchStartY
 
@@ -138,7 +246,7 @@ function onTouchEnd(e: TouchEvent) {
   }
 
   if (deltaY > 60) {
-    enterAsGuest()
+    enterPreviewDown()
   } else if (deltaY < -60) {
     if (loggedIn.value) enterBlogLoggedIn()
     else openLogin()
@@ -148,50 +256,78 @@ function onTouchEnd(e: TouchEvent) {
 function onLoginSuccess() {
   showLogin.value = false
   guestMode.value = false
+  setStoredGuestMode(false)
   loggedIn.value = true
-  void reloadBlogData().catch(() => {})
+  startBlogEnter(() => {
+    blogViewActive.value = true
+  })
   void triggerDailyCheckIn()
 }
 
-/** 返回首页：强制整页导航，避免 Vue Teleport/Transition 卸载报错 */
 function returnToLanding() {
-  goHome()
-}
-
-function leaveGuest() {
-  goHome()
-}
-
-function handleAuthLogout() {
-  loggedIn.value = false
-  guestMode.value = false
+  enterAnimGeneration += 1
   blogViewActive.value = false
+  preferLanding.value = true
+  setPreferLanding(true)
+  enterLandingUrl()
+  guestMode.value = false
   pendingBlog.value = false
   showLogin.value = false
   enteringBlog.value = false
   animating.value = false
-  resetBlogStore()
+  setStoredGuestMode(false)
   clearMusicPlayback()
+  landingMountKey.value += 1
+  void loadLandingProfile()
+}
+
+function leaveGuest() {
+  returnToLanding()
+  clearBlogViewStorage()
+  resetBlogStore()
+}
+
+function handleAuthLogout() {
+  loggedIn.value = false
+  preferLanding.value = false
+  setPreferLanding(false)
+  returnToLanding()
+  clearBlogViewStorage()
+  resetBlogStore()
 }
 
 onMounted(() => {
-  // 返回首页带 ?home= 时去掉查询参数，保持地址栏干净
   if (typeof window !== 'undefined' && /[?&]home=/.test(window.location.search)) {
     const url = new URL(window.location.href)
     url.searchParams.delete('home')
     const clean = url.pathname + (url.search || '') + url.hash
     window.history.replaceState(null, '', clean || '/')
   }
-  if (loggedIn.value) {
+
+  const urlBlog = isBlogHash()
+
+  if (canAccessBlog() && urlBlog && !getPreferLanding()) {
+    blogViewActive.value = true
+    preferLanding.value = false
+    setPreferLanding(false)
+    enterBlogUrl()
+    markSkipEnterAnim()
     void reloadBlogData().catch(() => {})
-    void triggerDailyCheckIn()
+    if (loggedIn.value) void triggerDailyCheckIn()
   } else {
+    if (getPreferLanding()) {
+      preferLanding.value = true
+      blogViewActive.value = false
+      enterLandingUrl()
+    }
     void loadLandingProfile()
   }
+
   window.addEventListener('wheel', onWheel, { passive: true })
   window.addEventListener('touchstart', onTouchStart, { passive: true })
   window.addEventListener('touchend', onTouchEnd, { passive: true })
   window.addEventListener('auth:logout', handleAuthLogout)
+  window.addEventListener('blog:return-landing', returnToLanding)
 })
 
 onUnmounted(() => {
@@ -199,6 +335,7 @@ onUnmounted(() => {
   window.removeEventListener('touchstart', onTouchStart)
   window.removeEventListener('touchend', onTouchEnd)
   window.removeEventListener('auth:logout', handleAuthLogout)
+  window.removeEventListener('blog:return-landing', returnToLanding)
 })
 </script>
 
@@ -219,14 +356,15 @@ onUnmounted(() => {
 
     <div
       v-if="landingVisible"
+      :key="landingMountKey"
       class="landing-wrap"
-      :class="{ 'is-leaving': enteringBlog && animating }"
+      :class="{ 'is-leaving': animating }"
     >
       <div class="landing-inner">
         <LandingHero
           :logged-in="loggedIn"
           @login="openLogin"
-          @guest="enterAsGuest"
+          @guest="enterPreviewDown"
           @enter-blog="enterBlogLoggedIn"
         />
       </div>
@@ -235,9 +373,10 @@ onUnmounted(() => {
     <div v-if="showBlog" key="blog" class="blog-stage">
       <div v-if="animating" class="blog-frost" aria-hidden="true" />
       <BlogLayout
-        :guest-mode="guestMode && !loggedIn"
+        :guest-mode="guestMode"
         @request-login="openLogin"
         @leave-guest="leaveGuest"
+        @enter-manage="exitGuestPreview"
         @return-landing="returnToLanding"
       />
     </div>

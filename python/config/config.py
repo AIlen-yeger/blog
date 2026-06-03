@@ -193,6 +193,17 @@ class AgentConfig:
         self.btc_dca_initial_cost_usdt = _env_float("BTC_DCA_INITIAL_COST_USDT", 0)
         self.btc_dca_initial_avg_usdt = _env_float("BTC_DCA_INITIAL_AVG_USDT", 92212.5651)
 
+        # ── 向量模型（用户记忆 embed / recall）──
+        self.embedding_model_name = _env_str("EMBEDDING_MODEL_NAME", "")
+        self.embedding_base_url = _env_str("EMBEDDING_BASE_URL", "")
+        self.embedding_api_key = _env_str("EMBEDDING_API_KEY", "")
+
+        # ── Chroma 用户记忆（仅向量库，不写 MySQL）──
+        self.chroma_memory_enabled = _env_bool("CHROMA_MEMORY_ENABLED", True)
+        self.chroma_memory_path = _env_str("CHROMA_MEMORY_PATH", "data/chroma_user_memory")
+        self.chroma_memory_collection = _env_str(
+            "CHROMA_MEMORY_COLLECTION", "user_memories"
+        )
 
 def _key_status(value: str) -> str:
     return "ok" if (value or "").strip() else "MISSING"

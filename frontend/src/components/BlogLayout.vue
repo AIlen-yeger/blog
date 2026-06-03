@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, toRef } from 'vue'
 import SideNav from './SideNav.vue'
 import BlogSection from './BlogSection.vue'
 import NoteCard from './NoteCard.vue'
@@ -15,20 +15,26 @@ import { useSession } from '@/composables/useSession'
 import type { LifeItem, NoteItem, ProfileData } from '@/data/mockContent'
 import { toUserErrorMessage } from '@/utils/userErrorMessage'
 
-defineProps<{
+const props = defineProps<{
   guestMode?: boolean
 }>()
 
 const emit = defineEmits<{
   requestLogin: []
   leaveGuest: []
+  enterManage: []
   returnLanding: []
 }>()
+
+const guestMode = toRef(props, 'guestMode')
 
 const mainRef = ref<HTMLElement | null>(null)
 const { activeSection, scrollToSection } = useSectionScroll(() => mainRef.value)
 
 const { isAdmin } = useSession()
+
+/** 预览/游客模式仅浏览；上滑登录进入后才开放管理端能力 */
+const canManage = computed(() => isAdmin.value && !guestMode.value)
 
 const {
   profile,
@@ -137,13 +143,14 @@ async function onSaveProfile(data: ProfileData) {
   <div class="blog-layout">
     <SideNav
       :active="activeSection"
-      :is-admin="isAdmin"
+      :is-admin="canManage"
       :guest-mode="guestMode"
       @navigate="scrollToSection"
       @publish-life="openLifeEditor(null)"
       @publish="openNoteEditor(null)"
       @request-login="emit('requestLogin')"
       @leave-guest="emit('leaveGuest')"
+      @enter-manage="emit('enterManage')"
       @return-landing="emit('returnLanding')"
     />
 
@@ -162,16 +169,21 @@ async function onSaveProfile(data: ProfileData) {
           重试
         </button>
       </div>
-      <p v-if="!isAdmin" class="blog-alert blog-alert--info" role="status">
+      <p v-if="guestMode || !isAdmin" class="blog-alert blog-alert--info" role="status">
         <span class="blog-alert__icon" aria-hidden="true">i</span>
-        <span>当前为浏览模式，仅管理员可发布与编辑内容</span>
+        <span>{{
+          guestMode
+            ? '当前为预览模式，仅可浏览内容；管理员请上滑进入或点击侧栏「进入管理」'
+            : '当前为浏览模式，仅管理员可发布与编辑内容'
+        }}</span>
       </p>
 
       <BlogDiscoverBar
+        v-if="canManage"
         :tags="tagCloud"
         :archive-months="archiveMonths"
         :loading="loading"
-        :show-draft-filter="isAdmin"
+        :show-draft-filter="canManage"
         @search="onDiscoverSearch"
         @filter-tag="onDiscoverTag"
         @filter-month="onDiscoverMonth"
@@ -182,7 +194,7 @@ async function onSaveProfile(data: ProfileData) {
       <BlogSection id="about" title-en="A B O U T" title-zh="关于我">
         <AboutProfilePanel
           :profile="profile"
-          :show-edit="isAdmin"
+          :show-edit="canManage"
           @edit="profileModalOpen = true"
         />
       </BlogSection>
@@ -190,7 +202,7 @@ async function onSaveProfile(data: ProfileData) {
       <BlogSection id="notes" title-en="N O T E S" title-zh="学习笔记">
         <p class="section-desc">
           点击「阅读全文」在弹窗中查看完整内容。
-          <template v-if="isAdmin">管理员可使用左侧栏「发布文章」添加内容，或通过卡片右上角 ··· 菜单编辑、置顶或删除。</template>
+          <template v-if="canManage">管理员可使用左侧栏「发布文章」添加内容，或通过卡片右上角 ··· 菜单编辑、置顶或删除。</template>
         </p>
 
         <div class="topic-filter-bar">
@@ -223,7 +235,7 @@ async function onSaveProfile(data: ProfileData) {
             v-for="note in searchResult!.notes"
             :key="note.id"
             :item="note"
-            :editable="isAdmin"
+            :editable="canManage"
             @edit="openNoteEditor"
             @delete="deleteNote"
             @pin="onPinNote"
@@ -244,7 +256,7 @@ async function onSaveProfile(data: ProfileData) {
                 v-for="note in getVisibleNotes(topic.id)"
                 :key="note.id"
                 :item="note"
-                :editable="isAdmin"
+                :editable="canManage"
                 @edit="openNoteEditor"
                 @delete="deleteNote"
                 @pin="onPinNote"
@@ -253,7 +265,7 @@ async function onSaveProfile(data: ProfileData) {
                 v-if="getVisibleNotes(topic.id).length === 0"
                 class="empty-hint"
               >
-                {{ isAdmin ? '该专题下暂无文章，点击「发布文章」添加' : '该专题下暂无文章' }}
+                {{ canManage ? '该专题下暂无文章，点击「发布文章」添加' : '该专题下暂无文章' }}
               </p>
             </div>
           </div>
@@ -263,7 +275,7 @@ async function onSaveProfile(data: ProfileData) {
       <BlogSection id="life" title-en="L I F E" title-zh="生活记录">
         <p class="section-desc">
           记录生活片段，点击「阅读全文」查看详情。
-          <template v-if="isAdmin">
+          <template v-if="canManage">
             管理员可使用左侧栏「发布日记」添加内容，或通过卡片右上角 ··· 菜单编辑、置顶或删除。
           </template>
         </p>
@@ -275,13 +287,13 @@ async function onSaveProfile(data: ProfileData) {
             v-for="item in visibleLife"
             :key="item.id"
             :item="item"
-            :editable="isAdmin"
+            :editable="canManage"
             @edit="openLifeEditor"
             @delete="deleteLife"
             @pin="onPinLife"
           />
           <p v-if="visibleLife.length === 0" class="empty-hint">
-            {{ isAdmin ? '暂无生活记录，点击左侧「发布日记」添加' : '暂无生活记录' }}
+            {{ canManage ? '暂无生活记录，点击左侧「发布日记」添加' : '暂无生活记录' }}
           </p>
         </div>
       </BlogSection>
@@ -303,14 +315,14 @@ async function onSaveProfile(data: ProfileData) {
     </main>
 
     <ProfileSettingsModal
-      v-if="isAdmin"
+      v-if="canManage"
       :open="profileModalOpen"
       :profile="profile"
       :on-save="onSaveProfile"
       @close="profileModalOpen = false"
     />
 
-    <template v-if="isAdmin">
+    <template v-if="canManage">
       <NoteEditorModal
         :open="noteEditorOpen"
         :editing="editingNote"
