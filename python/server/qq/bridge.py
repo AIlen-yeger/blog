@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 
 from config.config import AgentConfig
-from server.agent_entry import get_agent_entry
 from server.qq.daily_brief import try_handle_daily_brief_qq
 from utils.qq.qq_blog_auth import resolve_qq_blog_identity
 
@@ -14,6 +13,8 @@ logger = logging.getLogger(__name__)
 
 def handle_qq_private_message_sync(friend_qq: str, text: str) -> str:
     """同步入口：poller 线程内调用。"""
+    from server.agent_entry import get_agent_entry
+
     cfg = AgentConfig()
     entry = get_agent_entry()
 
