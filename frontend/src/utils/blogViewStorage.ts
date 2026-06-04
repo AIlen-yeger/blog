@@ -1,11 +1,6 @@
-import type { SectionId } from '@/data/mockContent'
-import { navSections } from '@/data/mockContent'
-
 const GUEST_KEY = 'personal-blog-guest'
 const PREFER_LANDING_KEY = 'personal-blog-prefer-landing'
 const SKIP_ANIM_KEY = 'personal-blog-skip-enter-anim'
-
-const validSectionIds = new Set(navSections.map((s) => s.id))
 
 export function getStoredGuestMode(): boolean {
   return sessionStorage.getItem(GUEST_KEY) === '1'
