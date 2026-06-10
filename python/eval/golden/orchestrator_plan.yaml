@@ -56,6 +56,12 @@ cases:
     attachments: []
     expect: false
 
+  - id: use_orch_multi_routes_keyword
+    kind: should_use_orchestrator
+    question: "发布笔记并加歌 https://y.qq.com/n/abc"
+    attachments: []
+    expect: true
+
   - id: use_orch_auto_attachment
     kind: should_orchestrate
     question: "整理一下"
@@ -99,3 +105,16 @@ cases:
       - {id: "2", intent: music, title: "添加歌曲"}
     mode: auto
     expect: true
+
+  - id: plan_aicoin_only
+    kind: plan
+    question: "查一下比特币行情并结合持仓算盈亏"
+    attachments: []
+    expect_intents: [aicoin]
+
+  - id: plan_publish_and_aicoin
+    kind: plan
+    question: "发布笔记到博客，顺便查一下 BTC 定投行情"
+    attachments:
+      - {kind: document, name: report.md, url: "http://x/report.md"}
+    expect_intents: [publish_note, aicoin]

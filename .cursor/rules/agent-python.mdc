@@ -1,0 +1,42 @@
+---
+description: Python Agent 路由与 Java 内网回调
+globs: python/**
+alwaysApply: false
+---
+
+# Python Agent 规范
+
+## 服务
+
+- 入口 `python/main.py`，默认 `127.0.0.1:8000`
+- 路由 `python/route/app.py`
+
+## 对外路由
+
+| 路径 | 鉴权 | 用途 |
+|------|------|------|
+| `POST /ai/chat` | 需 user 上下文 | Web/桌宠 SSE |
+| `POST /ai/internal/note-comment` | `X-Ops-Token` | Java 触发笔记回复 |
+| `POST /ai/ops/*` | `X-Ops-Token` | 运维测试 |
+
+## SSE 事件（/ai/chat）
+
+- `type: meta` → intent
+- `type: delta` / `message` → `content`
+- 结束：`data: [DONE]`
+
+## 回调 Java
+
+- 保存回复：`POST {BLOG_API_BASE}/agent/ops/notes/{id}/agent-reply`，body `{ jobId, agentReply }`
+- `BLOG_API_BASE` 默认 `http://127.0.0.1:8080/v1`
+
+## 人设与 Prompt
+
+- 角色 skill：`python/skills/character-skill/lacia-blog/`
+- 分层组装：`server/skills_server/prompt_assembler.py`、`tavern_persona.py`
+- QQ lean 路径：`channel=qq` + `intent=chat`
+
+## 环境
+
+- `AGENT_OPS_TOKEN` 与 Java `app.agent.ops-token` 对齐
+- LLM、MySQL、Redis 见 `python/.env.example`

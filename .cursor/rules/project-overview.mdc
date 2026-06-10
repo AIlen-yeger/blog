@@ -1,0 +1,37 @@
+---
+description: 个人博客 monorepo 三端结构与联调入口
+alwaysApply: true
+---
+
+# 个人博客 Monorepo
+
+## 目录
+
+| 端 | 路径 | 技术 |
+|----|------|------|
+| 前端 | `frontend/` | Vue 3 + Vite + TS |
+| 后端 | `backend/` | Spring Boot 3 + MyBatis |
+| Agent | `python/` | FastAPI + 蕾西亚人设 |
+
+## 开发端口
+
+- 前端 `5173`（`npm run dev`，API 走 `/api` 代理）
+- Java `8080`，context-path **`/v1`**
+- Python `8000`（`GET /health`）
+
+## 联调顺序
+
+1. `python/main.py` → `:8000`
+2. `mvn spring-boot:run`（backend）→ `:8080/v1`
+3. `npm run dev`（frontend）→ `:5173`
+
+## 跨层约定
+
+- 前端 ↔ Java：**camelCase** JSON，信封 `{ code, message, data }`，`code === 0` 成功
+- Java ↔ Python 聊天：`AgentPythonChatRequest` 为 **snake_case**；笔记评论内部接口为 camelCase + `X-Ops-Token`
+- 详细 API 见 skill `blog-api-contract` 与 `frontend/docs/API.md`（以 `src/api/*.ts` 与 Controller 为准）
+
+## 修改原则
+
+- 改 API 时同步：Java DTO/Controller、前端 `src/api/`、必要时 Python 路由或回调
+- Agent 人设与 prompt 在 `python/skills/character-skill/`，不要混进前端业务代码

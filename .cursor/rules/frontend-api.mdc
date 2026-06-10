@@ -1,0 +1,38 @@
+---
+description: 前端 API 调用与 Vite 代理约定
+globs: frontend/**
+alwaysApply: false
+---
+
+# 前端 API 规范
+
+## 基址
+
+- `VITE_API_BASE` 开发默认 `/api` → Vite 代理到 `http://localhost:8080/v1`
+- 统一用 `getApiBase()` + `request()`（`src/api/http.ts`），不要散落裸 `fetch`
+
+## 鉴权
+
+- Token：`localStorage['personal-blog-token']`，`Authorization: Bearer`
+- 登录类接口传 `{ auth: false }`
+- `40101` / HTTP 401 且 `auth: true` 时 `clearSession()`
+
+## 响应
+
+- 信封 `{ code, message, data }`；`code !== 0` 抛 `ApiError`
+- `DELETE` 成功可能 HTTP `204`，`data` 为 `undefined`
+- 分页：`data.list`, `data.total`, `data.page`, `data.pageSize`
+
+## 桌宠 SSE（例外）
+
+- `agentChat.ts` 不走 `request()` 信封；`POST /agent/chat`，`Accept: text/event-stream`
+- Payload camelCase：`question`, `sessionId`, `limit`
+
+## Agent 回复字段
+
+- 笔记/生活：`agentReply`, `agentReplyStatus`（`none|pending|running|done|failed`）
+- 发布笔记可传 `agentSessionId`；展示开关见 `useAgentReplySettings.ts`
+
+## Mock
+
+- `VITE_USE_MOCK=true` 时走 localStorage，不发 HTTP

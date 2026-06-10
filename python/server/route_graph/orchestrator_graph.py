@@ -13,8 +13,15 @@ from langchain_openai import ChatOpenAI
 
 from config.config import AgentConfig
 from server.agent import ChatModel
-from server.route_graph.music_route import run_music_react
-from server.route_graph.publish_note_route import run_publish_note_preview, wants_publish_note
+from server.intent_dispatch import (
+    build_planner_intent_list,
+    orchestratable_intents,
+    plan_step_title,
+    run_intent_step,
+    step_result_to_dict,
+)
+from server.route_graph.publish_note_route import wants_publish_note
+from server.intent_router import routes_from_question
 from server.state import AgentState
 from utils.log.trace_log import log_event, preview, span
 
@@ -22,11 +29,10 @@ logger = logging.getLogger(__name__)
 
 _MULTI_INTENT_WORDS = ("同时", "顺便", "并且", "还要", "另外", "再加", "一并", "然后", "再", "接着")
 
-STEP_TITLES: dict[str, str] = {
-    "publish_note": "整理并预览笔记",
-    "music": "添加歌曲",
-    "chat": "补充说明",
-}
+_AICOIN_PLAN_SIGNALS = re.compile(
+    r"btc|eth|比特币|纠缠之缘|原石|以太坊|币价|行情|定投|盈亏|持仓|恐惧贪婪|资金费率|快讯|k线",
+    re.I,
+)
 
 StepCallback = Callable[[str, str, str], None]
 
@@ -74,12 +80,26 @@ def should_use_orchestrator(state: AgentState) -> bool:
         return False
     if mode == "plan":
         return True
+    q = (state.get("question") or "").strip()
+    attachments = state.get("attachments") or []
+    if len(routes_from_question(q, attachments)) > 1:
+        return True
     return should_orchestrate(state)
+
+
+def resolve_orchestrator_tasks(state: AgentState) -> list[dict]:
+    """多意图关键词直出 steps；否则走 planner。"""
+    q = (state.get("question") or "").strip()
+    attachments = state.get("attachments") or []
+    routes = routes_from_question(q, attachments)
+    if len(routes) > 1:
+        return normalize_steps([{"intent": r} for r in routes])
+    return plan_tasks(state)
 
 
 def normalize_step(task: dict, index: int) -> dict:
     intent = str(task.get("intent") or "chat").strip().lower()
-    title = str(task.get("title") or "").strip() or STEP_TITLES.get(intent, intent)
+    title = str(task.get("title") or "").strip() or plan_step_title(intent)
     return {"id": str(task.get("id") or index + 1), "intent": intent, "title": title}
 
 
@@ -110,17 +130,32 @@ def effective_orchestrator_mode(state: AgentState, *, force_orchestrate: bool = 
 
 def _planner_prompt(question: str, has_attachments: bool) -> str:
     attach_hint = "用户附带了文件。" if has_attachments else "用户未附带文件。"
+    intent_list = build_planner_intent_list()
     return f"""你是任务规划器。根据用户输入，输出 JSON 数组 tasks，每个元素为 {{"intent":"...","title":"可选中文标题"}}。
-可用 intent：chat, music, publish_note
+可用 intent：{intent_list}
 规则：
 - 仅闲聊 → [{{"intent":"chat"}}] 或 []
 - 发布/上传笔记 → publish_note（需用户明确发布意图或附件+发布语义）
 - 加歌/音乐链接/听歌报告 → music
+- 币价/行情/定投/盈亏/持仓分析 → aicoin
 - 多需求按执行顺序列出，如 [{{"intent":"publish_note"}},{{"intent":"music"}}]
 - commit_user 表示已有笔记回复，此处用 publish_note 表示发新笔记
 {attach_hint}
 用户：{question}
 只输出 JSON 数组，无其它文字。"""
+
+
+def _wants_aicoin_in_plan(question: str) -> bool:
+    q = (question or "").strip()
+    if not q:
+        return False
+    if _AICOIN_PLAN_SIGNALS.search(q):
+        return True
+    if any(k in q for k in ("币", "代币")) and any(
+        k in q for k in ("价格", "涨跌", "走势", "盈亏", "持仓", "定投")
+    ):
+        return True
+    return False
 
 
 def plan_tasks_rules_only(state: AgentState) -> list[dict]:
@@ -133,6 +168,9 @@ def plan_tasks_rules_only(state: AgentState) -> list[dict]:
     if re.search(r"y\.qq\.com|加歌|添加歌曲|音乐链接", q, re.I):
         if not any(t.get("intent") == "music" for t in tasks):
             tasks.append({"intent": "music"})
+    if _wants_aicoin_in_plan(q):
+        if not any(t.get("intent") == "aicoin" for t in tasks):
+            tasks.append({"intent": "aicoin"})
     return normalize_steps(tasks) if tasks else []
 
 
@@ -144,6 +182,7 @@ def plan_tasks(state: AgentState) -> list[dict]:
     if ruled:
         return ruled
 
+    allowed = orchestratable_intents()
     cfg = AgentConfig()
     try:
         llm = ChatOpenAI(
@@ -167,7 +206,7 @@ def plan_tasks(state: AgentState) -> list[dict]:
             for row in data:
                 if isinstance(row, dict) and row.get("intent"):
                     intent = str(row["intent"]).strip().lower()
-                    if intent in ("chat", "music", "publish_note"):
+                    if intent in allowed:
                         item: dict[str, Any] = {"intent": intent}
                         if row.get("title"):
                             item["title"] = str(row["title"]).strip()
@@ -197,40 +236,24 @@ def _agent_state_from_orch(state: OrchestratorState) -> AgentState:
     }
 
 
-def run_orchestrator_step(agent_state: AgentState, task: dict) -> dict:
+def run_orchestrator_step(
+    agent_state: AgentState,
+    task: dict,
+    *,
+    prior_results: list[dict] | None = None,
+    chat_model: ChatModel | None = None,
+) -> dict:
     """执行单步，返回 text / preview / action / summary / ok。"""
     intent = str(task.get("intent") or "chat")
-    title = str(task.get("title") or STEP_TITLES.get(intent, intent))
-
-    if intent == "publish_note":
-        result = run_publish_note_preview(agent_state)
-        return {
-            "ok": True,
-            "text": result.get("final_answer") or "",
-            "preview": result.get("preview"),
-            "action": result.get("action") or "publish_note",
-            "summary": "预览已生成",
-        }
-
-    if intent == "music":
-        music = run_music_react(agent_state)
-        text = (music.get("final_answer") or "").strip() or "音乐相关已处理。"
-        return {"ok": True, "text": text, "summary": "音乐处理完成"}
-
-    if intent == "chat":
-        cm = ChatModel()
-        text = cm.chat_once(
-            question=agent_state["question"],
-            session_id=agent_state["session_id"],
-            user_id=agent_state["user_id"],
-            limit=int(agent_state.get("limit") or 10),
-            intent="chat",
-            channel=agent_state.get("channel") or "web",
-            developer_name=agent_state.get("user_name") or "",
-        )
-        return {"ok": True, "text": text, "summary": title}
-
-    return {"ok": False, "text": f"未知步骤：{intent}", "summary": "未知任务"}
+    title = str(task.get("title") or "").strip()
+    result = run_intent_step(
+        agent_state,
+        intent,
+        prior_results=prior_results,
+        chat_model=chat_model,
+        task_title=title,
+    )
+    return step_result_to_dict(result)
 
 
 def run_orchestrator(
@@ -238,6 +261,7 @@ def run_orchestrator(
     *,
     on_step: StepCallback | None = None,
     tasks: list[dict] | None = None,
+    chat_model: ChatModel | None = None,
 ) -> dict:
     """执行多意图编排，返回 final_answer / preview / action / tasks。"""
     with span("orchestrator.run", question_preview=preview(state.get("question"), 100)):
@@ -255,25 +279,46 @@ def run_orchestrator(
 
         agent_state = _agent_state_from_orch(orch)
         parts: list[str] = []
+        prior_results: list[dict] = []
 
         for task in steps:
             step_id = str(task.get("id") or "")
             if on_step and step_id:
                 on_step(step_id, "running", "")
             try:
-                result = run_orchestrator_step(agent_state, task)
+                result = run_orchestrator_step(
+                    agent_state,
+                    task,
+                    prior_results=prior_results,
+                    chat_model=chat_model,
+                )
                 if result.get("preview"):
                     orch["pending_preview"] = result.get("preview")
                     orch["pending_action"] = result.get("action") or "publish_note"
-                parts.append(result.get("text") or "")
+                text = str(result.get("text") or "")
+                parts.append(text)
+                prior_results.append(
+                    {
+                        "intent": task.get("intent"),
+                        "text": text,
+                        "ok": bool(result.get("ok", True)),
+                    }
+                )
                 orch["task_results"].append(
                     {"intent": task.get("intent"), "ok": bool(result.get("ok", True))}
                 )
                 if on_step and step_id:
                     on_step(step_id, "done", str(result.get("summary") or ""))
-            except Exception as exc:
+            except Exception:
                 logger.exception("[orchestrator] step failed intent=%s", task.get("intent"))
                 parts.append("该步骤处理失败，请稍后重试。")
+                prior_results.append(
+                    {
+                        "intent": task.get("intent"),
+                        "text": "该步骤处理失败",
+                        "ok": False,
+                    }
+                )
                 orch["task_results"].append({"intent": task.get("intent"), "ok": False})
                 if on_step and step_id:
                     on_step(step_id, "failed", "处理失败")

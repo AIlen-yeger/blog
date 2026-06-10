@@ -1,0 +1,35 @@
+---
+description: Java 后端 REST 与 ApiResponse 约定
+globs: backend/**
+alwaysApply: false
+---
+
+# 后端 API 规范
+
+## 前缀与包装
+
+- `server.servlet.context-path: /v1` — 所有 Controller 路径相对于 `/v1`
+- 统一返回 `ApiResponse<T>`：`{ code, message, data }`，成功 `ErrorCode.OK`（code `0`）
+
+## 鉴权
+
+- `JwtAuthInterceptor` + `Authorization: Bearer <JWT>`
+- Claims：`sub`(email), `role`, `userId`
+- 公开路径见 `PublicApiPaths`（`GET` 只读、`/auth/**`、`POST .../views` 等）
+
+## 命名
+
+- 对外 JSON：**camelCase**（`NoteDto.agentReply`, `agentReplyStatus`）
+- 写请求：`*WriteRequest`；读响应：`*Dto`
+- 分页：`PageResult<T>` → `list, total, page, pageSize`
+
+## Agent 集成
+
+- `AgentController`：`POST /agent/chat` → SSE 代理 Python `/ai/chat`
+- `AgentOpsController`：`POST /agent/ops/notes/{noteId}/agent-reply`（Python 回调，需 `X-Ops-Token`）
+- 发往 Python 聊天体：`AgentPythonChatRequest`（**snake_case**）
+
+## 配置
+
+- `app.agent.base-url` 默认 `http://127.0.0.1:8000`
+- `app.agent.ops-token` 必须与 Python `AGENT_OPS_TOKEN` 一致

@@ -12,21 +12,19 @@ from typing import Literal
 
 from config.config import AgentConfig
 from server.embedding.embedding_user_memory import get_user_memory
+from server.aicoin_access import aicoin_allowed_for_state
+from server.intent_dispatch import intent_output_mode, run_intent_step
 from server.intent_router import IntentRouter, intent_from_question
 from server.route_graph.comment_route import run_note_comment
-from server.aicoin_access import aicoin_allowed_for_state
-from server.route_graph.aicoin_route import run_aicoin_react
-from server.route_graph.music_route import run_music_react
 from server.route_graph.orchestrator_graph import (
     effective_orchestrator_mode,
-    plan_tasks,
     resolve_execution_mode,
+    resolve_orchestrator_tasks,
     run_orchestrator_step,
     should_delegate_chat,
     should_emit_plan_ui,
     should_use_orchestrator,
 )
-from server.route_graph.publish_note_route import run_publish_note_preview
 from server.state import AgentState
 from utils.judge_intent.quick_judge import should_skip_memory_pipeline
 from utils.log.token_usage import begin_request_tokens, finish_request_tokens
@@ -64,7 +62,9 @@ def canonical_intent(intent: str) -> str:
 def output_mode_for(intent: str, channel: str) -> OutputMode:
     ch = (channel or "web").strip().lower()
     it = canonical_intent(intent)
-    if ch == "web" and it in ("chat", "music", "publish_note", "orchestrate"):
+    if ch == "web" and it == "orchestrate":
+        return "stream"
+    if ch == "web" and intent_output_mode(it) == "stream":
         return "stream"
     return "once"
 
@@ -160,7 +160,7 @@ class AgentEntry:
             orch_mode = effective_orchestrator_mode(
                 state, force_orchestrate=(forced == "orchestrate")
             )
-            tasks = plan_tasks(state)
+            tasks = resolve_orchestrator_tasks(state)
             if not should_delegate_chat(tasks, orch_mode):
                 return AgentReplyResult(
                     intent="orchestrate",
@@ -275,26 +275,20 @@ class AgentEntry:
             return f"对话失败：{exc}"
 
     def _once_music(self, state: AgentState) -> str:
-        bind_trace_from_state(state, intent="music")
-        try:
-            result = run_music_react(state)
-            return (result.get("final_answer") or "").strip() or "处理完成"
-        except Exception:
-            logger.exception("[agent] music failed session_id=%s", state.get("session_id"))
-            return "音乐助手暂时不可用，请稍后再试。"
+        result = run_intent_step(state, "music", chat_model=self.chat_model)
+        if result.ok:
+            return (result.text or "").strip() or "处理完成"
+        return result.text or "音乐助手暂时不可用，请稍后再试。"
 
     def _once_commit_user(self, state: AgentState) -> str:
-        result = run_note_comment(state)
-        return (result.get("final_answer") or "").strip() or "笔记回复生成失败，请稍后刷新。"
+        result = run_intent_step(state, "commit_user", chat_model=self.chat_model)
+        return (result.text or "").strip() or "笔记回复生成失败，请稍后刷新。"
 
     def _once_aicoin(self, state: AgentState) -> str:
-        bind_trace_from_state(state, intent="aicoin")
-        try:
-            result = run_aicoin_react(state, chat_model=self.chat_model)
-            return (result.get("final_answer") or "").strip() or "处理完成"
-        except Exception:
-            logger.exception("[agent] aicoin failed session_id=%s", state.get("session_id"))
-            return "行情助手暂时不可用，请稍后再试。"
+        result = run_intent_step(state, "aicoin", chat_model=self.chat_model)
+        if result.ok:
+            return (result.text or "").strip() or "处理完成"
+        return result.text or "行情助手暂时不可用，请稍后再试。"
 
 
 
@@ -331,19 +325,7 @@ class AgentEntry:
 
 
     def _stream_aicoin(self, state: AgentState) -> Iterator[str]:
-        bind_trace_from_state(state, intent="aicoin")
-        try:
-            result = run_aicoin_react(state, chat_model=self.chat_model)
-            final = (result.get("final_answer") or "").strip() or "处理完成"
-            body = (final or "").strip()
-            for i in range(0, len(body), _STREAM_CHUNK_CHARS):
-                yield _format_sse({"type": "delta", "content": body[i : i + _STREAM_CHUNK_CHARS]})
-            if not body:
-                yield _format_sse({"type": "delta", "content": ""})
-        except Exception as exc:
-            logger.exception("[agent] aicoin stream failed session_id=%s", state.get("session_id"))
-            yield _format_sse({"code": 50000, "message": f"行情助手失败：{exc}"})
-        yield _sse_done()
+        yield from self._stream_intent_step(state, "aicoin", error_label="行情助手失败")
 
     def _stream_chat(self, state: AgentState) -> Iterator[str]:
         bind_trace_from_state(state, intent="chat")
@@ -369,14 +351,13 @@ class AgentEntry:
         yield _sse_done()
 
     def _stream_publish_note(self, state: AgentState) -> Iterator[str]:
-        bind_trace_from_state(state, intent="publish_note")
         try:
-            result = run_publish_note_preview(state)
+            result = run_intent_step(state, "publish_note", chat_model=self.chat_model)
             yield from self._emit_preview_stream(
                 intent="publish_note",
-                message=result.get("final_answer") or "",
-                preview=result.get("preview"),
-                action=result.get("action") or "publish_note",
+                message=result.text or "",
+                preview=result.preview,
+                action=result.action or "publish_note",
             )
         except Exception as exc:
             logger.exception("[agent] publish_note stream failed session_id=%s", state.get("session_id"))
@@ -425,6 +406,7 @@ class AgentEntry:
             parts: list[str] = []
             pending_preview: dict | None = None
             pending_action = ""
+            prior_results: list[dict] = []
 
             for task in tasks:
                 step_id = str(task.get("id") or "")
@@ -433,17 +415,31 @@ class AgentEntry:
                         {"type": "plan_step", "stepId": step_id, "status": "running"}
                     )
                 try:
-                    result = run_orchestrator_step(agent_state, task)
+                    result = run_orchestrator_step(
+                        agent_state,
+                        task,
+                        prior_results=prior_results,
+                        chat_model=self.chat_model,
+                    )
                     if result.get("preview"):
                         pending_preview = result.get("preview")
                         pending_action = str(result.get("action") or "publish_note")
-                    parts.append(str(result.get("text") or ""))
+                    text = str(result.get("text") or "")
+                    parts.append(text)
+                    prior_results.append(
+                        {
+                            "intent": task.get("intent"),
+                            "text": text,
+                            "ok": bool(result.get("ok", True)),
+                        }
+                    )
+                    status = "done" if result.get("ok", True) else "failed"
                     if step_id:
                         yield _format_sse(
                             {
                                 "type": "plan_step",
                                 "stepId": step_id,
-                                "status": "done",
+                                "status": status,
                                 "summary": str(result.get("summary") or ""),
                             }
                         )
@@ -453,6 +449,13 @@ class AgentEntry:
                         task.get("intent"),
                     )
                     parts.append("该步骤处理失败，请稍后重试。")
+                    prior_results.append(
+                        {
+                            "intent": task.get("intent"),
+                            "text": "该步骤处理失败",
+                            "ok": False,
+                        }
+                    )
                     if step_id:
                         yield _format_sse(
                             {
@@ -502,20 +505,30 @@ class AgentEntry:
             )
         yield _sse_done()
 
-    def _stream_music(self, state: AgentState) -> Iterator[str]:
-        bind_trace_from_state(state, intent="music")
+    def _stream_intent_step(
+        self,
+        state: AgentState,
+        intent: str,
+        *,
+        error_label: str,
+    ) -> Iterator[str]:
+        bind_trace_from_state(state, intent=intent)
         try:
-            result = run_music_react(state)
-            final = (result.get("final_answer") or "").strip() or "处理完成"
-            body = (final or "").strip()
+            result = run_intent_step(state, intent, chat_model=self.chat_model)
+            body = (result.text or "").strip()
             for i in range(0, len(body), _STREAM_CHUNK_CHARS):
                 yield _format_sse({"type": "delta", "content": body[i : i + _STREAM_CHUNK_CHARS]})
             if not body:
                 yield _format_sse({"type": "delta", "content": ""})
         except Exception as exc:
-            logger.exception("[agent] music stream failed session_id=%s", state.get("session_id"))
-            yield _format_sse({"code": 50000, "message": f"音乐助手失败：{exc}"})
+            logger.exception(
+                "[agent] %s stream failed session_id=%s", intent, state.get("session_id")
+            )
+            yield _format_sse({"code": 50000, "message": f"{error_label}：{exc}"})
         yield _sse_done()
+
+    def _stream_music(self, state: AgentState) -> Iterator[str]:
+        yield from self._stream_intent_step(state, "music", error_label="音乐助手失败")
 
     _ONCE_HANDLERS: dict[str, Callable[["AgentEntry", AgentState], str]] = {
         "chat": _once_chat,

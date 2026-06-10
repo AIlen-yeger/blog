@@ -72,6 +72,84 @@ _AICOIN_SIGNALS = (
 )
 _AICOIN_TOPIC_WORDS = ("币", "代币", "山寨", "合约", "现货")
 
+_ROUTE_PRIORITY = ("publish_note", "music", "aicoin", "commit_user", "chat")
+
+
+def _normalize_route_key(raw: str) -> str | None:
+    key = (raw or "").strip().lower()
+    if key == "add_son":
+        key = "music"
+    if key == "comment_user":
+        key = "commit_user"
+    if key in _valid_intents():
+        return key
+    return None
+
+
+def _question_has_music(q: str, lower: str) -> bool:
+    if "y.qq.com" in lower or "songid" in lower:
+        return True
+    if "qq.com" in lower and any(k in q for k in ("歌", "音乐", "加")):
+        return True
+    if any(signal in q for signal in _MUSIC_QUESTION_SIGNALS):
+        return True
+    if any(k in q for k in _MUSIC_TOPIC_WORDS) and any(
+        k in q for k in ("分析", "报告", "排行", "记录", "数据", "统计", "背景", "情绪", "循环")
+    ):
+        return True
+    if any(k in q for k in _MUSIC_QUERY_WORDS) and any(k in q for k in _MUSIC_TOPIC_WORDS):
+        return True
+    return False
+
+
+def _question_has_publish_note(q: str, attachments: list | None) -> bool:
+    from server.route_graph.publish_note_route import wants_publish_note
+
+    if wants_publish_note(q, attachments or []):
+        return True
+    return any(
+        k in q for k in ("发布笔记", "发一篇笔记", "发笔记", "上传的是笔记", "发布到博客", "发到博客")
+    )
+
+
+def _question_has_commit_user(q: str) -> bool:
+    return "笔记" in q and any(k in q for k in ("回复", "评论", "agent回复"))
+
+
+def _question_has_aicoin(q: str, lower: str) -> bool:
+    if any(s in lower or s in q for s in _AICOIN_SIGNALS):
+        return True
+    return any(k in q for k in _AICOIN_TOPIC_WORDS) and any(
+        k in q for k in ("价格", "涨跌", "新闻", "走势", "市值", "买入", "定投", "盈亏", "持仓")
+    )
+
+
+def routes_from_question(
+    question: str,
+    attachments: list | None = None,
+) -> list[str]:
+    """关键词收集全部命中 intent（多意图编排入口）。"""
+    q = (question or "").strip()
+    if not q and not attachments:
+        return []
+
+    lower = q.lower()
+    found: set[str] = set()
+
+    if _question_has_music(q, lower):
+        found.add("music")
+    if _question_has_publish_note(q, attachments):
+        found.add("publish_note")
+    if _question_has_commit_user(q):
+        found.add("commit_user")
+    if _question_has_aicoin(q, lower):
+        found.add("aicoin")
+
+    if not found:
+        return []
+
+    return [r for r in _ROUTE_PRIORITY if r in found]
+
 
 def intent_from_question(question: str) -> str | None:
     """用户原文强信号（模型误判时覆盖）。"""
@@ -79,45 +157,66 @@ def intent_from_question(question: str) -> str | None:
     if not q:
         return None
     lower = q.lower()
-    if "y.qq.com" in lower or "songid" in lower:
+    if _question_has_music(q, lower):
         return "music"
-    if any(signal in q for signal in _MUSIC_QUESTION_SIGNALS):
-        return "music"
-    if any(k in q for k in _MUSIC_TOPIC_WORDS) and any(
-        k in q for k in ("分析", "报告", "排行", "记录", "数据", "统计", "背景", "情绪", "循环")
-    ):
-        return "music"
-    if any(k in q for k in _MUSIC_QUERY_WORDS) and any(k in q for k in _MUSIC_TOPIC_WORDS):
-        return "music"
-    if any(k in q for k in ("发布笔记", "发一篇笔记", "发笔记", "上传的是笔记", "发布到博客", "发到博客")):
+    if _question_has_publish_note(q, None):
         return "publish_note"
-    if "笔记" in q and any(k in q for k in ("回复", "评论", "agent回复")):
+    if _question_has_commit_user(q):
         return "commit_user"
-    if any(s in lower or s in q for s in _AICOIN_SIGNALS):
-        return "aicoin"
-    if any(k in q for k in _AICOIN_TOPIC_WORDS) and any(
-        k in q for k in ("价格", "涨跌", "新闻", "走势", "市值", "买入", "定投")
-    ):
+    if _question_has_aicoin(q, lower):
         return "aicoin"
     return None
 
 
+def parse_judge_routes(raw: str) -> list[str]:
+    """解析 judge 输出：支持 routes[] 或单 route。"""
+    text = (raw or "").strip()
+    if not text:
+        return ["chat"]
+
+    try:
+        data = json.loads(text)
+        if isinstance(data, dict):
+            routes_raw = data.get("routes")
+            if isinstance(routes_raw, list):
+                out: list[str] = []
+                for item in routes_raw:
+                    key = _normalize_route_key(str(item))
+                    if key and key not in out:
+                        out.append(key)
+                if out:
+                    return out
+            route = _normalize_route_key(
+                str(data.get("route") or data.get("intent") or "")
+            )
+            if route:
+                return [route]
+    except json.JSONDecodeError:
+        pass
+
+    return [_normalize_intent_legacy(text)]
+
+
 def normalize_intent(raw: str) -> str:
-    """把 judge 模型输出解析成 intent。"""
+    """把 judge 模型输出解析成 intent（单路由）。"""
+    routes = parse_judge_routes(raw)
+    return routes[0] if routes else "chat"
+
+
+def _normalize_intent_legacy(raw: str) -> str:
+    """兼容旧逻辑：仅从文本片段推断单 intent。"""
     text = (raw or "").strip()
     if not text:
         return "chat"
 
     try:
         data = json.loads(text)
-        if isinstance(data, dict):
-            route = (data.get("route") or data.get("intent") or "").strip().lower()
-            if route == "comment_user":
-                route = "commit_user"
-            if route == "add_son":
-                route = "music"
-            if route in _valid_intents():
-                return "music" if route == "add_son" else route
+        if isinstance(data, dict) and not isinstance(data.get("routes"), list):
+            route = _normalize_route_key(
+                str(data.get("route") or data.get("intent") or "")
+            )
+            if route:
+                return route
     except json.JSONDecodeError:
         pass
 
@@ -137,11 +236,9 @@ def normalize_intent(raw: str) -> str:
 
     m = re.search(r'"route"\s*:\s*"(\w+)"', text, re.I)
     if m:
-        route = m.group(1).lower()
-        if route == "add_son":
-            return "music"
-        if route in _valid_intents():
-            return "music" if route == "add_son" else route
+        route = _normalize_route_key(m.group(1))
+        if route:
+            return route
 
     return "chat"
 
@@ -215,7 +312,8 @@ class IntentRouter:
             )
             return intent
 
-        model_intent = normalize_intent(raw)
+        model_routes = parse_judge_routes(raw)
+        model_intent = model_routes[0] if model_routes else "chat"
         keyword_intent = intent_from_question(question)
         if keyword_intent and keyword_intent != model_intent:
             log_event(

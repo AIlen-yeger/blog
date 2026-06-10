@@ -98,3 +98,18 @@ cases:
   - id: music_background
     question: "这首歌的制作背景讲讲"
     expect_intent: music
+
+  - id: routes_publish_and_music
+    kind: routes
+    question: "帮我把这篇发布笔记并加歌 https://y.qq.com/n/xxx"
+    expect_routes: [publish_note, music]
+
+  - id: routes_publish_and_aicoin
+    kind: routes
+    question: "发布笔记到博客，顺便查一下 BTC 行情"
+    expect_routes: [publish_note, aicoin]
+
+  - id: routes_music_only
+    kind: routes
+    question: "加这首歌 https://y.qq.com/n/1"
+    expect_routes: [music]
