@@ -28,4 +28,4 @@ python/reports/eval/*.json
 python/config/config.local.yml
 
 # NapCat 运行时数据（QQ 登录态、表情缓存等，仅保留 data/config 模板若需可单独说明）
-python/docker/napcat/data/
+python/docker/napcat/data/"python/docker/napcat/data/" 
