@@ -1,18 +1,17 @@
-"""笔记发布后：总结笔记 + 结合近期聊天写 Kohaku 回复，并入库。"""
+"""笔记发布后：总结笔记 + 结合近期聊天写蕾西亚回复，并入库。"""
 
 from __future__ import annotations
 
 import logging
-
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from config.config import AgentConfig
 from server.agent import ChatModel
-from server.prompt_skills import build_system_prompt
+from server.skills_server.prompt_assembler import assemble_for_state
 from server.state import AgentState
 from server.tools.comment_agent_tools import save_note_agent_reply_impl
 from service.chat_history import ChatHistoryService
-from utils.trace_log import bind_trace, log_event, preview, span
+from utils.log.trace_log import bind_trace, log_event, preview, span
 
 logger = logging.getLogger(__name__)
 _DEFAULT_HISTORY_LIMIT = AgentConfig().history_limit
@@ -58,10 +57,11 @@ def run_note_comment(state: AgentState) -> dict:
     limit = int(state.get("limit") or _DEFAULT_HISTORY_LIMIT)
     channel = (state.get("channel") or "internal").strip().lower()
 
-    system = build_system_prompt(
+    system = assemble_for_state(
+        state,
         intent="commit_user",
-        channel=channel,
-        developer_name=(state.get("user_name") or "").strip() or None,
+        include_lore=True,
+        user_message=question,
     )
     history_svc = ChatHistoryService()
     messages = [

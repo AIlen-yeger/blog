@@ -32,6 +32,9 @@ public class UploadFileController {
     @Value("${app.upload.content-dir}")
     private String contentDir;
 
+    @Value("${app.upload.document-dir}")
+    private String documentDir;
+
     @GetMapping("/uploads/avatars/{filename}")
     public ResponseEntity<Resource> avatar(@PathVariable String filename) {
         return serveFile(avatarDir, filename);
@@ -40,6 +43,11 @@ public class UploadFileController {
     @GetMapping("/uploads/content/{filename}")
     public ResponseEntity<Resource> content(@PathVariable String filename) {
         return serveFile(contentDir, filename);
+    }
+
+    @GetMapping("/uploads/documents/{filename}")
+    public ResponseEntity<Resource> document(@PathVariable String filename) {
+        return serveDocument(documentDir, filename);
     }
 
     private ResponseEntity<Resource> serveFile(String baseDir, String filename) {
@@ -59,6 +67,22 @@ public class UploadFileController {
                 .body(resource);
     }
 
+    private ResponseEntity<Resource> serveDocument(String baseDir, String filename) {
+        if (filename == null || !SAFE_FILENAME.matcher(filename.toLowerCase(Locale.ROOT)).matches()) {
+            return ResponseEntity.badRequest().build();
+        }
+        Path base = Paths.get(baseDir).toAbsolutePath().normalize();
+        Path file = base.resolve(filename).normalize();
+        if (!file.startsWith(base) || !Files.isRegularFile(file)) {
+            return ResponseEntity.notFound().build();
+        }
+        FileSystemResource resource = new FileSystemResource(file);
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.maxAge(Duration.ofDays(1)).cachePublic())
+                .contentType(probeDocumentMediaType(filename))
+                .body(resource);
+    }
+
     private static MediaType probeMediaType(String filename) {
         String ext = filename.substring(filename.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
         return switch (ext) {
@@ -66,6 +90,18 @@ public class UploadFileController {
             case "gif" -> MediaType.IMAGE_GIF;
             case "webp" -> MediaType.parseMediaType("image/webp");
             default -> MediaType.IMAGE_JPEG;
+        };
+    }
+
+    private static MediaType probeDocumentMediaType(String filename) {
+        String ext = filename.substring(filename.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
+        return switch (ext) {
+            case "pdf" -> MediaType.APPLICATION_PDF;
+            case "md", "markdown", "txt" -> MediaType.TEXT_PLAIN;
+            case "docx" -> MediaType.parseMediaType(
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+            case "doc" -> MediaType.parseMediaType("application/msword");
+            default -> MediaType.APPLICATION_OCTET_STREAM;
         };
     }
 }

@@ -22,14 +22,15 @@ const emit = defineEmits<{
 }>()
 
 const readerOpen = ref(false)
-const { shouldShowReply } = useAgentReplySettings()
+const { shouldShowReply, isGenerating, canViewAgentReply } = useAgentReplySettings()
 
 const showAgentReply = computed(() => shouldShowReply('note', props.item.agentReply))
 
-const agentReplyGenerating = computed(() => {
-  const st = (props.item.agentReplyStatus || '').toLowerCase()
-  return (st === 'pending' || st === 'running') && !props.item.agentReply?.trim()
-})
+const agentReplyGenerating = computed(
+  () =>
+    canViewAgentReply('note') &&
+    isGenerating(props.item.agentReplyStatus, props.item.agentReply),
+)
 
 function openReader() {
   readerOpen.value = true
@@ -70,7 +71,7 @@ function onPin() {
       </div>
       <h3 class="card-title" :class="{ 'is-pinned': item.pinned }">{{ item.title }}</h3>
       <p class="excerpt">{{ item.excerpt }}</p>
-      <p v-if="agentReplyGenerating" class="agent-reply-pending">Kohaku 正在写回复…</p>
+      <p v-if="agentReplyGenerating" class="agent-reply-pending">蕾西亚正在写回复…</p>
       <AgentReplyBlock
         v-if="showAgentReply && item.agentReply"
         kind="note"

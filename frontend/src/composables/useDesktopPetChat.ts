@@ -1,8 +1,15 @@
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { hasValidSession } from '@/composables/useSession'
 import { streamAgentChat, type ChatTurn } from '@/api/agentChat'
+import { ensureAgentSessionId, loadServerMessages } from '@/composables/agentSessionBridge'
 import { bubbleTierFromText } from '@/utils/bubbleSize'
-import { clearAgentChatHistory, loadAgentChatHistory, saveAgentChatHistory } from '@/utils/agentChatStorage'
+import {
+  ensureLocalDefaultSession,
+  getActiveSessionId,
+  setActiveSessionId,
+  upsertLocalSession,
+  type ChatMessage,
+} from '@/utils/agentSessionsStorage'
 import { genId } from '@/utils/id'
 import { toUserErrorMessage } from '@/utils/userErrorMessage'
 import {
@@ -10,21 +17,14 @@ import {
   replyIndicatesMusicPlaylistSaved,
 } from '@/composables/useUserMusicTracks'
 
-export interface ChatMessage {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  createdAt: number
-}
+export type { ChatMessage } from '@/utils/agentSessionsStorage'
 
 export interface DesktopPetChatOptions {
-  /** 是否已登录（非访客） */
   isLoggedIn?: () => boolean
-  /** 访客发消息时引导登录 */
   onLoginRequired?: () => void
 }
 
-const history = ref<ChatMessage[]>(loadAgentChatHistory())
+const messagesRef = ref<ChatMessage[]>([])
 const input = ref('')
 const streamingText = ref('')
 const isStreaming = ref(false)
@@ -34,7 +34,23 @@ const loginRequired = ref(false)
 
 let abortCtrl: AbortController | null = null
 
-watch(history, (messages) => saveAgentChatHistory(messages), { deep: true })
+async function reloadMessages() {
+  if (hasValidSession()) {
+    const sessionId = getActiveSessionId() ?? (await ensureAgentSessionId())
+    setActiveSessionId(sessionId)
+    try {
+      messagesRef.value = await loadServerMessages(sessionId)
+    } catch (e) {
+      error.value = toUserErrorMessage(e, '加载消息失败')
+      messagesRef.value = []
+    }
+    return
+  }
+  const session = ensureLocalDefaultSession()
+  messagesRef.value = session.messages
+}
+
+const history = computed(() => messagesRef.value)
 
 const displayText = computed(() => {
   if (isStreaming.value) return streamingText.value
@@ -48,6 +64,9 @@ const hasHistory = computed(() => history.value.length > 0)
 
 function toggleHistory() {
   historyOpen.value = !historyOpen.value
+  if (historyOpen.value) {
+    void reloadMessages()
+  }
 }
 
 function clearError() {
@@ -68,15 +87,24 @@ async function sendMessage(options?: DesktopPetChatOptions) {
   }
 
   clearError()
-  history.value.push({
+  const sessionId = await ensureAgentSessionId()
+  setActiveSessionId(sessionId)
+
+  const userMessage: ChatMessage = {
     id: genId('u'),
     role: 'user',
     content: text,
     createdAt: Date.now(),
-  })
+  }
+  messagesRef.value.push(userMessage)
+  if (!hasValidSession()) {
+    const session = ensureLocalDefaultSession()
+    session.messages = [...messagesRef.value]
+    upsertLocalSession(session)
+  }
   input.value = ''
 
-  const turns: ChatTurn[] = history.value.map((m) => ({
+  const turns: ChatTurn[] = messagesRef.value.map((m) => ({
     role: m.role,
     content: m.content,
   }))
@@ -94,6 +122,7 @@ async function sendMessage(options?: DesktopPetChatOptions) {
       },
       abortCtrl.signal,
       {
+        sessionId,
         onMeta: (meta) => {
           if (meta.intent) agentIntent = meta.intent
         },
@@ -101,12 +130,19 @@ async function sendMessage(options?: DesktopPetChatOptions) {
     )
 
     const reply = streamingText.value.trim() || '（没有收到回复）'
-    history.value.push({
+    messagesRef.value.push({
       id: genId('a'),
       role: 'assistant',
       content: reply,
       createdAt: Date.now(),
     })
+    if (!hasValidSession()) {
+      const session = ensureLocalDefaultSession()
+      session.messages = [...messagesRef.value]
+      upsertLocalSession(session)
+    } else {
+      await reloadMessages()
+    }
     if (
       replyIndicatesMusicPlaylistSaved(reply) ||
       (agentIntent === 'music' && /播放列表|已保存|添加/.test(reply))
@@ -128,21 +164,32 @@ function stopStreaming() {
   abortCtrl?.abort()
   abortCtrl = null
   if (partial) {
-    history.value.push({
+    messagesRef.value.push({
       id: genId('a'),
       role: 'assistant',
       content: partial,
       createdAt: Date.now(),
     })
+    if (!hasValidSession()) {
+      const session = ensureLocalDefaultSession()
+      session.messages = [...messagesRef.value]
+      upsertLocalSession(session)
+    }
   }
   isStreaming.value = false
   streamingText.value = ''
 }
 
 function clearHistory() {
-  history.value = []
-  clearAgentChatHistory()
+  messagesRef.value = []
+  if (!hasValidSession()) {
+    const session = ensureLocalDefaultSession()
+    session.messages = []
+    upsertLocalSession(session)
+  }
 }
+
+void reloadMessages()
 
 export function useDesktopPetChat() {
   return {

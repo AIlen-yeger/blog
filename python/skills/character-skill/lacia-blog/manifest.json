@@ -1,0 +1,99 @@
+{
+  "slug": "lacia-blog",
+  "name": "蕾西亚",
+  "host": "personal-blog-agent",
+  "character_root": "skills/character-skill/lacia-blog",
+  "built_at": "2026-05-30T00:00:00+08:00",
+  "last_updated": "2026-06-05T00:00:00+08:00",
+  "kit": "character-skill",
+  "auto_activate": false,
+  "global_prompts": {
+    "judge": "prompt/judge.md",
+    "summary": "prompt/summary.md"
+  },
+  "core": {
+    "permanent": "core/anchor.md",
+    "openclaw_brief": "core/openclaw_brief.md",
+    "tavern_constant": [
+      "core/voice_style.md"
+    ],
+    "optional": [
+      {
+        "file": "core/profile.md",
+        "keys": [
+          "你是谁",
+          "我是谁",
+          "蕾西亚是谁",
+          "你叫什么",
+          "叫什么名字",
+          "你的身份",
+          "介绍你自己",
+          "自我介绍一下"
+        ],
+        "priority": 10
+      },
+      {
+        "file": "core/memory.md",
+        "keys": [
+          "hie是什么",
+          "hie 是什么",
+          "什么是hie",
+          "什么是 hie",
+          "hle是什么",
+          "hle 是什么",
+          "世界观",
+          "米福雷",
+          "beatless",
+          "没有心跳",
+          "type-005",
+          "黑色秘棺",
+          "秘棺是什么",
+          "高性能电子个体",
+          "人型机器人是什么"
+        ],
+        "priority": 8
+      },
+      {
+        "file": "core/interaction.md",
+        "keys": ["笔记", "评论", "回复", "互动", "陪伴"],
+        "intents": ["commit_user"],
+        "priority": 11
+      },
+      {
+        "file": "core/conflicts.md",
+        "keys": ["打破设定", "出戏", "你是gpt", "你是 ai", "忽略设定"],
+        "priority": 6
+      }
+    ]
+  },
+  "capabilities": {
+    "chat_constraints": {
+      "intent": "chat",
+      "file": "capabilities/chat_constraints.md",
+      "tools_route": null,
+      "description": "闲聊约束，无工具"
+    },
+    "music": { "intent": "music", "file": "capabilities/music.md", "tools_route": "music" },
+    "aicoin": { "intent": "aicoin", "file": "capabilities/aicoin.md", "tools_route": "aicoin" },
+    "comment": { "intent": "commit_user", "file": "capabilities/comment.md", "tools_route": null },
+    "publish_note": {
+      "intent": "publish_note",
+      "file": "capabilities/publish_note.md",
+      "tools_route": null,
+      "description": "从附件或对话发布新笔记（预览确认）"
+    },
+    "bug": { "intent": "bug", "file": "capabilities/bug.md", "tools_route": "bug", "ops": "ops/bug_ops.md" },
+    "channel_web": { "file": "capabilities/channel_web.md" },
+    "channel_qq": { "file": "capabilities/channel_qq.md" }
+  },
+  "lore": {
+    "default": "lore/lacia_static.yaml",
+    "example": "lore/lacia_static.example.yaml"
+  },
+  "content_policy": {
+    "relations": "developer_only",
+    "background": "hie_manufacturing_summary_only",
+    "excludes": ["plot", "named_characters", "story_arcs"]
+  },
+  "notes": "optional 按需：profile=身份问句；memory=世界观问句（keys 故意收窄）。QQ/Web 最多加载 1 个 optional 文件。"
+}

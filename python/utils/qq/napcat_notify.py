@@ -48,7 +48,7 @@ def format_alert_text(
     trace_id: str | None = None,
     event: str | None = None,
 ) -> str:
-    lines = [f"【博客 Agent · {severity.upper()}】", (title or "告警").strip()]
+    lines = [f"【蕾西亚 · 工作室运维 · {severity.upper()}】", (title or "告警").strip()]
     if trace_id and trace_id not in ("-", ""):
         lines.append(f"trace: {trace_id}")
     if event:

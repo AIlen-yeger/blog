@@ -90,7 +90,7 @@ class AgentConfig:
         )
         self.chat_base_url = _env_str("DP_CHAT_API_URL", "https://api.deepseek.com")
         self.temperature = _env_float("DP_CHAT_TEMPERATURE", 0.7)
-        self.history_limit = _env_int("DP_CHAT_HISTORY_LIMIT", 10)
+        self.history_limit = _env_int("DP_CHAT_HISTORY_LIMIT", 6)
 
         # ── 意图识别 judge（默认与闲聊同 DeepSeek）──
         # 仅当 DP_JUDGE_ENABLED=true 时读取 DP_JUDGE_* / DP_EXECUTE_*（避免 .env 残留千问配置）
@@ -155,6 +155,8 @@ class AgentConfig:
         self.chat_list_key = _env_str("REDIS_CHAT_LIST_KEY", "chat:s:{session_id}")
         self.chat_ttl = _env_int("REDIS_CHAT_TTL", 86400)
         self.max_cache_msgs = _env_int("REDIS_MAX_CACHE_MSGS", 40)
+        self.memory_episode_key = _env_str("REDIS_MEMORY_EPISODE_KEY", "memory:episode:{user_id}")
+        self.memory_episode_ttl = _env_int("REDIS_MEMORY_EPISODE_TTL", 604800)
 
         # ── NapCat QQ 告警（Bug Ops notify_developer / 可选即时推送）──
         self.napcat_notify_enabled = _env_bool("NAPCAT_NOTIFY_ENABLED", True)
@@ -193,9 +195,12 @@ class AgentConfig:
         self.btc_dca_initial_cost_usdt = _env_float("BTC_DCA_INITIAL_COST_USDT", 0)
         self.btc_dca_initial_avg_usdt = _env_float("BTC_DCA_INITIAL_AVG_USDT", 92212.5651)
 
-        # ── 向量模型（用户记忆 embed / recall）──
-        self.embedding_model_name = _env_str("EMBEDDING_MODEL_NAME", "")
-        self.embedding_base_url = _env_str("EMBEDDING_BASE_URL", "")
+        # ── 向量模型（用户记忆 embed / recall；未配 key 时 recall 自动跳过）──
+        self.embedding_model_name = _env_str("EMBEDDING_MODEL_NAME", "text-embedding-v4")
+        self.embedding_base_url = _env_str(
+            "EMBEDDING_BASE_URL",
+            "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        )
         self.embedding_api_key = _env_str("EMBEDDING_API_KEY", "")
 
         # ── Chroma 用户记忆（仅向量库，不写 MySQL）──
@@ -207,6 +212,28 @@ class AgentConfig:
 
 def _key_status(value: str) -> str:
     return "ok" if (value or "").strip() else "MISSING"
+
+
+def embedding_configured(cfg: AgentConfig | None = None) -> bool:
+    """EMBEDDING_* 三项齐全才可做向量 recall / 持久化 embed。"""
+    c = cfg or AgentConfig()
+    return bool(
+        (c.embedding_model_name or "").strip()
+        and (c.embedding_api_key or "").strip()
+        and (c.embedding_base_url or "").strip()
+    )
+
+
+def chat_llm_configured(cfg: AgentConfig | None = None) -> bool:
+    c = cfg or AgentConfig()
+    return bool((c.chat_model_name or "").strip() and (c.chat_api_key or "").strip())
+
+
+def normalize_openai_base_url(url: str) -> str:
+    base = (url or "https://api.deepseek.com").strip().rstrip("/")
+    if base.endswith("/v1"):
+        return base
+    return base + "/v1"
 
 
 def log_startup_config() -> None:
@@ -251,7 +278,7 @@ def log_startup_config() -> None:
     except Exception as exc:
         logger.warning("[config] mcp registry load failed: %s", exc)
     from utils.qq.napcat_notify import napcat_configured
-    from utils.agent_log_config import resolve_log_dir
+    from utils.log.agent_log_config import resolve_log_dir
 
     logger.info(
         "[config] napcat enabled=%s configured=%s url=%s qq=%s min_severity=%s",

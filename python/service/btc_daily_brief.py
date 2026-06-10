@@ -11,14 +11,15 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from config.config import AgentConfig
 from server.agent import ChatModel
-from server.prompt_skills import build_system_prompt, read_aicoin_skill
+from server.prompt_skills import read_aicoin_skill
+from server.skills_server.prompt_assembler import PromptContext, assemble_system_prompt
 from server.qq.message_format import QQ_DCA_DAILY_MAX_CHARS, finalize_qq_reply
 from utils.world_lexicon import COIN_BTC_DISPLAY, CURRENCY_USDT_DISPLAY
 from service.btc_dca_position import load_position, position_pnl_usdt
 from service.btc_market_quote import fetch_btc_ticker
 from utils.ahr999 import enrich_facts_with_ahr999
 from utils.qq.napcat_notify import napcat_configured, send_private_message
-from utils.trace_log import log_event, preview, span
+from utils.log.trace_log import log_event, preview, span
 
 logger = logging.getLogger(__name__)
 
@@ -81,9 +82,15 @@ def polish_daily_qq_message(facts: dict[str, Any]) -> str:
 
     try:
         model = ChatModel()
-        system = build_system_prompt(intent="chat", channel="qq", developer_name="开发者")
-        extra = read_aicoin_skill("dca_daily")
-        system = "\n\n---\n\n".join(p for p in (system, extra) if p)
+        system = assemble_system_prompt(
+            PromptContext(
+                intent="chat",
+                channel="qq",
+                user_message="定投日报",
+                developer_name="开发者",
+                system_append=read_aicoin_skill("dca_daily"),
+            ),
+        )
 
         human = (
             f"请根据以下只读数据，写一条 QQ 早安定投简报（1～3 句、约 {QQ_DCA_DAILY_MAX_CHARS} 字内）。"

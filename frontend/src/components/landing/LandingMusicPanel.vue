@@ -185,7 +185,7 @@ function onEmbedInteract() {
         @ended="nextTrackAuto"
       />
       <p v-else-if="landingMusicLoading" class="music-empty">加载曲目中…</p>
-      <p v-else class="music-empty">暂无曲目，登录后可通过 Kohaku 添加</p>
+      <p v-else class="music-empty">暂无曲目，登录后可通过蕾西亚添加</p>
     </div>
 
     <MusicPlaylistDrawer

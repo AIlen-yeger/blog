@@ -189,7 +189,7 @@ async function onDeletePlaylist(track: (typeof playlistTracks.value)[0]) {
             <span>{{ loadError }}</span>
           </p>
           <p v-else-if="isQqTrack" class="music-tip">
-            由 QQ 音乐官方播放器提供；登录后可通过 Kohaku 发送分享链接添加曲目
+            由 QQ 音乐官方播放器提供；登录后可通过蕾西亚发送分享链接添加曲目
           </p>
           <p v-else class="music-tip">
             将 mp3 放入 <code>public/music/</code> 后重启

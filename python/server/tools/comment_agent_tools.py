@@ -1,4 +1,4 @@
-"""笔记评论：保存 Kohaku 回复到 Java 博客 API。"""
+"""笔记评论：保存蕾西亚回复到 Java 博客 API。"""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import urllib.request
 from langchain_core.tools import tool
 
 from utils.qq.qq_music_tools import blog_api_base
-from utils.trace_log import log_event, preview
+from utils.log.trace_log import log_event, preview
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +81,6 @@ def save_note_agent_reply_impl(*, note_id: str, agent_reply: str, job_id: str = 
 
 @tool
 def save_note_agent_reply(note_id: str, agent_reply: str, job_id: str = "") -> str:
-    """将 Kohaku 对笔记的回复写入博客数据库，关联指定 note_id 与 job_id。"""
+    """将蕾西亚对笔记的回复写入博客数据库，关联指定 note_id 与 job_id。"""
     result = save_note_agent_reply_impl(note_id=note_id, agent_reply=agent_reply, job_id=job_id)
     return json.dumps(result, ensure_ascii=False)

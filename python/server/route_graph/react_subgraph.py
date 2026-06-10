@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 from collections.abc import Callable
 from typing import Any
@@ -14,11 +15,20 @@ from langgraph.prebuilt import ToolNode, tools_condition
 
 from config.config import AgentConfig
 from server.state import AgentState
-from utils.trace_log import log_event, preview, redact_args, span, tool_result_status
+from utils.log.token_usage import record_from_response
+from utils.log.trace_log import log_event, preview, redact_args, span, tool_result_status
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_MAX_REACT_ROUNDS = 6
+
+
+def effective_max_react_rounds(default: int = DEFAULT_MAX_REACT_ROUNDS) -> int:
+    """测试时可设环境变量 TEST_REACT_MAX_ROUNDS 压低 ReAct 轮次（防 token 爆炸）。"""
+    raw = (os.getenv("TEST_REACT_MAX_ROUNDS") or "").strip()
+    if raw.isdigit():
+        return max(1, min(12, int(raw)))
+    return default
 
 
 def _tool_call_name(tc: Any) -> str:
@@ -43,6 +53,7 @@ def build_bound_model(tools: list) -> Any:
         temperature=cfg.react_temperature,
         timeout=90,
         max_retries=1,
+        stream_usage=True,
     )
     return llm.bind_tools(tools)
 
@@ -144,6 +155,16 @@ def make_react_agent_node(
         round_no = count_tool_rounds(msgs) + 1
         with span(ev_llm, subgraph=subgraph, round=round_no, message_count=len(msgs)):
             ai_msg = model.invoke(msgs)
+
+        record_from_response(
+            phase=f"{subgraph}.react",
+            model=AgentConfig().react_model_name,
+            messages=msgs,
+            response=ai_msg,
+            trace_id=(state.get("trace_id") or None),
+            subgraph=subgraph,
+            round=round_no,
+        )
 
         tool_calls = getattr(ai_msg, "tool_calls", None) or []
         for tc in tool_calls:

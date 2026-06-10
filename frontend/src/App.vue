@@ -6,6 +6,7 @@ import LoginModal from '@/components/LoginModal.vue'
 import BlogLayout from '@/components/BlogLayout.vue'
 import MusicAudioHost from '@/components/MusicAudioHost.vue'
 import DesktopPetAssistant from '@/components/DesktopPetAssistant.vue'
+import AgentChatPage from '@/components/AgentChatPage.vue'
 import {
   loadLandingProfile,
   reloadBlogData,
@@ -18,6 +19,7 @@ import QqMusicPersistentHost from '@/components/QqMusicPersistentHost.vue'
 import { handoffLandingMusicToBlog } from '@/composables/useAboutMusic'
 import { applyQqTeleportSlot, useGlobalQqPlayer } from '@/composables/useGlobalQqPlayer'
 import { isBlogHash, readBlogRouteFromUrl } from '@/utils/blogRoute'
+import { isAgentHash, readAgentRouteFromUrl } from '@/utils/agentRoute'
 import {
   clearBlogViewStorage,
   getPreferLanding,
@@ -34,6 +36,9 @@ const guestMode = ref(getStoredGuestMode())
 const preferLanding = ref(getPreferLanding())
 const blogHashActive = ref(
   typeof window !== 'undefined' ? readBlogRouteFromUrl() === 'blog' : false,
+)
+const agentPageActive = ref(
+  typeof window !== 'undefined' ? readAgentRouteFromUrl() === 'chat' : false,
 )
 /** 用户主动进入博客后为 true；刷新时仅当 URL 为 #/blog 时恢复 */
 const blogViewActive = ref(blogHashActive.value)
@@ -287,6 +292,10 @@ function leaveGuest() {
   resetBlogStore()
 }
 
+function syncAgentRouteFromHash() {
+  agentPageActive.value = isAgentHash()
+}
+
 function handleAuthLogout() {
   loggedIn.value = false
   preferLanding.value = false
@@ -328,6 +337,8 @@ onMounted(() => {
   window.addEventListener('touchend', onTouchEnd, { passive: true })
   window.addEventListener('auth:logout', handleAuthLogout)
   window.addEventListener('blog:return-landing', returnToLanding)
+  window.addEventListener('hashchange', syncAgentRouteFromHash)
+  syncAgentRouteFromHash()
 })
 
 onUnmounted(() => {
@@ -336,6 +347,7 @@ onUnmounted(() => {
   window.removeEventListener('touchend', onTouchEnd)
   window.removeEventListener('auth:logout', handleAuthLogout)
   window.removeEventListener('blog:return-landing', returnToLanding)
+  window.removeEventListener('hashchange', syncAgentRouteFromHash)
 })
 </script>
 
@@ -347,7 +359,7 @@ onUnmounted(() => {
   >
     <div v-if="animating" class="transition-scrim" aria-hidden="true" />
 
-    <div class="bg-shell">
+    <div v-if="!agentPageActive" class="bg-shell">
       <div class="bg-panel bg-panel--tl" />
       <div class="bg-panel bg-panel--tr" />
       <div class="bg-panel bg-panel--bl" />
@@ -355,7 +367,7 @@ onUnmounted(() => {
     </div>
 
     <div
-      v-if="landingVisible"
+      v-if="landingVisible && !agentPageActive"
       :key="landingMountKey"
       class="landing-wrap"
       :class="{ 'is-leaving': animating }"
@@ -370,7 +382,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-if="showBlog" key="blog" class="blog-stage">
+    <div v-if="showBlog && !agentPageActive" key="blog" class="blog-stage">
       <div v-if="animating" class="blog-frost" aria-hidden="true" />
       <BlogLayout
         :guest-mode="guestMode"
@@ -384,7 +396,17 @@ onUnmounted(() => {
     <div id="qq-music-offscreen" class="qq-music-offscreen" aria-hidden="true" />
     <QqMusicPersistentHost />
     <MusicAudioHost v-if="inBlog" />
-    <DesktopPetAssistant :logged-in="loggedIn" @request-login="openLogin" />
+    <DesktopPetAssistant
+      v-if="!agentPageActive"
+      :logged-in="loggedIn"
+      @request-login="openLogin"
+    />
+
+    <AgentChatPage
+      v-if="agentPageActive"
+      :logged-in="loggedIn"
+      @request-login="openLogin"
+    />
 
     <LoginModal
       :open="showLogin"

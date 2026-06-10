@@ -129,6 +129,18 @@ CREATE TABLE IF NOT EXISTS user_music_track (
     CONSTRAINT fk_user_music_user FOREIGN KEY (user_id) REFERENCES users (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户音乐播放列表';
 
+CREATE TABLE IF NOT EXISTS ai_chat_session (
+    session_id   VARCHAR(128) NOT NULL PRIMARY KEY,
+    user_id      BIGINT       NOT NULL,
+    guest_flag   TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '0=登录用户 1=访客',
+    title        VARCHAR(255) NOT NULL DEFAULT '新对话',
+    msg_count    INT          NOT NULL DEFAULT 0,
+    last_msg_id  BIGINT       NULL,
+    last_active  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    create_time  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_chat_session_user (user_id, last_active DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Agent Web 对话会话';
+
 CREATE TABLE IF NOT EXISTS ai_chat_message (
     id           BIGINT AUTO_INCREMENT PRIMARY KEY,
     session_id   VARCHAR(128) NOT NULL,

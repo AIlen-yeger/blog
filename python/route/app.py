@@ -9,7 +9,7 @@ from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from config.config import AgentConfig
 from server.agent_entry import get_agent_entry
-from utils.trace_log import new_trace_id, preview, span
+from utils.log.trace_log import bind_trace, new_trace_id, preview, span
 
 _DEFAULT_HISTORY_LIMIT = AgentConfig().history_limit
 
@@ -34,6 +34,30 @@ class ChatRequest(BaseModel):
     user_id: int = Field(default=0, validation_alias=AliasChoices("user_id", "userId"))
     access_token: str = Field(default="", validation_alias=AliasChoices("access_token", "accessToken"))
     user_role: str = Field(default="", validation_alias=AliasChoices("user_role", "userRole"))
+    attachments: list[dict[str, Any]] = Field(default_factory=list)
+
+
+def _parse_attachments(raw: dict[str, Any]) -> list[dict[str, Any]]:
+    rows = raw.get("attachments")
+    if not isinstance(rows, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        item = {
+            "id": _pick_str(row, "id"),
+            "name": _pick_str(row, "name"),
+            "mime": _pick_str(row, "mime"),
+            "url": _pick_str(row, "url"),
+            "kind": _pick_str(row, "kind") or "document",
+        }
+        text_inline = _pick_str(row, "text", "content")
+        if text_inline:
+            item["text"] = text_inline
+        if item["id"] or item["name"] or item["url"] or text_inline:
+            out.append(item)
+    return out
 
 
 def _pick_str(raw: dict[str, Any], *keys: str) -> str:
@@ -89,6 +113,7 @@ def _parse_chat_request(raw: object) -> ChatRequest | JSONResponse:
         limit=limit,
         access_token=_pick_str(raw, "access_token", "accessToken"),
         user_role=_pick_str(raw, "user_role", "userRole"),
+        attachments=_parse_attachments(raw),
     )
 
 
@@ -184,7 +209,18 @@ async def llm_chat(request: Request):
         )
 
     def sse_stream() -> Iterator[str]:
-        with span("request", question_preview=preview(body.question)):
+        with span(
+            "request",
+            trace_id=trace_id,
+            session_id=body.session_id,
+            user_id=body.user_id,
+            question_preview=preview(body.question),
+        ):
+            bind_trace(
+                trace_id=trace_id,
+                session_id=body.session_id,
+                user_id=body.user_id,
+            )
             try:
                 result = get_agent_entry().run(
                     question=body.question,
@@ -197,6 +233,7 @@ async def llm_chat(request: Request):
                     user_name=body.user_name,
                     account=body.account,
                     user_role=body.user_role,
+                    attachments=body.attachments,
                 )
                 yield from result.iter_sse()
             except Exception as exc:

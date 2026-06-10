@@ -25,14 +25,14 @@ try:
 except ImportError:
     pass
 
-from utils.agent_log_config import (  # noqa: E402
+from utils.log.agent_log_config import (  # noqa: E402
     ERROR_RETAIN_DAYS,
     INTENT_RETAIN_DAYS,
     SUMMARY_RETAIN_DAYS,
     TRACE_RETAIN_DAYS,
     resolve_log_dir,
 )
-from utils.agent_log_prune import run_agent_log_prune  # noqa: E402
+from utils.log.agent_log_prune import run_agent_log_prune  # noqa: E402
 
 
 def main() -> int:

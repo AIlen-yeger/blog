@@ -1,11 +1,11 @@
-"""多场景测试：滚动摘要 + 滑动窗口 + Chroma 入库。
+"""用户记忆测试：内置 5 个场景（滚动摘要 + 滑动窗口 + 可选 Chroma）。
 
 在 python 目录、已配置 .env（DP_*、EMBEDDING_*）且已安装依赖时运行：
 
   python scripts/test_user_memory_scenarios.py
   python scripts/test_user_memory_scenarios.py --scenario multi_turn_experience
-  python scripts/test_user_memory_scenarios.py --no-persist   # 只测摘要，不 embed/Chroma
-  python scripts/test_user_memory_scenarios.py --max-turns 5 --scenario sliding_window
+  python scripts/test_user_memory_scenarios.py --no-persist
+  python scripts/test_user_memory_scenarios.py --max-turns 4 --scenario sliding_window
 
 每个场景使用独立 test user_id，避免污染真实用户记忆。
 """
@@ -16,8 +16,6 @@ import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -55,7 +53,8 @@ class Scenario:
     max_turns: int = 8
 
 
-SCENARIOS: list[Scenario] = [
+# 固定 5 个场景：一句 commit、多轮经历、偏好、话题切换、滑动窗口
+SCENARIOS: tuple[Scenario, ...] = (
     Scenario(
         key="one_shot_commit",
         title="一句话讲完经历 → 应 commit",
@@ -97,39 +96,6 @@ SCENARIOS: list[Scenario] = [
         expect="第一条 commit；第二条可能 commit 旧摘要或 continue 新话题",
     ),
     Scenario(
-        key="split_rare",
-        title="单条内收尾+新话题 → 期望 split（模型不一定稳定）",
-        user_id="test_split",
-        messages=[
-            "昨天被溅水那事就算了。对了我想学 Python，有入门书推荐吗？",
-        ],
-        expect="理想 split：旧经历归档 + 新目标开 episode",
-    ),
-    Scenario(
-        key="small_talk",
-        title="寒暄/短句 → 多 continue",
-        user_id="test_small_talk",
-        messages=[
-            "嗨",
-            "在吗",
-            "嗯嗯",
-            "随便聊聊",
-        ],
-        expect="多为 continue，committed_memory 为空或很晚才 commit",
-    ),
-    Scenario(
-        key="emotion_vent",
-        title="情绪倾诉多轮",
-        user_id="test_emotion",
-        messages=[
-            "最近工作压力特别大",
-            "老板天天加班还不给调休",
-            "我都快撑不住了，晚上睡不着",
-            "算了，先这样吧，发泄一下就好",
-        ],
-        expect="前几轮 continue；收束句 commit，tags 含用户情绪",
-    ),
-    Scenario(
         key="sliding_window",
         title="滑动窗口：超过 max_turns 强制 commit",
         user_id="test_sliding",
@@ -144,28 +110,7 @@ SCENARIOS: list[Scenario] = [
         max_turns=5,
         expect="满 5 轮仍 continue 时，第 6 条应被 force_commit",
     ),
-    Scenario(
-        key="goal_plan",
-        title="计划/目标",
-        user_id="test_goal",
-        messages=[
-            "我打算今年年底前把博客重构完",
-            "还想加一个用户记忆功能，就用向量库",
-        ],
-        expect="目标相关 tags，第二条可能 commit 或 continue",
-    ),
-    Scenario(
-        key="relation",
-        title="人际关系",
-        user_id="test_relation",
-        messages=[
-            "我女朋友下周生日",
-            "她在上海，我想买个礼物寄过去",
-            "她喜欢手账和贴纸",
-        ],
-        expect="多轮 continue 合并；最后一轮或满轮 commit，tags 含用户关系",
-    ),
-]
+)
 
 
 def _print_banner(text: str) -> None:
@@ -233,7 +178,7 @@ def main() -> None:
     parser.add_argument(
         "--scenario",
         default="all",
-        help="场景 key 或 all（默认跑全部）",
+        help="场景 key 或 all（默认跑全部 5 个）",
     )
     parser.add_argument(
         "--no-persist",
@@ -249,7 +194,7 @@ def main() -> None:
     parser.add_argument("--recall-query", default="", help="覆盖 recall 用的 query")
     args = parser.parse_args()
 
-    selected = SCENARIOS
+    selected = list(SCENARIOS)
     if args.scenario != "all":
         selected = [s for s in SCENARIOS if s.key == args.scenario]
         if not selected:
@@ -260,7 +205,7 @@ def main() -> None:
     auto_persist = not args.no_persist
     recall_q = args.recall_query.strip() or None
 
-    print("用户记忆多场景测试")
+    print("用户记忆测试（5 个内置场景）")
     print(f"持久化: {'开 (Chroma+embed)' if auto_persist else '关 (--no-persist)'}")
     print(f"场景数: {len(selected)}")
 

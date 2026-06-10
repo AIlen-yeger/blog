@@ -5,6 +5,7 @@ const {
   settings,
   setNoteEnabled,
   setLifeEnabled,
+  setOwnerOnlyVisible,
   setPreviewMaxChars,
   resetToEnvDefaults,
 } = useAgentReplySettings()
@@ -12,9 +13,9 @@ const {
 
 <template>
   <section class="agent-reply-settings" aria-labelledby="agent-reply-settings-title">
-    <h3 id="agent-reply-settings-title" class="section-title">Kohaku 自动回复</h3>
+    <h3 id="agent-reply-settings-title" class="section-title">蕾西亚 自动回复</h3>
     <p class="section-desc">
-      发布笔记或生活记录后，由 Kohaku 根据内容生成回复。可分别开关；卡片上超出字数会显示省略号，完整内容在「阅读全文」中查看。
+      笔记或生活记录发布后，由蕾西亚生成回复。可开关展示、限制预览字数；设置保存在本浏览器。
     </p>
 
     <label class="switch-row">
@@ -32,6 +33,18 @@ const {
         type="checkbox"
         :checked="settings.lifeEnabled"
         @change="setLifeEnabled(($event.target as HTMLInputElement).checked)"
+      />
+    </label>
+
+    <label class="switch-row">
+      <span class="switch-label">
+        蕾西亚回复仅个人可见
+        <span class="switch-hint">开启后仅管理员登录时可见，访客看不到</span>
+      </span>
+      <input
+        type="checkbox"
+        :checked="settings.ownerOnlyVisible"
+        @change="setOwnerOnlyVisible(($event.target as HTMLInputElement).checked)"
       />
     </label>
 
@@ -89,6 +102,14 @@ const {
 
 .switch-label {
   flex: 1;
+}
+
+.switch-hint {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  font-weight: 400;
 }
 
 .number-row input[type='number'] {

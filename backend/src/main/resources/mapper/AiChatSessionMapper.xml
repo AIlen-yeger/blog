@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.personalblog.mapper.AiChatSessionMapper">
+
+    <resultMap id="SessionMap" type="com.personalblog.entity.AiChatSessionEntity">
+        <id column="session_id" property="sessionId"/>
+        <result column="user_id" property="userId"/>
+        <result column="guest_flag" property="guestFlag"/>
+        <result column="title" property="title"/>
+        <result column="msg_count" property="msgCount"/>
+        <result column="last_msg_id" property="lastMsgId"/>
+        <result column="last_active" property="lastActive"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <select id="listByUserId" resultMap="SessionMap">
+        SELECT session_id, user_id, guest_flag, title, msg_count, last_msg_id, last_active, create_time
+        FROM ai_chat_session
+        WHERE user_id = #{userId}
+          AND guest_flag = 0
+        ORDER BY last_active DESC
+    </select>
+
+    <select id="selectBySessionIdAndUserId" resultMap="SessionMap">
+        SELECT session_id, user_id, guest_flag, title, msg_count, last_msg_id, last_active, create_time
+        FROM ai_chat_session
+        WHERE session_id = #{sessionId}
+          AND user_id = #{userId}
+        LIMIT 1
+    </select>
+
+    <insert id="insert">
+        INSERT INTO ai_chat_session (
+            session_id, user_id, guest_flag, title, msg_count, last_msg_id, last_active, create_time
+        )
+        VALUES (
+            #{sessionId}, #{userId}, #{guestFlag}, #{title}, #{msgCount}, #{lastMsgId}, NOW(), NOW()
+        )
+    </insert>
+
+    <update id="updateTitle">
+        UPDATE ai_chat_session
+        SET title = #{title},
+            last_active = NOW()
+        WHERE session_id = #{sessionId}
+          AND user_id = #{userId}
+    </update>
+
+    <delete id="deleteBySessionIdAndUserId">
+        DELETE FROM ai_chat_session
+        WHERE session_id = #{sessionId}
+          AND user_id = #{userId}
+    </delete>
+</mapper>

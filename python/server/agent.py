@@ -5,9 +5,17 @@ from config.config import AgentConfig
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
-from server.prompt_skills import build_system_prompt
+from server.skills_server.prompt_assembler import PromptContext, assemble_chat_system
 from service.chat_history import ChatHistoryService
-from utils.trace_log import answer_log_fields, bind_trace_from_state, log_event, record_model
+from utils.llm_errors import format_llm_user_message
+from utils.log.token_usage import (
+    log_prompt_assembled,
+    record_from_response,
+    record_llm_usage,
+    request_token_summary_fields,
+    usage_from_ai_message,
+)
+from utils.log.trace_log import answer_log_fields, bind_trace_from_state, log_event, record_model
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +56,30 @@ class ChatModel:
             temperature=self.temperature,
             timeout=90,
             max_retries=1,
+            stream_usage=True,
         )
         self.history = ChatHistoryService(config)
+
+    def _build_chat_system(
+        self,
+        *,
+        question: str,
+        user_id: int,
+        channel: str,
+        developer_name: str,
+        intent: str = "chat",
+        user_logged_in: bool = False,
+    ) -> str:
+        return assemble_chat_system(
+            PromptContext(
+                intent=intent or "chat",
+                channel=channel,
+                user_message=question,
+                user_id=user_id,
+                user_logged_in=user_logged_in,
+                developer_name=developer_name or None,
+            )
+        )
 
     def chat(
         self,
@@ -61,17 +91,24 @@ class ChatModel:
         trace_id: str = "",
         channel: str = "web",
         developer_name: str = "",
+        intent: str = "chat",
+        user_logged_in: bool = False,
     ):
         """流式对话：逐 token 产出 SSE delta，结束后写入历史。"""
         bind_trace_from_state(
             {"trace_id": trace_id, "session_id": session_id, "user_id": user_id},
-            intent="chat",
+            intent=intent or "chat",
         )
         record_model(self.model)
         if limit is None:
             limit = AgentConfig().history_limit
-        system_prompt = build_system_prompt(
-            channel=channel, developer_name=developer_name or None
+        system_prompt = self._build_chat_system(
+            question=question,
+            user_id=user_id,
+            channel=channel,
+            developer_name=developer_name,
+            intent=intent,
+            user_logged_in=user_logged_in,
         )
 
         history_message = self.history.get_recent_history(
@@ -85,10 +122,20 @@ class ChatModel:
             *self._to_lc_messages(history_message),
             HumanMessage(content=question),
         ]
+        log_prompt_assembled(
+            phase="chat",
+            system_prompt=system_prompt,
+            intent=intent or "chat",
+            channel=channel,
+        )
 
         full_answer = []
+        stream_usage: tuple[int, int, int] | None = None
         try:
             for chunk in self.chat_llm.stream(messages):
+                u = usage_from_ai_message(chunk)
+                if u:
+                    stream_usage = u
                 content = chunk.content
                 if isinstance(content, str):
                     delta = content
@@ -104,10 +151,7 @@ class ChatModel:
                     yield {"type": "delta", "content": delta}
         except Exception as exc:
             logger.exception("[agent] llm stream failed session_id=%s", session_id)
-            yield {
-                "code": 50000,
-                "message": f"模型调用失败：{exc}。请检查 DP_AGENT_API_KEY 与网络。",
-            }
+            yield {"code": 50000, "message": format_llm_user_message(exc)}
             return
 
         answer = "".join(full_answer).strip()
@@ -117,6 +161,27 @@ class ChatModel:
                 "message": "模型未返回内容，请检查 DP_MODEL 是否为 deepseek-chat 且 API 额度正常",
             }
             return
+
+        if stream_usage:
+            p, c, _ = stream_usage
+            record_llm_usage(
+                phase="chat",
+                model=self.model,
+                prompt_tokens=p,
+                completion_tokens=c,
+                estimated=False,
+                channel=channel,
+                trace_id=trace_id or None,
+            )
+        else:
+            record_from_response(
+                phase="chat",
+                model=self.model,
+                messages=messages,
+                completion_text=answer,
+                channel=channel,
+                trace_id=trace_id or None,
+            )
 
         self.history.save_turn(
             session_id=session_id,
@@ -131,6 +196,7 @@ class ChatModel:
             session_id=session_id,
             user_id=user_id,
             **answer_log_fields(answer),
+            **request_token_summary_fields(trace_id or None),
         )
 
     def chat_once(
@@ -140,24 +206,32 @@ class ChatModel:
         user_id: int,
         limit: int | None = None,
         *,
+        intent: str = "chat",
         trace_id: str = "",
         channel: str = "qq",
         developer_name: str = "",
+        user_logged_in: bool = False,
     ) -> str:
         """非流式对话：QQ 等渠道一次性拿全文。"""
         bind_trace_from_state(
             {"trace_id": trace_id, "session_id": session_id, "user_id": user_id},
-            intent="chat",
+            intent=intent or "chat",
         )
         record_model(self.model)
+
+        system_prompt = self._build_chat_system(
+            question=question,
+            user_id=user_id,
+            channel=channel,
+            developer_name=developer_name,
+            intent=intent,
+            user_logged_in=user_logged_in,
+        )
+
         if limit is None:
             limit = AgentConfig().history_limit
         messages = [
-            SystemMessage(
-                content=build_system_prompt(
-                    channel=channel, developer_name=developer_name or None
-                )
-            ),
+            SystemMessage(content=system_prompt),
             *self._to_lc_messages(
                 self.history.get_recent_history(
                     session_id=session_id,
@@ -167,6 +241,12 @@ class ChatModel:
             ),
             HumanMessage(content=question),
         ]
+        log_prompt_assembled(
+            phase="chat",
+            system_prompt=system_prompt,
+            intent=intent or "chat",
+            channel=channel,
+        )
         try:
             resp = self.chat_llm.invoke(messages)
             content = resp.content
@@ -180,10 +260,20 @@ class ChatModel:
                 answer = str(content or "").strip()
         except Exception as exc:
             logger.exception("[agent] llm invoke failed session_id=%s", session_id)
-            return f"模型调用失败：{exc}。请检查 DP_AGENT_API_KEY 与网络。"
+            return format_llm_user_message(exc)
 
         if not answer:
             return "模型未返回内容，请检查 DP_MODEL 是否为 deepseek-chat 且 API 额度正常"
+
+        record_from_response(
+            phase="chat",
+            model=self.model,
+            messages=messages,
+            response=resp,
+            completion_text=answer,
+            channel=channel,
+            trace_id=trace_id or None,
+        )
 
         self.history.save_turn(
             session_id=session_id,
@@ -198,6 +288,7 @@ class ChatModel:
             session_id=session_id,
             user_id=user_id,
             **answer_log_fields(answer),
+            **request_token_summary_fields(trace_id or None),
         )
         return answer
 

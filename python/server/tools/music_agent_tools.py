@@ -11,7 +11,7 @@ from langchain_core.tools import tool
 from utils.qq import qq_music_tools as qq
 from utils.mcp.registry import is_mcp_enabled
 from utils.mcp.web_search import search_song_background_story_sync
-from utils.trace_log import log_event, preview
+from utils.log.trace_log import log_event, preview
 
 _QQ_URL_RE = re.compile(r"(y\.qq\.com|i\.qq\.com)", re.I)
 
@@ -82,7 +82,6 @@ def search_song_story_on_web(title: str, artist: str = "") -> str:
     """搜索歌曲创作背景、灵感或轶事。
     仅当用户明确询问背景、故事、灵感、听歌简报或情绪分析时调用。
     禁止在：仅添加歌曲、仅发 QQ 链接、仅说「加歌/保存」时调用。"""
-    from config.config import AgentConfig
 
     if not is_mcp_enabled("sogou"):
         return json.dumps(

@@ -1,6 +1,7 @@
 package com.personalblog.controller;
 
 import com.personalblog.common.ApiResponse;
+import com.personalblog.dto.DocumentUploadResultDto;
 import com.personalblog.dto.ImageUploadResultDto;
 import com.personalblog.service.ContentUploadService;
 import lombok.RequiredArgsConstructor;
@@ -24,5 +25,12 @@ public class UploadController {
     public ApiResponse<ImageUploadResultDto> uploadContentImage(@RequestParam("file") MultipartFile file)
             throws IOException {
         return ApiResponse.ok(contentUploadService.uploadImage(file));
+    }
+
+    /** Agent 对话附件：pdf / md / txt / docx（需管理员登录） */
+    @PostMapping("/documents")
+    public ApiResponse<DocumentUploadResultDto> uploadDocument(@RequestParam("file") MultipartFile file)
+            throws IOException {
+        return ApiResponse.ok(contentUploadService.uploadDocument(file));
     }
 }

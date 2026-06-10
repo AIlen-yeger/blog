@@ -10,9 +10,9 @@ from typing import Any
 
 from server.route_graph.bug_route import run_bug_react
 from server.state import AgentState
-from utils.agent_log_config import resolve_log_dir, state_dir
-from utils.agent_log_reader import list_recent_errors
-from utils.trace_log import log_event, new_trace_id, preview
+from utils.log.agent_log_config import resolve_log_dir, state_dir
+from utils.log.agent_log_reader import list_recent_errors
+from utils.log.trace_log import log_event, new_trace_id, preview
 
 logger = logging.getLogger(__name__)
 
@@ -185,8 +185,8 @@ def build_ops_task_message(
         lines.append(f"日志事件: {log_event_name}")
     lines.append(f"现象摘要: {symptoms}")
     lines.append(
-        "请：读取相关日志 → 分析根因 → update_incident_record → "
-        "若需人工处理则 notify_developer(severity 与现象一致)。"
+        "请：读取相关日志 → 分析根因 → 更新 incident → "
+        "若需人工处理则以蕾西亚口吻 notify_developer（title/message 简短、准确，severity 与现象一致）。"
     )
     return "\n".join(lines)
 

@@ -13,7 +13,7 @@ from typing import Any
 from config.config import AgentConfig
 from server.qq.message_format import QQ_DCA_COMMAND_MAX_CHARS, finalize_qq_reply
 from utils.world_lexicon import BTC_USER_ALIASES, COIN_BTC_DISPLAY, CURRENCY_USDT_DISPLAY
-from utils.agent_log_config import state_dir
+from utils.log.agent_log_config import state_dir
 
 logger = logging.getLogger(__name__)
 

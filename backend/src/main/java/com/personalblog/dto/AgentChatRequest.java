@@ -5,6 +5,9 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Data
 public class AgentChatRequest {
 
@@ -17,4 +20,6 @@ public class AgentChatRequest {
     @Min(value = 1, message = "limit 至少为 1")
     @Max(value = 50, message = "limit 不能超过 50")
     private int limit = 5;
+
+    private List<AgentAttachmentDto> attachments = new ArrayList<>();
 }

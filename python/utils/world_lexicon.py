@@ -7,13 +7,11 @@ import re
 COIN_BTC_DISPLAY = "纠缠之缘"
 CURRENCY_USDT_DISPLAY = "原石"
 
-# 注入 system prompt 的共用说明（各 AiCoin 段落前会带 preamble）
-WORLD_LEXICON_PROMPT = f"""## 世界观用词（对用户输出，硬约束）
-
-- **{COIN_BTC_DISPLAY}**：对外代替 BTC、比特币、btc；工具参数仍用 BTC，JSON 字段名不变。
-- **{CURRENCY_USDT_DISPLAY}**：对外代替 USDT、稳定币计价单位；口语里的「U」「多少 u」也写成 {CURRENCY_USDT_DISPLAY}。
-- 美元现价可继续用 $ 或「美元」；**禁止**在对用户回复里再写 BTC、比特币、USDT（除非用户明确在问技术名词）。
-- ETH 等其他币种名称不改。"""
+# 注入 system skills 的共用说明（各 AiCoin 段落前会带 preamble）
+WORLD_LEXICON_PROMPT = (
+    f"对用户：BTC/比特币→{COIN_BTC_DISPLAY}，USDT/U→{CURRENCY_USDT_DISPLAY}；"
+    f"工具/JSON 仍用 BTC/USDT。禁对用户写 BTC/USDT（除非用户问技术名）。ETH 不改。"
+)
 
 # 识别用户是否在说纠缠之缘 / 原石
 BTC_USER_ALIASES = ("btc", "比特币", COIN_BTC_DISPLAY)

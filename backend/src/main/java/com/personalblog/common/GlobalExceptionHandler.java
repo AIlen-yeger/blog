@@ -102,7 +102,7 @@ public class GlobalExceptionHandler {
         return switch (ec) {
             case UNAUTHORIZED -> HttpStatus.UNAUTHORIZED;
             case FORBIDDEN, QUIET_HOURS -> HttpStatus.FORBIDDEN;
-            case NOTE_NOT_FOUND, LIFE_NOT_FOUND, ACCOUNT_NOT_REGISTERED -> HttpStatus.NOT_FOUND;
+            case NOTE_NOT_FOUND, LIFE_NOT_FOUND, ACCOUNT_NOT_REGISTERED, AGENT_SESSION_NOT_FOUND -> HttpStatus.NOT_FOUND;
             case EMAIL_ALREADY_REGISTERED -> HttpStatus.CONFLICT;
             case CODE_SEND_TOO_FREQUENT, CODE_DAILY_LIMIT -> HttpStatus.TOO_MANY_REQUESTS;
             case MAIL_SEND_FAILED -> HttpStatus.INTERNAL_SERVER_ERROR;

@@ -19,8 +19,8 @@ spring:
       timeout: 3000ms
   servlet:
     multipart:
-      max-file-size: 5MB
-      max-request-size: 10MB
+      max-file-size: 10MB
+      max-request-size: 12MB
   mail:
     host: smtp.qq.com
     port: 465
@@ -71,6 +71,7 @@ app:
   upload:
     avatar-dir: ./uploads/avatars
     content-dir: ./uploads/content
+    document-dir: ./uploads/documents
   music:
     weekly-window-days: 7
     daily-key-ttl-days: 8

@@ -10,9 +10,9 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from config.config import AgentConfig
 from database.mysql.mysql_db import MysqlRepo
 from server.agent import ChatModel
-from server.prompt_skills import build_system_prompt
+from server.skills_server.prompt_assembler import assemble_for_state
 from server.route_graph.react_subgraph import (
-    DEFAULT_MAX_REACT_ROUNDS,
+    effective_max_react_rounds,
     compile_react_graph,
     count_tool_rounds,
     extract_final_answer,
@@ -20,7 +20,7 @@ from server.route_graph.react_subgraph import (
 from server.state import AgentState
 from server.tools.bug_agent_tools import build_bug_tools
 from service.chat_history import ChatHistoryService
-from utils.trace_log import bind_trace, log_event, new_trace_id, preview, span
+from utils.log.trace_log import bind_trace, log_event, new_trace_id, preview, span
 
 _DEFAULT_HISTORY_LIMIT = AgentConfig().history_limit
 
@@ -35,7 +35,7 @@ def _resolve_bug_ids(state: AgentState) -> tuple[str, str]:
 
 
 def _build_initial_messages(state: AgentState) -> list:
-    system = build_system_prompt(intent="bug", user_logged_in=False)
+    system = assemble_for_state(state, intent="bug")
     _, bug_session_id = _resolve_bug_ids(state)
     msgs: list = [SystemMessage(content=system)]
     limit = int(state.get("limit") or _DEFAULT_HISTORY_LIMIT)
@@ -55,7 +55,7 @@ def _bug_react_graph(mode: str = "general"):
         tools=build_bug_tools(mode=mode),
         build_initial_messages=_build_initial_messages,
         subgraph="bug",
-        max_rounds=DEFAULT_MAX_REACT_ROUNDS,
+        max_rounds=effective_max_react_rounds(),
     )
 
 

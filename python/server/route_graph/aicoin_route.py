@@ -6,8 +6,9 @@ import logging
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from config.config import AgentConfig
 from server.agent import ChatModel
-from server.prompt_skills import build_system_prompt
+from server.skills_server.prompt_assembler import assemble_for_state
 from server.qq.market_pipeline import env_two_phase_enabled
 from server.qq.reply_format import (
     build_qq_aicoin_system_append,
@@ -15,7 +16,7 @@ from server.qq.reply_format import (
     qq_aicoin_max_rounds,
 )
 from server.route_graph.react_subgraph import (
-    DEFAULT_MAX_REACT_ROUNDS,
+    effective_max_react_rounds,
     compile_react_graph,
     count_tool_rounds,
     extract_final_answer,
@@ -23,7 +24,12 @@ from server.route_graph.react_subgraph import (
 from server.state import AgentState
 from server.tools.aicoin_agent_tools import build_aicoin_tools
 from service.chat_history import ChatHistoryService
-from utils.trace_log import bind_trace, log_event, preview, span
+from utils.log.token_usage import (
+    log_prompt_assembled,
+    record_react_conversation,
+    request_token_summary_fields,
+)
+from utils.log.trace_log import bind_trace, log_event, preview, span
 from utils.world_lexicon import apply_world_lexicon
 
 _DEFAULT_AICOIN_HISTORY_LIMIT = 4
@@ -32,19 +38,16 @@ logger = logging.getLogger(__name__)
 
 
 def _build_initial_messages(state: AgentState) -> list:
-    logged_in = bool((state.get("access_token") or "").strip())
     channel = (state.get("channel") or "web").strip().lower()
     question = (state.get("question") or "").strip()
-    system = build_system_prompt(
+    append = build_qq_aicoin_system_append(question) if channel == "qq" else ""
+    system = assemble_for_state(state, intent="aicoin", system_append=append)
+    log_prompt_assembled(
+        phase="aicoin",
+        system_prompt=system,
         intent="aicoin",
-        user_logged_in=logged_in,
         channel=channel,
-        developer_name=(state.get("user_name") or "").strip() or None,
     )
-    if channel == "qq":
-        system = "\n\n---\n\n".join(
-            part for part in (system, build_qq_aicoin_system_append(question)) if part
-        )
     msgs: list = [SystemMessage(content=system)]
     session_id = state.get("session_id") or ""
     user_id = int(state.get("user_id") or 0)
@@ -112,7 +115,7 @@ def run_aicoin_react(
     max_rounds = (
         qq_aicoin_max_rounds(question)
         if channel == "qq"
-        else DEFAULT_MAX_REACT_ROUNDS
+        else effective_max_react_rounds()
     )
 
     graph = compile_react_graph(
@@ -133,15 +136,23 @@ def run_aicoin_react(
 
     raw = extract_final_answer(messages) or "处理完成。"
     final = format_qq_market_reply(raw) if channel == "qq" else apply_world_lexicon(raw)
+    rounds = count_tool_rounds(messages)
+    record_react_conversation(
+        subgraph="aicoin",
+        model=AgentConfig().react_model_name,
+        messages=messages,
+        tool_rounds=rounds,
+    )
     log_event(
         "react.done",
         subgraph="aicoin",
         channel=channel,
         max_rounds=max_rounds,
         tool_count=len(tools),
-        rounds=count_tool_rounds(messages),
+        rounds=rounds,
         final_preview=preview(final),
         message_count=len(messages),
+        **request_token_summary_fields(),
     )
 
     session_id = state.get("session_id") or ""

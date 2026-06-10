@@ -1,4 +1,4 @@
-"""QQ 渠道 AiCoin：① 轻量 ReAct 采集 JSON → ② chat 模型润色为 Kohaku 口语。"""
+"""QQ 渠道 AiCoin：① 轻量 ReAct 采集 JSON → ② chat 模型润色为蕾西亚口语。"""
 
 from __future__ import annotations
 
@@ -10,7 +10,11 @@ from typing import Any
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from server.agent import ChatModel
-from server.prompt_skills import build_system_prompt, read_aicoin_skill
+from server.prompt_skills import read_aicoin_skill
+from server.skills_server.prompt_assembler import (
+    PromptContext,
+    assemble_system_prompt,
+)
 from server.qq.message_format import QQ_MARKET_REPLY_MAX_CHARS
 from server.qq.reply_format import format_qq_market_reply, qq_aicoin_max_rounds
 from server.route_graph.react_subgraph import (
@@ -26,7 +30,7 @@ from utils.ahr999 import (
     enrich_facts_with_ahr999,
     tool_texts_from_messages,
 )
-from utils.trace_log import log_event, preview, span
+from utils.log.trace_log import log_event, preview, span
 
 logger = logging.getLogger(__name__)
 
@@ -124,13 +128,16 @@ def _run_chat_polish(
     question = (state.get("question") or "").strip()
     developer = (state.get("user_name") or "").strip() or None
 
-    system = build_system_prompt(
-        intent="chat",
-        channel="qq",
-        developer_name=developer,
+    system = assemble_system_prompt(
+        PromptContext(
+            intent="chat",
+            channel="qq",
+            user_message=question,
+            user_id=int(state.get("user_id") or 0),
+            developer_name=developer,
+            system_append=read_aicoin_skill("qq_tone"),
+        ),
     )
-    polish_rules = read_aicoin_skill("qq_tone")
-    system = "\n\n---\n\n".join(p for p in (system, polish_rules) if p)
 
     limit = min(int(state.get("limit") or 4), 4)
     history = []
@@ -150,7 +157,7 @@ def _run_chat_polish(
     human = (
         f"用户原话：{question}\n\n"
         f"{format_facts_block(facts)}\n\n"
-        "请根据以上**只读**行情数据，用 Kohaku 在 QQ 里的口语回复用户。"
+        "请根据以上**只读**行情数据，用蕾西亚在 QQ 里的口语回复用户。"
         f"数字不得修改或编造；1～3 句、约 {QQ_MARKET_REPLY_MAX_CHARS} 字内；无 Markdown。"
         "对用户称纠缠之缘、原石。"
         f"{ahr999_rule}"

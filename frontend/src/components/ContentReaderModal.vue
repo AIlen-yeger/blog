@@ -30,7 +30,7 @@ const emit = defineEmits<{
 }>()
 
 const trackOpen = ref(false)
-const { shouldShowReply } = useAgentReplySettings()
+const { shouldShowReply, isGenerating, canViewAgentReply } = useAgentReplySettings()
 
 const showAgentReply = computed(() =>
   props.item ? shouldShowReply(props.kind, props.item.agentReply) : false,
@@ -38,8 +38,10 @@ const showAgentReply = computed(() =>
 
 const agentReplyGenerating = computed(() => {
   if (!props.item) return false
-  const st = (props.item.agentReplyStatus || '').toLowerCase()
-  return (st === 'pending' || st === 'running') && !props.item.agentReply?.trim()
+  return (
+    canViewAgentReply(props.kind) &&
+    isGenerating(props.item.agentReplyStatus, props.item.agentReply)
+  )
 })
 
 const { viewCount } = useContentViewTracking(
@@ -88,7 +90,7 @@ watch(viewCount, (n) => emit('view-count', n))
           </header>
           <div class="reader-body">
             <div class="content">{{ item.content }}</div>
-            <p v-if="agentReplyGenerating" class="agent-reply-pending">Kohaku 正在写回复…</p>
+            <p v-if="agentReplyGenerating" class="agent-reply-pending">蕾西亚正在写回复…</p>
             <AgentReplyBlock
               v-if="showAgentReply && item.agentReply"
               :kind="kind"

@@ -9,7 +9,7 @@
   python scripts/test_channel_reply.py --channel qq --question "在干嘛呀"
 
   # 对比同一句在 web / qq 下的 system 提示词（不调模型）
-  python scripts/test_channel_reply.py --show-prompt --intent aicoin
+  python scripts/test_channel_reply.py --show-skills --intent aicoin
 
   # 强制意图，跳过 judge
   python scripts/test_channel_reply.py --channel qq --intent aicoin --question "eth走势"
@@ -65,7 +65,7 @@ def _print_prompt(*, channel: str, intent: str) -> None:
         channel=channel,
         developer_name="开发者",
     )
-    print(f"\n=== system prompt · channel={channel} intent={intent or 'chat'} ===\n")
+    print(f"\n=== system skills · channel={channel} intent={intent or 'chat'} ===\n")
     print(text)
     print(f"\n--- len={len(text)} chars ---\n")
 
@@ -76,12 +76,12 @@ def main() -> None:
     parser.add_argument("--question", default="btc现在多少钱")
     parser.add_argument("--intent", default="", help="force_intent，如 aicoin / chat / music")
     parser.add_argument(
-        "--show-prompt",
+        "--show-skills",
         action="store_true",
         help="只打印 system 提示词，不调用模型",
     )
     parser.add_argument(
-        "--compare-prompt",
+        "--compare-skills",
         action="store_true",
         help="打印 web 与 qq 的 aicoin system 提示词对比",
     )
@@ -99,7 +99,7 @@ def main() -> None:
 
     ensure_env_loaded()
     from utils.mcp.registry import reload_mcp_configs
-    from utils.trace_log import setup_agent_logging
+    from utils.log.trace_log import setup_agent_logging
 
     setup_agent_logging()
     reload_mcp_configs()

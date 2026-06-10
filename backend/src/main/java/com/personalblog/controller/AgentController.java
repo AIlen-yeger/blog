@@ -60,7 +60,8 @@ public class AgentController {
                     displayName(user),
                     role,
                     request.getLimit(),
-                    resolveBearerToken(httpRequest)
+                    resolveBearerToken(httpRequest),
+                    request.getAttachments() != null ? request.getAttachments() : java.util.List.of()
             );
 
             StreamingResponseBody body = outputStream -> {

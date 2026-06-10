@@ -13,24 +13,39 @@ from typing import Any, Literal
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
-from config.config import AgentConfig
+from config.config import AgentConfig, embedding_configured, normalize_openai_base_url
+from database.redis.redis_episode import EpisodeState, RedisEpisodeStore
 from server.embedding.embedding import EmbeddingClient
 from server.embedding.memory_chroma_store import MemoryChromaStore, MemoryRecallHit
+from utils.log.token_usage import record_from_response
+from utils.log.trace_log import log_event, record_model
 from utils.path_tools import get_abs_path
 
 logger = logging.getLogger(__name__)
 
+
+def _summary_llm_recoverable(exc: BaseException) -> bool:
+    """余额不足、限流等：记忆子图降级，不阻断主对话。"""
+    name = type(exc).__name__
+    if name in ("APIStatusError", "RateLimitError", "AuthenticationError"):
+        return True
+    msg = str(exc).lower()
+    return any(
+        k in msg
+        for k in (
+            "insufficient balance",
+            "402",
+            "429",
+            "rate limit",
+            "quota",
+            "余额",
+        )
+    )
+
+
 MemoryAction = Literal["continue", "commit", "split"]
 
 _user_memory_singleton: UserMemory | None = None
-
-
-@dataclass
-class EpisodeState:
-    """当前进行中的话题缓冲（按 user_id 分桶）。"""
-
-    running_summary: str = ""
-    turns: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -115,10 +130,11 @@ class UserMemory:
     def __init__(self, *, max_turns: int = 8, auto_persist: bool = True) -> None:
         config = AgentConfig()
         self.embedding = EmbeddingClient()
+        model_name = (config.chat_model_name or "deepseek-chat").strip()
         self.summary_model = ChatOpenAI(
-            model=config.chat_model_name,
+            model=model_name,
             api_key=config.chat_api_key,
-            base_url=config.chat_base_url,
+            base_url=normalize_openai_base_url(config.chat_base_url),
             temperature=0,
             timeout=90,
             max_retries=1,
@@ -126,25 +142,25 @@ class UserMemory:
         self._max_turns = max(2, max_turns)
         self._auto_persist = auto_persist
         self._system_prompt = self._load_summary_prompt()
-        self._episodes: dict[str, EpisodeState] = {}
+        self._episode_store = RedisEpisodeStore(config)
         self._chroma: MemoryChromaStore | None = None
         if config.chroma_memory_enabled:
             self._chroma = MemoryChromaStore()
 
     def _load_summary_prompt(self) -> str:
-        return get_abs_path("prompt/summary.md").read_text(encoding="utf-8")
+        return get_abs_path("skills/summary.md").read_text(encoding="utf-8")
 
     def _episode_key(self, user_id: int | str) -> str:
         return str(user_id or "default")
 
     def get_episode(self, user_id: int | str = 0) -> EpisodeState:
-        key = self._episode_key(user_id)
-        if key not in self._episodes:
-            self._episodes[key] = EpisodeState()
-        return self._episodes[key]
+        return self._episode_store.get(user_id)
+
+    def _save_episode(self, user_id: int | str, episode: EpisodeState) -> None:
+        self._episode_store.set(user_id, episode)
 
     def reset_episode(self, user_id: int | str = 0) -> None:
-        self._episodes.pop(self._episode_key(user_id), None)
+        self._episode_store.delete(user_id)
 
     def memory_count(self, user_id: int | str | None = None) -> int:
         if not self._chroma:
@@ -171,7 +187,15 @@ class UserMemory:
             SystemMessage(content=self._system_prompt),
             HumanMessage(content=self._build_user_payload(episode, message)),
         ]
+        cfg = AgentConfig()
+        record_model(cfg.summary_model_name or cfg.chat_model_name)
         resp = self.summary_model.invoke(messages)
+        record_from_response(
+            phase="memory.summary",
+            model=cfg.summary_model_name or cfg.chat_model_name,
+            messages=messages,
+            response=resp,
+        )
         content = resp.content if isinstance(resp.content, str) else str(resp.content)
         return _parse_summary_llm_output(content)
 
@@ -253,11 +277,13 @@ class UserMemory:
         top_k: int = 5,
         channel: str | None = None,
     ) -> list[MemoryRecallHit]:
-        """按 user_id 过滤的语义检索（用于拼 system prompt）。"""
+        """按 user_id 过滤的语义检索（用于拼 system skills）。"""
         q = (query or "").strip()
-        if not q or not self._chroma:
+        if not q or not self._chroma or not embedding_configured():
             return []
         vector = self.embedding.embed_query(q)
+        if not vector:
+            return []
         return self._chroma.query(user_id, vector, top_k=top_k, channel=channel)
 
     def format_recall_for_prompt(
@@ -303,8 +329,23 @@ class UserMemory:
 
         try:
             out = self._invoke_summary(episode, text)
-        except Exception:
+        except Exception as exc:
+            if _summary_llm_recoverable(exc):
+                if episode.turns and episode.turns[-1] == text:
+                    episode.turns.pop()
+                logger.warning(
+                    "[user_memory] summary skipped (recoverable) user_id=%s err=%s",
+                    user_id,
+                    str(exc)[:200],
+                )
+                return MemoryProcessResult(
+                    action="continue",
+                    running_summary=episode.running_summary,
+                    committed_memory=None,
+                )
             logger.exception("[user_memory] summary llm failed user_id=%s", user_id)
+            if episode.turns and episode.turns[-1] == text:
+                episode.turns.pop()
             raise
 
         action = out.action
@@ -332,6 +373,7 @@ class UserMemory:
                 extra_summary=extra,
             )
             self._maybe_persist(user_id, result, channel=channel, raw_turns=turns_snapshot)
+            self._save_episode(user_id, episode)
             return result
 
         if action == "commit":
@@ -339,6 +381,7 @@ class UserMemory:
             if topic_shift and not episode_complete:
                 episode.running_summary = ""
                 episode.turns = [text]
+                self._save_episode(user_id, episode)
             else:
                 self.reset_episode(user_id)
             result = MemoryProcessResult(
@@ -355,6 +398,7 @@ class UserMemory:
 
         if running:
             episode.running_summary = running
+        self._save_episode(user_id, episode)
         return MemoryProcessResult(
             action="continue",
             running_summary=episode.running_summary,

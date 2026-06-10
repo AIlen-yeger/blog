@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.personalblog.mapper.AiChatMessageMapper">
+
+    <resultMap id="MessageMap" type="com.personalblog.entity.AiChatMessageEntity">
+        <id column="id" property="id"/>
+        <result column="session_id" property="sessionId"/>
+        <result column="user_id" property="userId"/>
+        <result column="channel" property="channel"/>
+        <result column="role" property="role"/>
+        <result column="content" property="content"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <select id="listBySession" resultMap="MessageMap">
+        SELECT id, session_id, user_id, channel, role, content, create_time
+        FROM ai_chat_message
+        WHERE session_id = #{sessionId}
+          AND user_id = #{userId}
+          AND channel = #{channel}
+        ORDER BY id ASC
+    </select>
+
+    <delete id="deleteBySessionIdAndUserId">
+        DELETE FROM ai_chat_message
+        WHERE session_id = #{sessionId}
+          AND user_id = #{userId}
+          AND channel = #{channel}
+    </delete>
+</mapper>

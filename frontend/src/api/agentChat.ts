@@ -1,7 +1,10 @@
 import { ApiError, getApiBase } from '@/api/http'
 import { toUserErrorMessage } from '@/utils/userErrorMessage'
 import { getAuthToken, hasValidSession } from '@/composables/useSession'
-import { buildAgentChatPayload } from '@/utils/agentPayload'
+import {
+  buildAgentChatPayload,
+  type AgentAttachmentPayload,
+} from '@/utils/agentPayload'
 
 export interface ChatTurn {
   role: 'user' | 'assistant'
@@ -39,11 +42,28 @@ async function mockStreamReply(
   }
 }
 
-export interface AgentChatStreamOptions {
-  onMeta?: (meta: { intent?: string }) => void
+export interface PublishNotePreviewData {
+  title: string
+  excerpt: string
+  topicTitle: string
+  contentPreview: string
+  content: string
+  attachmentNames?: string
+  sessionId?: string
 }
 
-function handleSsePayload(payload: unknown, onChunk: (piece: string) => void, onMeta?: AgentChatStreamOptions['onMeta']) {
+export interface AgentChatStreamOptions {
+  onMeta?: (meta: { intent?: string }) => void
+  onActionPreview?: (preview: { action: string; data: PublishNotePreviewData }) => void
+}
+
+function handleSsePayload(
+  payload: unknown,
+  onChunk: (piece: string) => void,
+  options?: AgentChatStreamOptions,
+) {
+  const onMeta = options?.onMeta
+  const onActionPreview = options?.onActionPreview
   if (!payload || typeof payload !== 'object') return
   const row = payload as Record<string, unknown>
   if (typeof row.code === 'number' && row.code !== 0) {
@@ -55,6 +75,14 @@ function handleSsePayload(payload: unknown, onChunk: (piece: string) => void, on
     onMeta?.({ intent })
     return
   }
+  if (type === 'action_preview') {
+    const action = typeof row.action === 'string' ? row.action : ''
+    const data = row.data as PublishNotePreviewData | undefined
+    if (action && data && typeof data.title === 'string') {
+      onActionPreview?.({ action, data })
+    }
+    return
+  }
   const piece = extractPiece(payload)
   if (piece) onChunk(piece)
 }
@@ -62,7 +90,7 @@ function handleSsePayload(payload: unknown, onChunk: (piece: string) => void, on
 function parseSseChunk(
   buffer: string,
   onChunk: (piece: string) => void,
-  onMeta?: AgentChatStreamOptions['onMeta'],
+  options?: AgentChatStreamOptions,
 ): string {
   let rest = buffer
   const lines = rest.split('\n')
@@ -74,7 +102,7 @@ function parseSseChunk(
       const data = trimmed.slice(5).trim()
       if (!data || data === '[DONE]') continue
       try {
-        handleSsePayload(JSON.parse(data), onChunk, onMeta)
+        handleSsePayload(JSON.parse(data), onChunk, options)
       } catch (e) {
         if (e instanceof Error && e.message !== 'Agent 返回错误') {
           onChunk(data)
@@ -85,7 +113,7 @@ function parseSseChunk(
       continue
     }
     try {
-      handleSsePayload(JSON.parse(trimmed), onChunk, onMeta)
+      handleSsePayload(JSON.parse(trimmed), onChunk, options)
     } catch {
       /* 忽略非 JSON 行 */
     }
@@ -112,11 +140,16 @@ function extractPiece(payload: unknown): string {
   return typeof piece === 'string' ? piece : ''
 }
 
+export interface AgentChatStreamContext extends AgentChatStreamOptions {
+  sessionId?: string
+  attachments?: AgentAttachmentPayload[]
+}
+
 export async function streamAgentChat(
   messages: ChatTurn[],
   onChunk: (piece: string) => void,
   signal?: AbortSignal,
-  options?: AgentChatStreamOptions,
+  options?: AgentChatStreamContext,
 ): Promise<void> {
   const lastUser = [...messages].reverse().find((m) => m.role === 'user')
   const question = lastUser?.content?.trim() ?? ''
@@ -147,7 +180,9 @@ export async function streamAgentChat(
       Accept: 'text/event-stream',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify(buildAgentChatPayload(question)),
+    body: JSON.stringify(
+      buildAgentChatPayload(question, options?.sessionId, options?.attachments),
+    ),
     signal,
   })
 
@@ -167,7 +202,7 @@ export async function streamAgentChat(
   const ctype = res.headers.get('content-type') ?? ''
   if (!ctype.includes('text/event-stream') || !res.body) {
     const json = (await res.json()) as Record<string, unknown>
-    handleSsePayload(json, onChunk, options?.onMeta)
+    handleSsePayload(json, onChunk, options)
     return
   }
 
@@ -181,6 +216,6 @@ export async function streamAgentChat(
     pending += decoder.decode(value, { stream: true })
     pending = parseSseChunk(pending, (piece) => {
       if (piece) onChunk(piece)
-    }, options?.onMeta)
+    }, options)
   }
 }

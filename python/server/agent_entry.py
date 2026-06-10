@@ -11,13 +11,18 @@ from dataclasses import dataclass
 from typing import Literal
 
 from config.config import AgentConfig
+from server.embedding.embedding_user_memory import get_user_memory
 from server.intent_router import IntentRouter, intent_from_question
 from server.route_graph.comment_route import run_note_comment
 from server.aicoin_access import aicoin_allowed_for_state
 from server.route_graph.aicoin_route import run_aicoin_react
 from server.route_graph.music_route import run_music_react
+from server.route_graph.orchestrator_graph import run_orchestrator, should_orchestrate
+from server.route_graph.publish_note_route import run_publish_note_preview
 from server.state import AgentState
-from utils.trace_log import (
+from utils.judge_intent.quick_judge import should_skip_memory_pipeline
+from utils.log.token_usage import begin_request_tokens, finish_request_tokens
+from utils.log.trace_log import (
     bind_trace,
     bind_trace_from_state,
     log_event,
@@ -51,7 +56,7 @@ def canonical_intent(intent: str) -> str:
 def output_mode_for(intent: str, channel: str) -> OutputMode:
     ch = (channel or "web").strip().lower()
     it = canonical_intent(intent)
-    if ch == "web" and it in ("chat", "music"):
+    if ch == "web" and it in ("chat", "music", "publish_note", "orchestrate"):
         return "stream"
     return "once"
 
@@ -109,6 +114,7 @@ class AgentEntry:
         account: str = "",
         user_role: str = "",
         friend_qq: str = "",
+        attachments: list | None = None,
     ) -> AgentReplyResult:
         ch = (channel or "web").strip().lower()
         tid = trace_id or new_trace_id()
@@ -126,11 +132,25 @@ class AgentEntry:
             "friend_qq": "".join(c for c in (friend_qq or "").strip() if c.isdigit()),
             "note_id": (note_id or "").strip(),
             "note_title": (note_title or "").strip(),
+            "attachments": list(attachments or []),
         }
 
         bind_trace(trace_id=tid, session_id=session_id, user_id=user_id)
+        begin_request_tokens(tid)
 
+        #测试/调试强制路由，跳过 judge
         forced = canonical_intent(force_intent) if (force_intent or "").strip() else ""
+
+        if forced == "orchestrate" or (not forced and should_orchestrate(state)):
+            orch = run_orchestrator(state)
+            if not orch.get("delegate_chat"):
+                return AgentReplyResult(
+                    intent="orchestrate",
+                    output_mode="stream",
+                    channel=ch,
+                    _body_stream=self._stream_orchestrator(orch),
+                )
+
         if forced:
             intent = forced
             log_event(
@@ -138,6 +158,7 @@ class AgentEntry:
                 intent=intent,
                 question_preview=preview(question, 120),
             )
+
         else:
             # 1. 意图 judge（失败则用关键词兜底）
             with span("intent.classify"):
@@ -178,18 +199,36 @@ class AgentEntry:
             question_preview=preview(question, 120),
         )
 
+        if intent == "chat" and not should_skip_memory_pipeline(question):
+            try:
+                get_user_memory().process_user_message(
+                    question,
+                    user_id=user_id,
+                    channel=ch,
+                )
+            except Exception:
+                logger.exception(
+                    "[agent] memory pipeline failed user_id=%s session_id=%s",
+                    user_id,
+                    session_id,
+                )
+
         # 2. intent × channel → 输出形态 + 分支执行
         mode = output_mode_for(intent, ch)
         log_event("reply.route", intent=intent, channel=ch, output_mode=mode)
 
+
+        #上面确认路由，经过路由模型判断，下面是根据流式还是非流式来选择执行对应路由下的方法
         if mode == "once":
             handler = self._ONCE_HANDLERS.get(intent, self._once_chat)
-            return AgentReplyResult(
+            result = AgentReplyResult(
                 intent=intent,
                 output_mode="once",
                 channel=ch,
                 text=handler(self, state),
             )
+            finish_request_tokens(tid)
+            return result
 
         stream_handler = self._STREAM_HANDLERS.get(intent, self._stream_chat)
         return AgentReplyResult(
@@ -207,9 +246,11 @@ class AgentEntry:
                 session_id=state["session_id"],
                 user_id=state["user_id"],
                 limit=int(state.get("limit") or _DEFAULT_HISTORY_LIMIT),
+                intent=state.get("intent") or "chat",
                 trace_id=state.get("trace_id") or "",
                 channel=(state.get("channel") or "qq").strip().lower(),
                 developer_name=(state.get("user_name") or "").strip(),
+                user_logged_in=bool((state.get("access_token") or "").strip()),
             )
         except Exception as exc:
             logger.exception("[agent] chat failed session_id=%s", state.get("session_id"))
@@ -228,6 +269,18 @@ class AgentEntry:
         result = run_note_comment(state)
         return (result.get("final_answer") or "").strip() or "笔记回复生成失败，请稍后刷新。"
 
+    def _once_aicoin(self, state: AgentState) -> str:
+        bind_trace_from_state(state, intent="aicoin")
+        try:
+            result = run_aicoin_react(state, chat_model=self.chat_model)
+            return (result.get("final_answer") or "").strip() or "处理完成"
+        except Exception:
+            logger.exception("[agent] aicoin failed session_id=%s", state.get("session_id"))
+            return "行情助手暂时不可用，请稍后再试。"
+
+
+
+
     def run_note_comment_job(
         self,
         *,
@@ -240,7 +293,7 @@ class AgentEntry:
         trace_id: str = "",
         job_id: str = "",
     ) -> dict:
-        """笔记发布后内部任务：生成 Kohaku 回复并写入 Java notes.agent_reply。"""
+        """笔记发布后内部任务：生成蕾西亚回复并写入 Java notes.agent_reply。"""
         tid = trace_id or new_trace_id()
         state: AgentState = {
             "question": question,
@@ -255,16 +308,9 @@ class AgentEntry:
             "job_id": (job_id or "").strip(),
         }
         bind_trace(trace_id=tid, session_id=session_id, user_id=user_id, intent="commit_user")
+        begin_request_tokens(tid)
         return run_note_comment(state)
 
-    def _once_aicoin(self, state: AgentState) -> str:
-        bind_trace_from_state(state, intent="aicoin")
-        try:
-            result = run_aicoin_react(state, chat_model=self.chat_model)
-            return (result.get("final_answer") or "").strip() or "处理完成"
-        except Exception:
-            logger.exception("[agent] aicoin failed session_id=%s", state.get("session_id"))
-            return "行情助手暂时不可用，请稍后再试。"
 
     def _stream_aicoin(self, state: AgentState) -> Iterator[str]:
         bind_trace_from_state(state, intent="aicoin")
@@ -292,6 +338,8 @@ class AgentEntry:
                 trace_id=state.get("trace_id") or "",
                 channel=(state.get("channel") or "web").strip().lower(),
                 developer_name=(state.get("user_name") or "").strip(),
+                intent=state.get("intent") or "chat",
+                user_logged_in=bool((state.get("access_token") or "").strip()),
             ):
                 if isinstance(chunk, dict):
                     yield _format_sse(chunk)
@@ -300,6 +348,56 @@ class AgentEntry:
         except Exception as exc:
             logger.exception("[agent] chat stream failed session_id=%s", state.get("session_id"))
             yield _format_sse({"code": 50000, "message": f"对话失败：{exc}"})
+        yield _sse_done()
+
+    def _stream_publish_note(self, state: AgentState) -> Iterator[str]:
+        bind_trace_from_state(state, intent="publish_note")
+        try:
+            result = run_publish_note_preview(state)
+            yield from self._emit_preview_stream(
+                intent="publish_note",
+                message=result.get("final_answer") or "",
+                preview=result.get("preview"),
+                action=result.get("action") or "publish_note",
+            )
+        except Exception as exc:
+            logger.exception("[agent] publish_note stream failed session_id=%s", state.get("session_id"))
+            yield _format_sse({"code": 50000, "message": f"笔记预览失败：{exc}"})
+            yield _sse_done()
+
+    def _stream_orchestrator(self, orch: dict) -> Iterator[str]:
+        try:
+            yield from self._emit_preview_stream(
+                intent="orchestrate",
+                message=orch.get("final_answer") or "",
+                preview=orch.get("preview"),
+                action=orch.get("action") or "",
+            )
+        except Exception as exc:
+            logger.exception("[agent] orchestrator stream failed")
+            yield _format_sse({"code": 50000, "message": f"编排失败：{exc}"})
+            yield _sse_done()
+
+    def _emit_preview_stream(
+        self,
+        *,
+        intent: str,
+        message: str,
+        preview: dict | None,
+        action: str,
+    ) -> Iterator[str]:
+        yield _format_sse({"type": "meta", "intent": intent})
+        body = (message or "").strip()
+        for i in range(0, len(body), _STREAM_CHUNK_CHARS):
+            yield _format_sse({"type": "delta", "content": body[i : i + _STREAM_CHUNK_CHARS]})
+        if preview and action:
+            yield _format_sse(
+                {
+                    "type": "action_preview",
+                    "action": action,
+                    "data": preview,
+                }
+            )
         yield _sse_done()
 
     def _stream_music(self, state: AgentState) -> Iterator[str]:
@@ -328,6 +426,7 @@ class AgentEntry:
         "chat": _stream_chat,
         "music": _stream_music,
         "aicoin": _stream_aicoin,
+        "publish_note": _stream_publish_note,
     }
 
 

@@ -83,6 +83,19 @@ export async function uploadContentImage(file: File): Promise<{ url: string }> {
   return post<{ url: string }>('/uploads/images', form)
 }
 
+export interface DocumentUploadResult {
+  url: string
+  filename: string
+  mime: string
+  size: number
+}
+
+export async function uploadDocument(file: File): Promise<DocumentUploadResult> {
+  const form = new FormData()
+  form.append('file', file)
+  return post<DocumentUploadResult>('/uploads/documents', form)
+}
+
 export async function fetchTopics(): Promise<TopicItem[]> {
   return get<TopicItem[]>('/topics')
 }

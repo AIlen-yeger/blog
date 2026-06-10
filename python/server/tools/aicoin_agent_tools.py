@@ -10,7 +10,7 @@ from typing import Any
 from langchain_core.tools import tool
 
 from utils.mcp import get_mcp_client, is_mcp_enabled
-from utils.trace_log import log_event, preview
+from utils.log.trace_log import log_event, preview
 
 logger = logging.getLogger(__name__)
 

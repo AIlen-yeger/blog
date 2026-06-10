@@ -26,4 +26,8 @@ public final class IdGenerator {
     public static String agentCommentJobId() {
         return "j_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 8);
     }
+
+    public static String chatSessionId() {
+        return "sess_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 8);
+    }
 }

@@ -6,6 +6,7 @@ import { useDesktopPetScale } from '@/composables/useDesktopPetScale'
 import { useDesktopPetSprite } from '@/composables/useDesktopPetSprite'
 import { PET_SPRITE_STAGE } from '@/data/desktopPetLayout'
 import { petSpriteFallback } from '@/utils/petSpriteSrc'
+import { navigateToAgentChat } from '@/utils/agentRoute'
 
 const { loggedIn: loggedInProp } = defineProps<{
   loggedIn?: boolean
@@ -112,6 +113,10 @@ function onSpriteLoad() {
   spriteMatteHint.value = /\.jpe?g(\?|$)/i.test(currentSprite.value.src)
 }
 
+function openAgentPage() {
+  navigateToAgentChat()
+}
+
 function onSpriteError(e: Event) {
   const img = e.target as HTMLImageElement
   const fallback = petSpriteFallback(currentSprite.value.src)
@@ -147,17 +152,28 @@ function onSpriteError(e: Event) {
             @wheel.stop
           >
           <div class="pet-assistant__qq-head">
-            <span class="pet-assistant__name">Kohaku</span>
-            <button
-              type="button"
-              class="pet-assistant__history-btn"
-              :aria-expanded="historyOpen"
-              :title="historyOpen ? '收起历史' : '对话历史'"
-              @click.stop="toggleHistory"
-            >
-              <span class="pet-assistant__history-icon" aria-hidden="true">☰</span>
-              <span class="pet-assistant__history-chevron" :class="{ open: historyOpen }">›</span>
-            </button>
+            <span class="pet-assistant__name">蕾西亚</span>
+            <div class="pet-assistant__head-actions">
+              <button
+                type="button"
+                class="pet-assistant__expand-btn"
+                title="全屏对话"
+                aria-label="进入全屏对话"
+                @click.stop="openAgentPage"
+              >
+                <span class="pet-assistant__expand-icon" aria-hidden="true">⤢</span>
+              </button>
+              <button
+                type="button"
+                class="pet-assistant__history-btn"
+                :aria-expanded="historyOpen"
+                :title="historyOpen ? '收起历史' : '对话历史'"
+                @click.stop="toggleHistory"
+              >
+                <span class="pet-assistant__history-icon" aria-hidden="true">☰</span>
+                <span class="pet-assistant__history-chevron" :class="{ open: historyOpen }">›</span>
+              </button>
+            </div>
           </div>
 
           <Transition name="pet-history">
@@ -170,7 +186,7 @@ function onSpriteError(e: Event) {
                   class="pet-assistant__history-item"
                   :class="msg.role"
                 >
-                  <span class="pet-assistant__history-role">{{ msg.role === 'user' ? '你' : 'Kohaku' }}</span>
+                  <span class="pet-assistant__history-role">{{ msg.role === 'user' ? '你' : '蕾西亚' }}</span>
                   <p class="pet-assistant__history-text">{{ msg.content }}</p>
                 </div>
                 <button type="button" class="pet-assistant__history-clear" @click.stop="clearHistory">
@@ -395,6 +411,37 @@ function onSpriteError(e: Event) {
   font-weight: 700;
   color: var(--qq-accent);
   letter-spacing: 0.04em;
+}
+
+.pet-assistant__head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.pet-assistant__expand-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.3rem;
+  height: 1.3rem;
+  padding: 0 0.2rem;
+  border: 1px solid rgba(140, 190, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--qq-accent);
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.pet-assistant__expand-icon {
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.pet-assistant__expand-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(140, 190, 255, 0.35);
 }
 
 .pet-assistant__history-btn {

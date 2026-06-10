@@ -16,7 +16,7 @@ const props = withDefaults(
 
 const { previewMaxChars } = useAgentReplySettings()
 
-const label = computed(() => (props.kind === 'note' ? 'Kohaku · 笔记回复' : 'Kohaku · 生活回复'))
+const label = computed(() => (props.kind === 'note' ? '蕾西亚 · 笔记回复' : '蕾西亚 · 生活回复'))
 
 const body = computed(() => {
   const text = (props.reply || '').trim()
@@ -39,7 +39,7 @@ const body = computed(() => {
     </header>
     <p class="agent-reply__text">{{ body.display }}</p>
     <p v-if="mode === 'preview' && body.truncated" class="agent-reply__hint">
-      点击「阅读全文」查看 Kohaku 的完整回复
+      点击「阅读全文」查看蕾西亚的完整回复
     </p>
   </aside>
 </template>

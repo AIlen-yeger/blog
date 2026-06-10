@@ -9,15 +9,19 @@ import re
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
-from config.config import AgentConfig
+from config.config import AgentConfig, normalize_openai_base_url
 from server.agent import ChatModel
+from server.skills_server.skill_registry import get_registry, skill_catalog_for_judge
 from server.state import AgentState
 from utils.path_tools import get_abs_path
-from utils.trace_log import log_event, record_model
+from utils.log.token_usage import record_from_response
+from utils.log.trace_log import log_event, record_model
 
 logger = logging.getLogger(__name__)
 
-_VALID_INTENTS = frozenset({"chat", "music", "add_son", "commit_user", "aicoin"})
+
+def _valid_intents() -> frozenset[str]:
+    return get_registry().routable_intents
 
 _MUSIC_QUESTION_SIGNALS = (
     "听歌报告",
@@ -85,7 +89,9 @@ def intent_from_question(question: str) -> str | None:
         return "music"
     if any(k in q for k in _MUSIC_QUERY_WORDS) and any(k in q for k in _MUSIC_TOPIC_WORDS):
         return "music"
-    if "笔记" in q and any(k in q for k in ("发布", "写了", "刚发", "我的笔记")):
+    if any(k in q for k in ("发布笔记", "发一篇笔记", "发笔记", "上传的是笔记", "发布到博客", "发到博客")):
+        return "publish_note"
+    if "笔记" in q and any(k in q for k in ("回复", "评论", "agent回复")):
         return "commit_user"
     if any(s in lower or s in q for s in _AICOIN_SIGNALS):
         return "aicoin"
@@ -110,7 +116,7 @@ def normalize_intent(raw: str) -> str:
                 route = "commit_user"
             if route == "add_son":
                 route = "music"
-            if route in _VALID_INTENTS:
+            if route in _valid_intents():
                 return "music" if route == "add_son" else route
     except json.JSONDecodeError:
         pass
@@ -120,7 +126,9 @@ def normalize_intent(raw: str) -> str:
         return "music"
     if "music" in lowered or "听歌" in text or "歌曲" in text or "音乐" in text:
         return "music"
-    if "commit_user" in lowered or "笔记" in text:
+    if "publish_note" in lowered or "发布笔记" in text or "发笔记" in text:
+        return "publish_note"
+    if "commit_user" in lowered:
         return "commit_user"
     if "aicoin" in lowered or "行情" in text or "币价" in text:
         return "aicoin"
@@ -132,7 +140,7 @@ def normalize_intent(raw: str) -> str:
         route = m.group(1).lower()
         if route == "add_son":
             return "music"
-        if route in _VALID_INTENTS:
+        if route in _valid_intents():
             return "music" if route == "add_son" else route
 
     return "chat"
@@ -143,28 +151,56 @@ class IntentRouter:
         cfg = AgentConfig()
         self.chat_model = ChatModel()
         self.judge_model_name = cfg.judge_model_name
+        judge_model = (cfg.judge_model_name or cfg.chat_model_name or "deepseek-chat").strip()
+        if not judge_model:
+            raise RuntimeError("未配置 judge/chat 模型名（DP_MODEL 或 DP_JUDGE_MODEL）")
         self._judge_llm = ChatOpenAI(
-            model=cfg.judge_model_name,
-            base_url=cfg.judge_base_url,
+            model=judge_model,
+            base_url=normalize_openai_base_url(cfg.judge_base_url or cfg.chat_base_url),
             temperature=cfg.judge_temperature,
-            api_key=cfg.judge_api_key,
+            api_key=cfg.judge_api_key or cfg.chat_api_key,
             timeout=90,
             max_retries=1,
+            stream_usage=True,
         )
-        with open(get_abs_path("prompt/judge.md"), encoding="utf-8") as f:
-            self._judge_prompt = f.read()
+        self._judge_prompt = self._load_judge_prompt()
+        self._skill_catalog = skill_catalog_for_judge()
+
+    @staticmethod
+    def _load_judge_prompt() -> str:
+        registry = get_registry()
+        candidates = [
+            registry.global_prompt_path("judge"),
+            "skills/judge.md",
+            "prompt/judge.md",
+        ]
+        for rel in candidates:
+            if not rel:
+                continue
+            path = get_abs_path(rel)
+            if path.is_file():
+                return path.read_text(encoding="utf-8")
+        raise FileNotFoundError("judge prompt not found (manifest global_prompts.judge / skills/judge.md)")
 
     def classify_intent(self, state: AgentState) -> str:
         """调 judge 小模型 → 解析 JSON → 必要时用关键词覆盖。"""
         question = (state.get("question") or "").strip()
         record_model(self.judge_model_name)
+        human_body = question
+        if self._skill_catalog:
+            human_body = f"{question}\n\n{self._skill_catalog}"
 
+        judge_messages = [
+            SystemMessage(content=self._judge_prompt),
+            HumanMessage(content=human_body),
+        ]
         try:
-            resp = self._judge_llm.invoke(
-                [
-                    SystemMessage(content=self._judge_prompt),
-                    HumanMessage(content=question),
-                ]
+            resp = self._judge_llm.invoke(judge_messages)
+            record_from_response(
+                phase="judge",
+                model=self.judge_model_name,
+                messages=judge_messages,
+                response=resp,
             )
             raw = (resp.content or "").strip() if resp.content else ""
         except Exception as exc:

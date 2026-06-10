@@ -6,8 +6,8 @@ import json
 
 from langchain_core.tools import tool
 
-from utils.agent_log_reader import list_recent_errors, read_log_events, read_trace_bundle
-from utils.trace_log import current_trace, preview
+from utils.log.agent_log_reader import list_recent_errors, read_log_events, read_trace_bundle
+from utils.log.trace_log import current_trace, preview
 
 
 @tool

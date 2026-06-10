@@ -159,9 +159,19 @@ class MysqlRepo:
             VALUES (%s, %s, %s, %s, %s, NOW())
         """
         try:
+            last_msg_id = 0
             with conn.cursor() as cur:
                 cur.execute(sql, (session_id, user_id, ch, "user", user_question))
                 cur.execute(sql, (session_id, user_id, ch, "assistant", assistant_answer))
+                last_msg_id = int(cur.lastrowid or 0)
+            self.touch_chat_session(
+                session_id=session_id,
+                user_id=user_id,
+                channel=ch,
+                user_question=user_question,
+                last_msg_id=last_msg_id,
+                msg_increment=2,
+            )
             return True
         except Exception as e:
             logger.warning("[history] save turn failed session_id=%s err=%s", session_id, e)
@@ -170,6 +180,64 @@ class MysqlRepo:
             if conn is not None:
                 conn.close()
 
+    def touch_chat_session(
+        self,
+        *,
+        session_id: str,
+        user_id: int,
+        channel: str = "web",
+        user_question: str = "",
+        last_msg_id: int = 0,
+        msg_increment: int = 2,
+    ) -> None:
+        """同步 ai_chat_session 的 last_active / msg_count / last_msg_id / title。"""
+        if not session_id or user_id <= 0:
+            return
+        ch = (channel or "web").strip().lower()[:16] or "web"
+        if ch != "web":
+            return
+        conn = self.connect()
+        if conn is None:
+            return
+        question = (user_question or "").strip()
+        title = question[:24] + ("…" if len(question) > 24 else "") if question else None
+        inc = max(0, int(msg_increment or 0))
+        try:
+            with conn.cursor() as cur:
+                if title:
+                    cur.execute(
+                        """
+                        UPDATE ai_chat_session
+                        SET last_active = NOW(),
+                            msg_count = msg_count + %s,
+                            last_msg_id = CASE WHEN %s > 0 THEN %s ELSE last_msg_id END,
+                            title = CASE
+                                WHEN title = '新对话' OR title = '对话' THEN %s
+                                ELSE title
+                            END
+                        WHERE session_id = %s AND user_id = %s AND guest_flag = 0
+                        """,
+                        (inc, last_msg_id, last_msg_id, title, session_id, user_id),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        UPDATE ai_chat_session
+                        SET last_active = NOW(),
+                            msg_count = msg_count + %s,
+                            last_msg_id = CASE WHEN %s > 0 THEN %s ELSE last_msg_id END
+                        WHERE session_id = %s AND user_id = %s AND guest_flag = 0
+                        """,
+                        (inc, last_msg_id, last_msg_id, session_id, user_id),
+                    )
+        except Exception as e:
+            logger.warning(
+                "[history] touch session failed session_id=%s err=%s",
+                session_id,
+                e,
+            )
+        finally:
+            conn.close()
 
     def save_bug_message(
         self,

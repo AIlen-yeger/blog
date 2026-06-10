@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 
 from utils.mcp.registry import get_mcp_client, is_mcp_enabled
-from utils.trace_log import log_event
+from utils.log.trace_log import log_event
 
 logger = logging.getLogger(__name__)
 

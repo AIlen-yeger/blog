@@ -78,7 +78,7 @@ def build_qq_aicoin_system_append(question: str) -> str:
     return "\n".join(
         [
             "## QQ 行情回复（单阶段 ReAct）",
-            f"- 遵守 aicoin 的 QQ 语气段：Kohaku 口语，1～3 句、约 {QQ_MARKET_REPLY_MAX_CHARS} 字内。",
+            f"- 遵守 aicoin 的 QQ 语气段：蕾西亚口语，1～3 句、约 {QQ_MARKET_REPLY_MAX_CHARS} 字内。",
             "- 工具已由系统按问题收窄；查到现价与关键涨跌后尽快回复，勿为写全再开无关工具。",
             "- 直接写价格与 24h 涨跌；禁止 Markdown 表格/标题/长列表；勿罗列用户没问的币。",
             "- 数据以工具为准；对用户用纠缠之缘、原石；末尾可轻带非投资建议。",
