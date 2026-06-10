@@ -25,6 +25,7 @@ import * as blogApi from '@/api/blog'
 import { getAgentSessionId } from '@/utils/agentSession'
 import type { ContentListParams } from '@/api/blog'
 import { useAgentReplySettings } from '@/composables/useAgentReplySettings'
+import { useContentViewer } from '@/composables/useContentViewer'
 
 const STORAGE_KEY = 'personal-blog-data'
 
@@ -135,6 +136,18 @@ function normalizeNote(n: NoteItem): NoteItem {
   )
 }
 
+function filterContentForViewer<T extends NoteItem | LifeItem>(
+  items: T[],
+  kind: 'note' | 'life',
+): T[] {
+  const { isManageView } = useContentViewer()
+  const normalized = items.map((item) =>
+    kind === 'note' ? normalizeNote(item as NoteItem) : normalizeLife(item as LifeItem),
+  ) as T[]
+  if (isManageView.value) return normalized
+  return normalized.filter((item) => item.status !== 'draft')
+}
+
 export function patchNoteInStore(note: NoteItem) {
   const normalized = normalizeNote(note)
   const idx = state.notes.findIndex((n) => n.id === normalized.id)
@@ -180,7 +193,11 @@ function listParamsFromFilters(): ContentListParams | undefined {
 }
 
 function filterMockNotes(notes: NoteItem[]) {
+  const { isManageView } = useContentViewer()
   let list = [...notes]
+  if (!isManageView.value) {
+    list = list.filter((n) => n.status !== 'draft')
+  }
   const kw = contentFilters.keyword?.trim().toLowerCase()
   if (kw) {
     list = list.filter(
@@ -199,7 +216,11 @@ function filterMockNotes(notes: NoteItem[]) {
 }
 
 function filterMockLife(items: LifeItem[]) {
+  const { isManageView } = useContentViewer()
   let list = [...items]
+  if (!isManageView.value) {
+    list = list.filter((l) => l.status !== 'draft')
+  }
   const kw = contentFilters.keyword?.trim().toLowerCase()
   if (kw) {
     list = list.filter(
@@ -243,6 +264,9 @@ function buildMockMeta() {
 async function loadFromServer() {
   const listParams = listParamsFromFilters()
   const kw = contentFilters.keyword?.trim()
+  const { usePublicContentApi } = useContentViewer()
+  /** 预览模式不带 JWT，与真实访客看到的内容一致（无 Agent 回复、无草稿） */
+  const publicContentOpts = usePublicContentApi.value ? { auth: false as const } : undefined
 
   const profileReq = hasValidSession()
     ? blogApi.fetchProfile()
@@ -252,8 +276,8 @@ async function loadFromServer() {
     profileReq,
     blogApi.fetchTopics(),
     blogApi.fetchTimeline(),
-    blogApi.fetchTagCloud(),
-    blogApi.fetchArchiveMonths(),
+    blogApi.fetchTagCloud(publicContentOpts),
+    blogApi.fetchArchiveMonths(publicContentOpts),
   ])
 
   tagCloud.value = tags
@@ -263,10 +287,10 @@ async function loadFromServer() {
   state.timeline = timeline
 
   if (kw) {
-    const res = await blogApi.searchContent(kw)
+    const res = await blogApi.searchContent(kw, 30, publicContentOpts)
     searchResult.value = {
-      notes: res.notes.map(normalizeNote),
-      life: res.life.map(normalizeLife),
+      notes: filterContentForViewer(res.notes, 'note'),
+      life: filterContentForViewer(res.life, 'life'),
       noteTotal: res.noteTotal,
       lifeTotal: res.lifeTotal,
     }
@@ -275,11 +299,11 @@ async function loadFromServer() {
   }
 
   const [notes, life] = await Promise.all([
-    blogApi.fetchNotes(listParams),
-    blogApi.fetchLife(listParams),
+    blogApi.fetchNotes(listParams, publicContentOpts),
+    blogApi.fetchLife(listParams, publicContentOpts),
   ])
-  state.notes = notes.map(normalizeNote)
-  state.life = life.map(normalizeLife)
+  state.notes = filterContentForViewer(notes, 'note')
+  state.life = filterContentForViewer(life, 'life')
 }
 
 async function ensureLoaded() {

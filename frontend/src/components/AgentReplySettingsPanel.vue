@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { reloadBlogData } from '@/composables/useBlogStore'
 import { useAgentReplySettings } from '@/composables/useAgentReplySettings'
 
 const {
@@ -17,6 +18,7 @@ async function onOwnerOnlyChange(checked: boolean) {
   ownerOnlyError.value = ''
   try {
     await setOwnerOnlyVisible(checked)
+    await reloadBlogData()
   } catch {
     ownerOnlyError.value = '保存失败，请稍后重试'
   }
@@ -27,7 +29,7 @@ async function onOwnerOnlyChange(checked: boolean) {
   <section class="agent-reply-settings" aria-labelledby="agent-reply-settings-title">
     <h3 id="agent-reply-settings-title" class="section-title">蕾西亚 自动回复</h3>
     <p class="section-desc">
-      笔记或生活记录发布后，由蕾西亚生成回复。可开关展示、限制预览字数；「仅个人可见」会保存到服务器，访客无法看到回复。
+      笔记或生活记录发布后，由蕾西亚生成回复。可开关展示、限制预览字数。「仅个人可见」保存到服务器：预览模式、访客与非管理员均看不到回复与草稿。
     </p>
 
     <label class="switch-row">
@@ -51,7 +53,9 @@ async function onOwnerOnlyChange(checked: boolean) {
     <label class="switch-row">
       <span class="switch-label">
         蕾西亚回复仅个人可见
-        <span class="switch-hint">开启后仅管理员登录时可见，访客看不到</span>
+        <span class="switch-hint">
+          开启后仅「进入管理」后可见；预览模式与访客均不展示
+        </span>
       </span>
       <input
         type="checkbox"

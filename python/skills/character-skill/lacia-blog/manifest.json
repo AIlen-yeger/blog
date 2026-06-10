@@ -8,8 +8,8 @@
   "kit": "character-skill",
   "auto_activate": false,
   "global_prompts": {
-    "judge": "prompt/judge.md",
-    "summary": "prompt/summary.md"
+    "judge": "skills/judge.md",
+    "summary": "skills/summary.md"
   },
   "core": {
     "permanent": "core/anchor.md",

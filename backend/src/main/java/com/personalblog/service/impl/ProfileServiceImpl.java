@@ -132,26 +132,42 @@ public class ProfileServiceImpl implements ProfileService {
 
     @Override
     public boolean isAgentReplyOwnerOnly() {
-        ProfileEntity siteOwner = profileMapper.selectSiteOwner();
-        if (siteOwner != null) {
-            return siteOwner.isAgentReplyOwnerOnly();
-        }
-        UserEntity admin = userMapper.selectFirstByRole(UserRole.admin.name());
-        if (admin == null) {
-            return false;
-        }
-        ProfileEntity profile = profileMapper.selectByUserId(admin.getId());
-        return profile != null && profile.isAgentReplyOwnerOnly();
+        ProfileEntity row = findSiteSettingsProfile();
+        return row != null && row.isAgentReplyOwnerOnly();
     }
 
     @Override
     @Transactional
     public void setAgentReplyOwnerOnly(boolean ownerOnlyVisible) {
         adminGuard.requireAdmin();
-        UserEntity user = requireCurrentUser();
-        ProfileEntity entity = getOrCreateProfileForUser(user);
+        ProfileEntity entity = resolveSiteSettingsProfile();
         entity.setAgentReplyOwnerOnly(ownerOnlyVisible);
         profileMapper.update(entity);
+    }
+
+    /** 站点级偏好：优先 site_owner=1 的资料行，与着陆页公开展示一致 */
+    private ProfileEntity findSiteSettingsProfile() {
+        ProfileEntity siteOwner = profileMapper.selectSiteOwner();
+        if (siteOwner != null) {
+            return siteOwner;
+        }
+        UserEntity admin = userMapper.selectFirstByRole(UserRole.admin.name());
+        if (admin == null) {
+            return null;
+        }
+        return profileMapper.selectByUserId(admin.getId());
+    }
+
+    private ProfileEntity resolveSiteSettingsProfile() {
+        ProfileEntity row = findSiteSettingsProfile();
+        if (row != null) {
+            return row;
+        }
+        UserEntity admin = userMapper.selectFirstByRole(UserRole.admin.name());
+        if (admin == null) {
+            throw new BusinessException(ErrorCode.PROFILE_NOT_FOUND, "站点主人资料未配置");
+        }
+        return getOrCreateProfileForUser(admin);
     }
 
     private UserEntity requireCurrentUser() {

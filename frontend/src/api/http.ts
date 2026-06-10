@@ -29,7 +29,7 @@ export function useMockApi(): boolean {
   return import.meta.env.VITE_USE_MOCK === 'true'
 }
 
-type RequestOptions = {
+export type RequestOptions = {
   /** 默认 true；登录等接口传 false */
   auth?: boolean
 }

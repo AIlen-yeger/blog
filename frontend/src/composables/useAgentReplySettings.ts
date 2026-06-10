@@ -2,6 +2,7 @@ import { computed, reactive, watch } from 'vue'
 import type { AgentReplyContentKind, AgentReplySettings } from '@/types/agentReply'
 import { fetchAgentReplySettings, updateAgentReplyOwnerOnly } from '@/api/blog'
 import { useMockApi } from '@/api/http'
+import { useGuestMode } from '@/composables/useGuestMode'
 import { useSession } from '@/composables/useSession'
 
 const STORAGE_KEY = 'blog:agent-reply-settings'
@@ -79,6 +80,7 @@ export async function syncAgentReplySettingsFromServer(): Promise<void> {
 
 export function useAgentReplySettings() {
   const { isAdmin } = useSession()
+  const { guestMode } = useGuestMode()
 
   function isEnabledFor(kind: AgentReplyContentKind): boolean {
     return kind === 'note' ? state.noteEnabled : state.lifeEnabled
@@ -87,7 +89,10 @@ export function useAgentReplySettings() {
   /** 当前访客是否允许看到蕾西亚回复区域（含撰写中提示） */
   function canViewAgentReply(kind: AgentReplyContentKind): boolean {
     if (!isEnabledFor(kind)) return false
-    if (state.ownerOnlyVisible && !isAdmin.value) return false
+    if (state.ownerOnlyVisible) {
+      // 预览模式模拟访客视角，即使已登录管理员也不展示
+      if (guestMode.value || !isAdmin.value) return false
+    }
     return true
   }
 

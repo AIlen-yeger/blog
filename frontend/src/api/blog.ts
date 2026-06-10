@@ -1,5 +1,5 @@
 import type { AgentReplySettings } from '@/types/agentReply'
-import { ApiError, get, post, put, del } from '@/api/http'
+import { ApiError, get, post, put, del, type RequestOptions } from '@/api/http'
 import type {
   ArchiveMonthItem,
   LifeItem,
@@ -119,9 +119,12 @@ export async function fetchTopics(): Promise<TopicItem[]> {
   return get<TopicItem[]>('/topics')
 }
 
-export async function fetchNotes(params?: ContentListParams): Promise<NoteItem[]> {
+export async function fetchNotes(
+  params?: ContentListParams,
+  options?: RequestOptions,
+): Promise<NoteItem[]> {
   const q = buildListQuery({ page: '1', pageSize: '200', sort: 'date_desc' }, params)
-  const data = await get<PageResult<NoteItem> | NoteItem[]>(`/notes?${q.toString()}`)
+  const data = await get<PageResult<NoteItem> | NoteItem[]>(`/notes?${q.toString()}`, options)
   return unwrapList(data)
 }
 
@@ -159,9 +162,12 @@ export async function pinNoteApi(id: string): Promise<NoteItem> {
   return post<NoteItem>(`/notes/${id}/pin`, {})
 }
 
-export async function fetchLife(params?: ContentListParams): Promise<LifeItem[]> {
+export async function fetchLife(
+  params?: ContentListParams,
+  options?: RequestOptions,
+): Promise<LifeItem[]> {
   const q = buildListQuery({ page: '1', pageSize: '200', sort: 'date_desc' }, params)
-  const data = await get<PageResult<LifeItem> | LifeItem[]>(`/life?${q.toString()}`)
+  const data = await get<PageResult<LifeItem> | LifeItem[]>(`/life?${q.toString()}`, options)
   return unwrapList(data)
 }
 
@@ -190,17 +196,21 @@ export async function fetchTimeline(): Promise<TimelineItem[]> {
   return get<TimelineItem[]>('/timeline')
 }
 
-export async function searchContent(q: string, limit = 30): Promise<SearchResult> {
+export async function searchContent(
+  q: string,
+  limit = 30,
+  options?: RequestOptions,
+): Promise<SearchResult> {
   const params = new URLSearchParams({ q, limit: String(limit) })
-  return get<SearchResult>(`/search?${params.toString()}`)
+  return get<SearchResult>(`/search?${params.toString()}`, options)
 }
 
-export async function fetchTagCloud(): Promise<TagCountItem[]> {
-  return get<TagCountItem[]>('/meta/tags')
+export async function fetchTagCloud(options?: RequestOptions): Promise<TagCountItem[]> {
+  return get<TagCountItem[]>('/meta/tags', options)
 }
 
-export async function fetchArchiveMonths(): Promise<ArchiveMonthItem[]> {
-  return get<ArchiveMonthItem[]>('/meta/archive-months')
+export async function fetchArchiveMonths(options?: RequestOptions): Promise<ArchiveMonthItem[]> {
+  return get<ArchiveMonthItem[]>('/meta/archive-months', options)
 }
 
 export async function fetchAgentReplySettings(): Promise<AgentReplySettings> {

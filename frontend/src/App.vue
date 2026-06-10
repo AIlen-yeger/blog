@@ -13,6 +13,7 @@ import {
   resetBlogStore,
 } from '@/composables/useBlogStore'
 import { syncAgentReplySettingsFromServer } from '@/composables/useAgentReplySettings'
+import { useGuestMode } from '@/composables/useGuestMode'
 import { initSessionFromStorage } from '@/composables/useSession'
 import { triggerDailyCheckIn } from '@/composables/useDailyCheckIn'
 import { clearMusicPlayback } from '@/utils/musicPlaybackStorage'
@@ -24,17 +25,20 @@ import { isAgentHash, readAgentRouteFromUrl } from '@/utils/agentRoute'
 import {
   clearBlogViewStorage,
   getPreferLanding,
-  getStoredGuestMode,
   markSkipEnterAnim,
   setPreferLanding,
-  setStoredGuestMode,
   takeSkipEnterAnim,
 } from '@/utils/blogViewStorage'
 
 const { gradientStyle } = useGradient()
 const loggedIn = ref(initSessionFromStorage())
-const guestMode = ref(getStoredGuestMode())
+const { guestMode, setGuestMode } = useGuestMode()
 const preferLanding = ref(getPreferLanding())
+
+watch(guestMode, (next, prev) => {
+  if (next === prev || !blogViewActive.value) return
+  void reloadBlogData().catch(() => {})
+})
 const blogHashActive = ref(
   typeof window !== 'undefined' ? readBlogRouteFromUrl() === 'blog' : false,
 )
@@ -189,8 +193,7 @@ function startBlogEnter(onComplete: () => void) {
 /** 向下滑动 /「向下滑动预览」：只读预览（游客模式），与上滑进入管理区分离 */
 function enterAsGuest() {
   if (animating.value) return
-  guestMode.value = true
-  setStoredGuestMode(true)
+  setGuestMode(true)
   startBlogEnter(() => {
     blogViewActive.value = true
   })
@@ -198,8 +201,7 @@ function enterAsGuest() {
 
 function enterBlogLoggedIn() {
   if (!loggedIn.value || animating.value) return
-  guestMode.value = false
-  setStoredGuestMode(false)
+  setGuestMode(false)
   void triggerDailyCheckIn()
   startBlogEnter(() => {
     blogViewActive.value = true
@@ -216,8 +218,7 @@ function exitGuestPreview() {
     openLogin()
     return
   }
-  guestMode.value = false
-  setStoredGuestMode(false)
+  setGuestMode(false)
   void reloadBlogData().catch(() => {})
 }
 
@@ -267,8 +268,7 @@ function onTouchEnd(e: TouchEvent) {
 
 function onLoginSuccess() {
   showLogin.value = false
-  guestMode.value = false
-  setStoredGuestMode(false)
+  setGuestMode(false)
   loggedIn.value = true
   startBlogEnter(() => {
     blogViewActive.value = true
@@ -282,12 +282,11 @@ function returnToLanding() {
   preferLanding.value = true
   setPreferLanding(true)
   enterLandingUrl()
-  guestMode.value = false
+  setGuestMode(false)
   pendingBlog.value = false
   showLogin.value = false
   enteringBlog.value = false
   animating.value = false
-  setStoredGuestMode(false)
   clearMusicPlayback()
   landingMountKey.value += 1
   void loadLandingProfile()
