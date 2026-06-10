@@ -154,6 +154,8 @@ app:
 ```bash
 sudo mkdir -p /opt/blog/backend/uploads/{avatars,content}
 sudo chown -R blog:blog /opt/blog/backend/uploads /opt/blog/config
+sudo mkdir -p /opt/blog/backend/uploads/note-images
+sudo chown -R blog:blog /opt/blog/backend/uploads/note-images
 sudo chmod 600 /opt/blog/config/application-prod.yml
 ```
 

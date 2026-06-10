@@ -36,6 +36,7 @@ app:
     # 与 systemd WorkingDirectory=/opt/blog/backend 一致；勿改到 /opt/blog/data 除非已迁移文件
     avatar-dir: /opt/blog/backend/uploads/avatars
     content-dir: /opt/blog/backend/uploads/content
+    note-images-dir: /opt/blog/backend/uploads/note-images
   agent:
     ops-token: CHANGE_ME_SAME_AS_PYTHON
     base-url: http://127.0.0.1:8000

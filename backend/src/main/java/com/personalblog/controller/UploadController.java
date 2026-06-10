@@ -27,6 +27,13 @@ public class UploadController {
         return ApiResponse.ok(contentUploadService.uploadImage(file));
     }
 
+    /** Markdown 正文内嵌图（与头像、编辑器附图目录分离） */
+    @PostMapping("/note-images")
+    public ApiResponse<ImageUploadResultDto> uploadNoteImage(@RequestParam("file") MultipartFile file)
+            throws IOException {
+        return ApiResponse.ok(contentUploadService.uploadNoteImage(file));
+    }
+
     /** Agent 对话附件：pdf / md / txt / docx（需管理员登录） */
     @PostMapping("/documents")
     public ApiResponse<DocumentUploadResultDto> uploadDocument(@RequestParam("file") MultipartFile file)

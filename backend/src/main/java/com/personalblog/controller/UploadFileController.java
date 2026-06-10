@@ -35,6 +35,9 @@ public class UploadFileController {
     @Value("${app.upload.content-dir}")
     private String contentDir;
 
+    @Value("${app.upload.note-images-dir}")
+    private String noteImagesDir;
+
     @Value("${app.upload.document-dir}")
     private String documentDir;
 
@@ -46,6 +49,11 @@ public class UploadFileController {
     @GetMapping("/uploads/content/{filename}")
     public ResponseEntity<Resource> content(@PathVariable String filename) {
         return serveFile(contentDir, filename);
+    }
+
+    @GetMapping("/uploads/note-images/{filename}")
+    public ResponseEntity<Resource> noteImage(@PathVariable String filename) {
+        return serveFile(noteImagesDir, filename);
     }
 
     @GetMapping("/uploads/documents/{filename}")

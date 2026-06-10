@@ -5,7 +5,7 @@ import { useContentViewTracking } from '@/composables/useContentView'
 import ContentImageGallery from './ContentImageGallery.vue'
 import AgentReplyBlock from './AgentReplyBlock.vue'
 import { useAgentReplySettings } from '@/composables/useAgentReplySettings'
-import { renderNoteMarkdown } from '@/utils/renderMarkdown'
+import { galleryImagesNotInMarkdown, renderNoteMarkdown } from '@/utils/renderMarkdown'
 
 export interface ReaderItem {
   id: string
@@ -67,6 +67,10 @@ watch(viewCount, (n) => emit('view-count', n))
 const contentHtml = computed(() =>
   props.item ? renderNoteMarkdown(props.item.content) : '',
 )
+
+const extraGalleryImages = computed(() =>
+  props.item ? galleryImagesNotInMarkdown(props.item.content, props.item.images) : [],
+)
 </script>
 
 <template>
@@ -114,7 +118,7 @@ const contentHtml = computed(() =>
               mode="full"
               :reply="item.agentReply"
             />
-            <ContentImageGallery v-if="item.images?.length" :images="item.images" />
+            <ContentImageGallery v-if="extraGalleryImages.length" :images="extraGalleryImages" />
           </div>
         </article>
       </div>
@@ -268,6 +272,24 @@ h2 {
   background: rgba(15, 25, 45, 0.06);
   overflow-x: auto;
   white-space: pre-wrap;
+}
+
+.content :deep(.md-figure) {
+  margin: 0.85rem 0;
+  text-align: center;
+}
+
+.content :deep(.md-figure img),
+.content :deep(.md-inline-img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 10px;
+  border: 1px solid rgba(59, 130, 246, 0.15);
+}
+
+.content :deep(.md-inline-img) {
+  vertical-align: middle;
+  margin: 0.15rem 0.25rem;
 }
 .agent-reply-pending {
   margin: 1rem 0 0;

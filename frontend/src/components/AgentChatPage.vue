@@ -17,6 +17,7 @@ const emit = defineEmits<{
 const isLoggedIn = () => loggedInProp === true
 
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const folderInputRef = ref<HTMLInputElement | null>(null)
 const messagesRef = ref<HTMLElement | null>(null)
 const inputRef = ref<HTMLTextAreaElement | null>(null)
 const previewTitle = ref('')
@@ -43,6 +44,7 @@ const {
   sendMessage,
   stopStreaming,
   addFiles,
+  addFolder,
   removeAttachment,
   dismissActionPreview,
   confirmPublishNote,
@@ -122,10 +124,22 @@ function onPickFiles() {
   fileInputRef.value?.click()
 }
 
+function onPickFolder() {
+  folderInputRef.value?.click()
+}
+
 function onFileChange(e: Event) {
   const input = e.target as HTMLInputElement
   if (input.files?.length) {
     void addFiles(input.files)
+    input.value = ''
+  }
+}
+
+function onFolderChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  if (input.files?.length) {
+    void addFolder(input.files)
     input.value = ''
   }
 }
@@ -360,6 +374,15 @@ onMounted(() => {
           multiple
           @change="onFileChange"
         />
+        <input
+          ref="folderInputRef"
+          type="file"
+          class="agent-composer__file-input"
+          webkitdirectory
+          directory
+          multiple
+          @change="onFolderChange"
+        />
         <button
           type="button"
           class="agent-composer__attach"
@@ -368,6 +391,15 @@ onMounted(() => {
           @click="onPickFiles"
         >
           📎
+        </button>
+        <button
+          type="button"
+          class="agent-composer__attach"
+          title="上传文件夹（含 .md 与 images 子目录，自动匹配本地图片路径）"
+          :disabled="isStreaming"
+          @click="onPickFolder"
+        >
+          📁
         </button>
         <button
           type="button"
@@ -954,6 +986,17 @@ onMounted(() => {
   border-radius: 4px;
   background: rgba(140, 190, 255, 0.12);
   font-size: 0.92em;
+}
+
+.agent-preview__body :deep(.md-figure) {
+  margin: 0.5rem 0;
+}
+
+.agent-preview__body :deep(.md-figure img),
+.agent-preview__body :deep(.md-inline-img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
 }
 
 .agent-preview__files {

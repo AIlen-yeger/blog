@@ -16,7 +16,7 @@ import {
   updateSessionTitleRemote,
   type AgentSessionRecord,
 } from '@/api/agentSessions'
-import { uploadContentImage, uploadDocument } from '@/api/blog'
+import { uploadDocument, uploadNoteImage } from '@/api/blog'
 import {
   stripPlanPrefix,
   type AgentAttachmentPayload,
@@ -42,7 +42,13 @@ import {
   setActiveSessionId,
   upsertLocalSession,
 } from '@/utils/agentSessionsStorage'
+import { patchNoteInStore } from '@/composables/useBlogStore'
+import { watchNoteAgentReply } from '@/composables/useNoteAgentReplyPoll'
 import { genId } from '@/utils/id'
+import {
+  collectUnmatchedLocalImages,
+  uploadAndRewriteMarkdownImages,
+} from '@/utils/markdownLocalImages'
 import { toUserErrorMessage } from '@/utils/userErrorMessage'
 
 export interface PendingAttachment {
@@ -325,6 +331,11 @@ async function addFiles(files: FileList | File[]) {
   }
 }
 
+/** 选择整个文件夹（保留 webkitRelativePath，用于匹配 md 内 ./images/... 引用） */
+async function addFolder(files: FileList | File[]) {
+  await addFiles(files)
+}
+
 function removeAttachment(id: string) {
   const item = pendingAttachments.value.find((a) => a.id === id)
   if (item?.preview?.startsWith('blob:')) {
@@ -339,14 +350,67 @@ async function buildAttachmentMeta(
   const meta: ChatAttachmentMeta[] = []
   const payload: AgentAttachmentPayload[] = []
   const parts: string[] = []
+  const warnings: string[] = []
+
+  const filePool = attachments.map((a) => a.file)
+  const uploadNoteImg = async (file: File) => {
+    const { url } = await uploadNoteImage(file)
+    return url
+  }
+
+  const imageUrlCache = new Map<string, string>()
+  async function urlForImageFile(file: File): Promise<string> {
+    const key = `${file.name}:${file.size}:${file.lastModified}`
+    const cached = imageUrlCache.get(key)
+    if (cached) return cached
+    const url = await uploadNoteImg(file)
+    imageUrlCache.set(key, url)
+    return url
+  }
+
   for (const att of attachments) {
     if (att.type === 'image') {
-      const { url } = await uploadContentImage(att.file)
+      const url = await urlForImageFile(att.file)
       meta.push({ id: att.id, name: att.name, type: 'image', url })
       payload.push({ id: att.id, name: att.name, mime: att.file.type || 'image/*', url, kind: 'image' })
-      parts.push(`\n\n![${att.name}](${url})`)
+      // 不追加到消息末尾，避免发布笔记时图片脱离 Markdown 原位
       continue
     }
+
+    const isMarkdownDoc =
+      att.type === 'document' && MARKDOWN_FILE_RE.test(att.name)
+
+    if (isMarkdownDoc || (att.type === 'text' && MARKDOWN_FILE_RE.test(att.name))) {
+      let content = att.type === 'text' ? (att.textContent ?? '') : await att.file.text()
+      const localRefs = collectUnmatchedLocalImages(content)
+      if (localRefs.length > 0) {
+        const { text, uploaded, unmatched } = await uploadAndRewriteMarkdownImages(
+          content,
+          filePool,
+          uploadNoteImg,
+        )
+        content = text
+        if (uploaded > 0) {
+          parts.push(`\n\n[已上传 ${uploaded} 张笔记配图到云端]`)
+        }
+        if (unmatched.length > 0) {
+          warnings.push(
+            `「${att.name}」中有 ${unmatched.length} 张图片未在同批文件中找到，请用「文件夹」上传整份笔记目录`,
+          )
+        }
+      }
+      meta.push({ id: att.id, name: att.name, type: 'text' })
+      payload.push({
+        id: att.id,
+        name: att.name,
+        mime: 'text/markdown',
+        kind: 'text',
+        text: content,
+      })
+      parts.push(`\n\n---\n附件：${att.name}\n\`\`\`\n${content}\n\`\`\``)
+      continue
+    }
+
     if (att.type === 'document') {
       const uploaded = await uploadDocument(att.file)
       meta.push({
@@ -376,6 +440,10 @@ async function buildAttachmentMeta(
       text: content,
     })
     parts.push(`\n\n---\n附件：${att.name}\n\`\`\`\n${content}\n\`\`\``)
+  }
+
+  if (warnings.length > 0) {
+    parts.push(`\n\n（提示：${warnings.join('；')}）`)
   }
   return { meta, payload, extra: parts.join('') }
 }
@@ -606,6 +674,11 @@ async function confirmPublishNote(edits?: { title?: string; topicTitle?: string 
       sessionId: session?.sessionId ?? data.sessionId,
       status: 'published',
     })
+    patchNoteInStore({
+      ...note,
+      agentReplyStatus: note.agentReplyStatus || 'pending',
+    })
+    watchNoteAgentReply(note.id)
     pendingActionPreview.value = null
     if (session) {
       const sessionId = session.sessionId
@@ -654,6 +727,7 @@ export function useAgentChat() {
     sendMessage,
     stopStreaming,
     addFiles,
+    addFolder,
     removeAttachment,
     dismissActionPreview,
     confirmPublishNote,

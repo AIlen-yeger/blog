@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { nextTick, ref, watch } from 'vue'
+import { galleryImagesNotInMarkdown } from '@/utils/renderMarkdown'
 import type { NoteItem } from '@/data/mockContent'
 import ContentImageUpload from './ContentImageUpload.vue'
 import EditorDrawer from './EditorDrawer.vue'
@@ -25,6 +26,7 @@ const topicListId = 'note-topic-datalist'
 const content = ref('')
 const initialImageUrls = ref<string[]>([])
 const imageUploadRef = ref<InstanceType<typeof ContentImageUpload> | null>(null)
+const contentRef = ref<HTMLTextAreaElement | null>(null)
 const submitting = ref(false)
 const submitError = ref('')
 
@@ -68,12 +70,31 @@ watch(
   },
 )
 
+function insertMarkdownAtCursor(snippet: string) {
+  const el = contentRef.value
+  if (!el) {
+    content.value += snippet
+    return
+  }
+  const start = el.selectionStart ?? content.value.length
+  const end = el.selectionEnd ?? start
+  const before = content.value.slice(0, start)
+  const after = content.value.slice(end)
+  content.value = before + snippet + after
+  void nextTick(() => {
+    const pos = start + snippet.length
+    el.setSelectionRange(pos, pos)
+    el.focus()
+  })
+}
+
 async function submit(publishStatus: 'published' | 'draft') {
   if (!title.value.trim() || submitting.value) return
   submitting.value = true
   submitError.value = ''
   try {
-    const images = (await imageUploadRef.value?.resolveImageUrls()) ?? []
+    const resolved = (await imageUploadRef.value?.resolveImageUrls()) ?? []
+    const images = galleryImagesNotInMarkdown(content.value.trim(), resolved)
     await saveNote({
       ...(props.editing?.id ? { id: props.editing.id } : {}),
       title: title.value.trim(),
@@ -122,12 +143,18 @@ async function submit(publishStatus: 'published' | 'draft') {
       </div>
       <label>正文</label>
       <textarea
+        ref="contentRef"
         v-model="content"
         class="content-area"
-        placeholder="详细内容…"
+        placeholder="详细内容…支持 Markdown；可用 ![说明](图片地址) 插入图片"
         :disabled="submitting"
       />
-      <ContentImageUpload ref="imageUploadRef" :initial-urls="initialImageUrls" />
+      <ContentImageUpload
+        ref="imageUploadRef"
+        :initial-urls="initialImageUrls"
+        inline-insert
+        @insert-markdown="insertMarkdownAtCursor"
+      />
       <p v-if="submitError" class="submit-err" role="alert">{{ submitError }}</p>
       <div class="actions">
         <button

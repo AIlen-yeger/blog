@@ -22,7 +22,7 @@ Restart=on-failure
 RestartSec=5
 SuccessExitStatus=143
 
-ReadWritePaths=/opt/blog/python/log
+ReadWritePaths=/opt/blog/python/log /opt/blog/python/data
 
 [Install]
 WantedBy=multi-user.target

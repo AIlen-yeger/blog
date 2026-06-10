@@ -94,6 +94,13 @@ export async function uploadContentImage(file: File): Promise<{ url: string }> {
   return post<{ url: string }>('/uploads/images', form)
 }
 
+/** Markdown 正文内嵌图（目录 uploads/note-images，与头像分离） */
+export async function uploadNoteImage(file: File): Promise<{ url: string }> {
+  const form = new FormData()
+  form.append('file', file)
+  return post<{ url: string }>('/uploads/note-images', form)
+}
+
 export interface DocumentUploadResult {
   url: string
   filename: string

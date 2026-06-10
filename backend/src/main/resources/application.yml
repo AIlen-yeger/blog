@@ -71,6 +71,7 @@ app:
   upload:
     avatar-dir: ./uploads/avatars
     content-dir: ./uploads/content
+    note-images-dir: ./uploads/note-images
     document-dir: ./uploads/documents
   music:
     weekly-window-days: 7

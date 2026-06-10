@@ -26,6 +26,9 @@ public class ContentUploadServiceImpl implements ContentUploadService {
     @Value("${app.upload.content-dir}")
     private String contentDir;
 
+    @Value("${app.upload.note-images-dir}")
+    private String noteImagesDir;
+
     @Value("${app.upload.document-dir}")
     private String documentDir;
 
@@ -36,6 +39,15 @@ public class ContentUploadServiceImpl implements ContentUploadService {
 
     @Override
     public ImageUploadResultDto uploadImage(MultipartFile file) throws IOException {
+        return storeImage(file, contentDir, "/uploads/content/");
+    }
+
+    @Override
+    public ImageUploadResultDto uploadNoteImage(MultipartFile file) throws IOException {
+        return storeImage(file, noteImagesDir, "/uploads/note-images/");
+    }
+
+    private ImageUploadResultDto storeImage(MultipartFile file, String dirPath, String urlPrefix) throws IOException {
         adminGuard.requireAdmin();
         if (file == null || file.isEmpty()) {
             throw new BusinessException(ErrorCode.TITLE_REQUIRED, "请选择图片文件");
@@ -46,7 +58,7 @@ public class ContentUploadServiceImpl implements ContentUploadService {
             throw new BusinessException(ErrorCode.TITLE_REQUIRED, "仅支持图片格式");
         }
 
-        Path dir = Paths.get(contentDir);
+        Path dir = Paths.get(dirPath);
         Files.createDirectories(dir);
 
         String ext = switch (contentType) {
@@ -59,7 +71,7 @@ public class ContentUploadServiceImpl implements ContentUploadService {
         Files.write(dir.resolve(filename), file.getBytes());
 
         String base = contextPath.endsWith("/") ? contextPath.substring(0, contextPath.length() - 1) : contextPath;
-        String url = base + "/uploads/content/" + filename;
+        String url = base + urlPrefix + filename;
         return new ImageUploadResultDto(url);
     }
 

@@ -10,9 +10,18 @@ import {
 import { resolveMediaUrl } from '@/utils/mediaUrl'
 import { toUserErrorMessage } from '@/utils/userErrorMessage'
 
-const props = defineProps<{
-  /** 打开编辑时已有的服务器图片地址 */
-  initialUrls?: string[]
+const props = withDefaults(
+  defineProps<{
+    /** 打开编辑时已有的服务器图片地址 */
+    initialUrls?: string[]
+    /** 上传后插入 Markdown 到正文光标处（Typora 式内嵌），不单独堆在底部附图区 */
+    inlineInsert?: boolean
+  }>(),
+  { inlineInsert: false },
+)
+
+const emit = defineEmits<{
+  'insert-markdown': [snippet: string]
 }>()
 
 const drafts = ref<ImageDraftItem[]>([])
@@ -34,7 +43,7 @@ watch(
   { immediate: true },
 )
 
-function onPick(e: Event) {
+async function onPick(e: Event) {
   const input = e.target as HTMLInputElement
   const files = input.files
   if (!files?.length) return
@@ -46,6 +55,12 @@ function onPick(e: Event) {
       }
       if (file.size > 5 * 1024 * 1024) {
         throw new Error('单张图片不能超过 5MB')
+      }
+      if (props.inlineInsert) {
+        const { url } = await uploadContentImage(file)
+        const alt = file.name.replace(/\.[^.]+$/, '')
+        emit('insert-markdown', `\n![${alt}](${url})\n`)
+        continue
       }
       if (drafts.value.length >= 12) {
         throw new Error('最多 12 张图片')
@@ -99,23 +114,32 @@ defineExpose({ resolveImageUrls, hasLocalPending })
 <template>
   <div class="img-upload">
     <div class="img-upload-head">
-      <span class="label">配图</span>
-      <label class="pick-btn" :class="{ disabled: drafts.length >= 12 }">
+      <span class="label">{{ inlineInsert ? '正文插图' : '配图' }}</span>
+      <label
+        class="pick-btn"
+        :class="{ disabled: !inlineInsert && drafts.length >= 12 }"
+      >
         <input
           type="file"
           accept="image/png,image/jpeg,image/webp,image/gif"
           multiple
-          :disabled="drafts.length >= 12"
+          :disabled="!inlineInsert && drafts.length >= 12"
           @change="onPick"
         />
-        + 添加图片
+        {{ inlineInsert ? '+ 插入图片到光标处' : '+ 添加图片' }}
       </label>
-      <span class="hint">最多 12 张，单张 ≤ 5MB；点击发布后才会上传</span>
+      <span class="hint">
+        {{
+          inlineInsert
+            ? '图片以 Markdown 插入正文当前位置，阅读时与 Typora 一致'
+            : '最多 12 张，单张 ≤ 5MB；点击发布后才会上传'
+        }}
+      </span>
     </div>
 
     <p v-if="pickError" class="err">{{ pickError }}</p>
 
-    <ul v-if="drafts.length" class="preview-list">
+    <ul v-if="!inlineInsert && drafts.length" class="preview-list">
       <li v-for="(item, i) in drafts" :key="item.key" class="preview-item">
         <img :src="previewSrc(item)" :alt="`配图 ${i + 1}`" loading="lazy" />
         <span v-if="item.file" class="badge">待上传</span>

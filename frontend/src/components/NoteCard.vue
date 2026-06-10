@@ -6,7 +6,7 @@ import ContentImageGallery from './ContentImageGallery.vue'
 import ContentReaderModal from './ContentReaderModal.vue'
 import AgentReplyBlock from './AgentReplyBlock.vue'
 import { useAgentReplySettings } from '@/composables/useAgentReplySettings'
-import { stripMarkdownForPlainText } from '@/utils/renderMarkdown'
+import { galleryImagesNotInMarkdown, stripMarkdownForPlainText } from '@/utils/renderMarkdown'
 
 const props = withDefaults(
   defineProps<{
@@ -28,6 +28,10 @@ const { shouldShowReply, isGenerating, canViewAgentReply } = useAgentReplySettin
 const showAgentReply = computed(() => shouldShowReply('note', props.item.agentReply))
 
 const plainExcerpt = computed(() => stripMarkdownForPlainText(props.item.excerpt))
+
+const extraGalleryImages = computed(() =>
+  galleryImagesNotInMarkdown(props.item.content, props.item.images),
+)
 
 const agentReplyGenerating = computed(
   () =>
@@ -86,7 +90,7 @@ function onPin() {
         mode="preview"
         :reply="item.agentReply"
       />
-      <ContentImageGallery v-if="item.images?.length" :images="item.images" compact />
+      <ContentImageGallery v-if="extraGalleryImages.length" :images="extraGalleryImages" compact />
       <div class="meta">
         <time :datetime="item.date">{{ item.date }}</time>
         <div class="meta-right">
