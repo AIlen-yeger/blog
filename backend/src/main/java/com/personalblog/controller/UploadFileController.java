@@ -23,8 +23,11 @@ import java.util.regex.Pattern;
 @RestController
 public class UploadFileController {
 
-    private static final Pattern SAFE_FILENAME =
-            Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.[a-z]{3,4}$");
+    private static final Pattern SAFE_IMAGE_FILENAME =
+            Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(jpe?g|png|gif|webp)$");
+
+    private static final Pattern SAFE_DOCUMENT_FILENAME =
+            Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(pdf|md|markdown|txt|doc|docx)$");
 
     @Value("${app.upload.avatar-dir}")
     private String avatarDir;
@@ -51,7 +54,7 @@ public class UploadFileController {
     }
 
     private ResponseEntity<Resource> serveFile(String baseDir, String filename) {
-        if (filename == null || !SAFE_FILENAME.matcher(filename.toLowerCase(Locale.ROOT)).matches()) {
+        if (filename == null || !SAFE_IMAGE_FILENAME.matcher(filename.toLowerCase(Locale.ROOT)).matches()) {
             return ResponseEntity.badRequest().build();
         }
         Path base = Paths.get(baseDir).toAbsolutePath().normalize();
@@ -68,7 +71,7 @@ public class UploadFileController {
     }
 
     private ResponseEntity<Resource> serveDocument(String baseDir, String filename) {
-        if (filename == null || !SAFE_FILENAME.matcher(filename.toLowerCase(Locale.ROOT)).matches()) {
+        if (filename == null || !SAFE_DOCUMENT_FILENAME.matcher(filename.toLowerCase(Locale.ROOT)).matches()) {
             return ResponseEntity.badRequest().build();
         }
         Path base = Paths.get(baseDir).toAbsolutePath().normalize();

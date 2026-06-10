@@ -1,0 +1,31 @@
+{
+  "user_id": "eval_recall",
+  "channel": "web",
+  "memories": [
+    {
+      "id": "mem_coffee",
+      "text": "用户平时喜欢喝手冲咖啡，周末会尝试新豆子。",
+      "tags": ["hobby", "food"]
+    },
+    {
+      "id": "mem_pet",
+      "text": "用户养了一只橘猫，名字叫布丁，三岁。",
+      "tags": ["life"]
+    },
+    {
+      "id": "mem_work",
+      "text": "用户最近在开发个人博客 Agent，包含 Python 与 Vue 前端。",
+      "tags": ["work", "tech"]
+    },
+    {
+      "id": "mem_city",
+      "text": "用户住在上海，常在浦东活动。",
+      "tags": ["life"]
+    },
+    {
+      "id": "mem_music",
+      "text": "用户喜欢听电子乐和氛围音乐，晚上写代码时会播放。",
+      "tags": ["hobby", "music"]
+    }
+  ]
+}

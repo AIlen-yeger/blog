@@ -35,6 +35,7 @@ class ChatRequest(BaseModel):
     access_token: str = Field(default="", validation_alias=AliasChoices("access_token", "accessToken"))
     user_role: str = Field(default="", validation_alias=AliasChoices("user_role", "userRole"))
     attachments: list[dict[str, Any]] = Field(default_factory=list)
+    execution_mode: str = Field(default="auto", validation_alias=AliasChoices("execution_mode", "executionMode"))
 
 
 def _parse_attachments(raw: dict[str, Any]) -> list[dict[str, Any]]:
@@ -58,6 +59,11 @@ def _parse_attachments(raw: dict[str, Any]) -> list[dict[str, Any]]:
         if item["id"] or item["name"] or item["url"] or text_inline:
             out.append(item)
     return out
+
+
+def _parse_execution_mode(raw: dict[str, Any]) -> str:
+    mode = _pick_str(raw, "execution_mode", "executionMode").lower() or "auto"
+    return mode if mode in ("auto", "plan", "fast") else "auto"
 
 
 def _pick_str(raw: dict[str, Any], *keys: str) -> str:
@@ -114,6 +120,7 @@ def _parse_chat_request(raw: object) -> ChatRequest | JSONResponse:
         access_token=_pick_str(raw, "access_token", "accessToken"),
         user_role=_pick_str(raw, "user_role", "userRole"),
         attachments=_parse_attachments(raw),
+        execution_mode=_parse_execution_mode(raw),
     )
 
 
@@ -234,6 +241,7 @@ async def llm_chat(request: Request):
                     account=body.account,
                     user_role=body.user_role,
                     attachments=body.attachments,
+                    execution_mode=body.execution_mode,
                 )
                 yield from result.iter_sse()
             except Exception as exc:
@@ -243,7 +251,7 @@ async def llm_chat(request: Request):
                     trace_id,
                 )
                 payload = json.dumps(
-                    {"code": 50000, "message": f"服务异常：{exc}"},
+                    {"code": 50000, "message": "服务暂时不可用，请稍后重试"},
                     ensure_ascii=False,
                 )
                 yield f"data: {payload}\n\n"

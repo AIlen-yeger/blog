@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
 import type { AuthUser, UserRole } from '@/types/auth'
+import { clearActiveSessionId } from '@/utils/agentSessionsStorage'
 
 const SESSION_KEY = 'personal-blog-session'
 const TOKEN_KEY = 'personal-blog-token'
@@ -71,6 +72,7 @@ export function setSessionFromLogin(result: {
   currentUser.value = { ...result.user }
   if (result.token) {
     persistSession(currentUser.value, result.token)
+    clearActiveSessionId()
   } else {
     persistSession(null)
     localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser.value))
@@ -80,6 +82,7 @@ export function setSessionFromLogin(result: {
 export function clearSession() {
   currentUser.value = null
   persistSession(null)
+  clearActiveSessionId()
   window.dispatchEvent(new CustomEvent('auth:logout'))
 }
 

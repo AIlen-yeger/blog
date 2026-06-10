@@ -1,0 +1,35 @@
+cases:
+  - id: sample_markdown
+    fixture: docs/sample.md
+    filename: sample.md
+    mime: text/markdown
+    expect_title: "评测样例笔记"
+    expect_body_contains:
+      - "第一段正文"
+      - "第二段正文"
+
+  - id: noisy_markdown
+    fixture: docs/noisy.md
+    filename: noisy.md
+    mime: text/markdown
+    expect_title: "噪声文档"
+    expect_body_contains:
+      - "有效内容行"
+      - "列表项一"
+
+  - id: sample_no_heading
+    fixture: docs/plain.txt
+    filename: plain.txt
+    mime: text/plain
+    expect_title: plain
+    expect_body_contains:
+      - "无标题纯文本"
+
+  - id: bold_title_strip
+    fixture: docs/bold_title.md
+    filename: bold_title.md
+    mime: text/markdown
+    expect_title: "加粗标题样例"
+    expect_body_contains:
+      - "**程序计数器**"
+      - "应显示为加粗"

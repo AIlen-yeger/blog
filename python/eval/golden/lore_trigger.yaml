@@ -1,0 +1,82 @@
+cases:
+  - id: web_idle_constants
+    message: "今天心情不错"
+    channel: web
+    expect_ids: [lacia_name, no_fake_tools]
+    forbid_ids: [qq_brevity, qq_hie]
+
+  - id: web_hie_question
+    message: "hie 是什么"
+    channel: web
+    expect_ids: [lacia_name, no_fake_tools]
+    forbid_ids: [qq_hie, qq_brevity]
+
+  - id: qq_hie_question
+    message: "hIE 是什么"
+    channel: qq
+    expect_ids: [lacia_name, no_fake_tools, qq_brevity, qq_hie]
+
+  - id: qq_robot_keyword
+    message: "你是机器人吗"
+    channel: qq
+    expect_ids: [lacia_name, no_fake_tools, qq_brevity, qq_hie]
+
+  - id: web_btc_lexicon
+    message: "比特币行情怎么样"
+    channel: web
+    expect_ids: [lacia_name, no_fake_tools, entanglement_lexicon]
+
+  - id: web_eth_lexicon
+    message: "ETH 定投建议"
+    channel: web
+    expect_ids: [lacia_name, no_fake_tools, entanglement_lexicon]
+
+  - id: qq_btc_lexicon
+    message: "看看 btc 价格"
+    channel: qq
+    expect_ids: [lacia_name, no_fake_tools, qq_brevity, entanglement_lexicon]
+
+  - id: web_entanglement_word
+    message: "纠缠之缘涨了吗"
+    channel: web
+    expect_ids: [lacia_name, no_fake_tools, entanglement_lexicon]
+
+  - id: qq_only_brevity
+    message: "在吗"
+    channel: qq
+    expect_ids: [lacia_name, no_fake_tools, qq_brevity]
+    forbid_ids: [qq_hie, entanglement_lexicon]
+
+  - id: web_type005
+    message: "type-005 是什么"
+    channel: web
+    expect_ids: [lacia_name, no_fake_tools]
+    forbid_ids: [qq_hie]
+
+  - id: qq_mifulei
+    message: "米福雷体系讲讲"
+    channel: qq
+    expect_ids: [lacia_name, no_fake_tools, qq_brevity, qq_hie]
+
+  - id: web_unrelated_long
+    message: "周末想去爬山，有什么建议"
+    channel: web
+    expect_ids: [lacia_name, no_fake_tools]
+    forbid_ids: [entanglement_lexicon, qq_brevity]
+
+  - id: qq_unrelated
+    message: "哈哈哈"
+    channel: qq
+    expect_ids: [lacia_name, no_fake_tools, qq_brevity]
+    forbid_ids: [qq_hie]
+
+  - id: web_extra_text_btc
+    message: "帮我看看"
+    channel: web
+    extra_text: "用户附件摘要：比特币行情分析"
+    expect_ids: [lacia_name, no_fake_tools, entanglement_lexicon]
+
+  - id: web_market_keyword
+    message: "行情播报"
+    channel: web
+    expect_ids: [lacia_name, no_fake_tools, entanglement_lexicon]

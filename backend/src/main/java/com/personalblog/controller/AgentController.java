@@ -61,7 +61,8 @@ public class AgentController {
                     role,
                     request.getLimit(),
                     resolveBearerToken(httpRequest),
-                    request.getAttachments() != null ? request.getAttachments() : java.util.List.of()
+                    request.getAttachments() != null ? request.getAttachments() : java.util.List.of(),
+                    normalizeExecutionMode(request.getExecutionMode())
             );
 
             StreamingResponseBody body = outputStream -> {
@@ -135,6 +136,17 @@ public class AgentController {
             log.debug("[agent/chat] profile name unavailable userId={}", user.getId());
         }
         return displayNameFromEmail(user.getEmail());
+    }
+
+    private static String normalizeExecutionMode(String mode) {
+        if (mode == null || mode.isBlank()) {
+            return "auto";
+        }
+        String key = mode.trim().toLowerCase();
+        return switch (key) {
+            case "plan", "fast" -> key;
+            default -> "auto";
+        };
     }
 
     private String displayNameFromEmail(String email) {

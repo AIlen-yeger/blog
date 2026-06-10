@@ -1,24 +1,38 @@
 import { ApiError } from '@/api/http'
 import {
   createAgentSessionRemote,
+  fetchAgentSessions,
   fetchSessionMessages,
 } from '@/api/agentSessions'
 import { hasValidSession } from '@/composables/useSession'
 import type { ChatMessage } from '@/utils/agentSessionsStorage'
 import {
+  clearActiveSessionId,
   createLocalAgentSession,
   ensureLocalDefaultSession,
   getActiveSessionId,
   setActiveSessionId,
 } from '@/utils/agentSessionsStorage'
 
+async function isRemoteSessionValid(sessionId: string): Promise<boolean> {
+  try {
+    const rows = await fetchAgentSessions()
+    return rows.some((s) => s.sessionId === sessionId)
+  } catch {
+    return false
+  }
+}
+
 export async function ensureAgentSessionId(): Promise<string> {
   if (!hasValidSession()) {
     return ensureLocalDefaultSession().sessionId
   }
   const existing = getActiveSessionId()
-  if (existing) {
+  if (existing && (await isRemoteSessionValid(existing))) {
     return existing
+  }
+  if (existing) {
+    clearActiveSessionId()
   }
   const created = await createAgentSessionRemote()
   setActiveSessionId(created.sessionId)

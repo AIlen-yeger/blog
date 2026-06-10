@@ -6,6 +6,7 @@ import ContentImageGallery from './ContentImageGallery.vue'
 import ContentReaderModal from './ContentReaderModal.vue'
 import AgentReplyBlock from './AgentReplyBlock.vue'
 import { useAgentReplySettings } from '@/composables/useAgentReplySettings'
+import { stripMarkdownForPlainText } from '@/utils/renderMarkdown'
 
 const props = withDefaults(
   defineProps<{
@@ -26,6 +27,8 @@ const { shouldShowReply, isGenerating, canViewAgentReply } = useAgentReplySettin
 
 const showAgentReply = computed(() => shouldShowReply('note', props.item.agentReply))
 
+const plainExcerpt = computed(() => stripMarkdownForPlainText(props.item.excerpt))
+
 const agentReplyGenerating = computed(
   () =>
     canViewAgentReply('note') &&
@@ -34,6 +37,11 @@ const agentReplyGenerating = computed(
 
 function openReader() {
   readerOpen.value = true
+}
+
+function onEditFromReader() {
+  readerOpen.value = false
+  onEdit()
 }
 
 function onEdit() {
@@ -70,7 +78,7 @@ function onPin() {
         />
       </div>
       <h3 class="card-title" :class="{ 'is-pinned': item.pinned }">{{ item.title }}</h3>
-      <p class="excerpt">{{ item.excerpt }}</p>
+      <p class="excerpt">{{ plainExcerpt }}</p>
       <p v-if="agentReplyGenerating" class="agent-reply-pending">蕾西亚正在写回复…</p>
       <AgentReplyBlock
         v-if="showAgentReply && item.agentReply"
@@ -82,6 +90,14 @@ function onPin() {
       <div class="meta">
         <time :datetime="item.date">{{ item.date }}</time>
         <div class="meta-right">
+          <button
+            v-if="editable"
+            type="button"
+            class="edit-btn"
+            @click="onEdit"
+          >
+            编辑
+          </button>
           <button type="button" class="read-btn" @click="openReader">阅读全文</button>
         </div>
       </div>
@@ -91,7 +107,9 @@ function onPin() {
       :open="readerOpen"
       kind="note"
       :item="item"
+      :editable="editable"
       @close="readerOpen = false"
+      @edit="onEditFromReader"
     />
   </article>
 </template>
@@ -171,7 +189,20 @@ function onPin() {
 .meta-right {
   display: flex;
   align-items: center;
+  gap: 0.65rem;
   flex-shrink: 0;
+}
+.edit-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--color-accent-dark);
+  cursor: pointer;
+}
+.edit-btn:hover {
+  text-decoration: underline;
 }
 time {
   font-size: 0.78rem;

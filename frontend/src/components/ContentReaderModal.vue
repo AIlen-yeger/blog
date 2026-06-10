@@ -5,6 +5,7 @@ import { useContentViewTracking } from '@/composables/useContentView'
 import ContentImageGallery from './ContentImageGallery.vue'
 import AgentReplyBlock from './AgentReplyBlock.vue'
 import { useAgentReplySettings } from '@/composables/useAgentReplySettings'
+import { renderNoteMarkdown } from '@/utils/renderMarkdown'
 
 export interface ReaderItem {
   id: string
@@ -22,10 +23,12 @@ const props = defineProps<{
   open: boolean
   kind: ContentKind
   item: ReaderItem | null
+  editable?: boolean
 }>()
 
 const emit = defineEmits<{
   close: []
+  edit: []
   'view-count': [count: number]
 }>()
 
@@ -60,6 +63,10 @@ watch(
 )
 
 watch(viewCount, (n) => emit('view-count', n))
+
+const contentHtml = computed(() =>
+  props.item ? renderNoteMarkdown(props.item.content) : '',
+)
 </script>
 
 <template>
@@ -84,12 +91,22 @@ watch(viewCount, (n) => emit('view-count', n))
                 <span>{{ viewCount }} 次浏览</span>
               </p>
             </div>
-            <button type="button" class="close-btn" aria-label="关闭" @click="emit('close')">
-              ×
-            </button>
+            <div class="head-actions">
+              <button
+                v-if="editable"
+                type="button"
+                class="edit-btn"
+                @click="emit('edit')"
+              >
+                编辑
+              </button>
+              <button type="button" class="close-btn" aria-label="关闭" @click="emit('close')">
+                ×
+              </button>
+            </div>
           </header>
           <div class="reader-body">
-            <div class="content">{{ item.content }}</div>
+            <div class="content md-content" v-html="contentHtml" />
             <p v-if="agentReplyGenerating" class="agent-reply-pending">蕾西亚正在写回复…</p>
             <AgentReplyBlock
               v-if="showAgentReply && item.agentReply"
@@ -164,6 +181,25 @@ h2 {
 .dot {
   margin: 0 0.35rem;
 }
+.head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+.edit-btn {
+  padding: 0.35rem 0.75rem;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  border-radius: 10px;
+  background: rgba(59, 130, 246, 0.08);
+  color: var(--color-accent-dark);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.edit-btn:hover {
+  background: rgba(59, 130, 246, 0.16);
+}
 .close-btn {
   flex-shrink: 0;
   width: 2rem;
@@ -187,8 +223,51 @@ h2 {
   font-size: 0.95rem;
   line-height: 1.8;
   color: var(--color-text);
-  white-space: pre-wrap;
   word-break: break-word;
+}
+
+.content :deep(p) {
+  margin: 0 0 0.85rem;
+}
+
+.content :deep(h1),
+.content :deep(h2),
+.content :deep(h3) {
+  margin: 1rem 0 0.5rem;
+  line-height: 1.35;
+  color: var(--color-text);
+}
+
+.content :deep(h1) {
+  font-size: 1.15rem;
+}
+
+.content :deep(h2) {
+  font-size: 1.05rem;
+}
+
+.content :deep(h3) {
+  font-size: 1rem;
+}
+
+.content :deep(strong) {
+  font-weight: 700;
+}
+
+.content :deep(code) {
+  padding: 0.12em 0.35em;
+  border-radius: 4px;
+  background: rgba(59, 130, 246, 0.1);
+  font-size: 0.9em;
+}
+
+.content :deep(pre.md-code) {
+  margin: 0.75rem 0;
+  padding: 0.75rem 0.85rem;
+  border-radius: 8px;
+  background: rgba(15, 25, 45, 0.06);
+  overflow-x: auto;
+  white-space: pre-wrap;
 }
 .agent-reply-pending {
   margin: 1rem 0 0;

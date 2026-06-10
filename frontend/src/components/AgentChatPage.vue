@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import AgentPlanSteps from '@/components/AgentPlanSteps.vue'
 import { useAgentChat } from '@/composables/useAgentChat'
 import { exitAgentChat } from '@/utils/agentRoute'
 import { resolveMediaUrl } from '@/utils/mediaUrl'
+import { renderNoteMarkdown } from '@/utils/renderMarkdown'
 
 const { loggedIn: loggedInProp } = defineProps<{
   loggedIn?: boolean
@@ -32,6 +34,8 @@ const {
   pendingAttachments,
   pendingActionPreview,
   publishNoteLoading,
+  planSteps,
+  planModeEnabled,
   sidebarOpen,
   selectSession,
   startNewSession,
@@ -42,12 +46,18 @@ const {
   removeAttachment,
   dismissActionPreview,
   confirmPublishNote,
+  togglePlanMode,
   clearError,
   toggleSidebar,
   refreshSessions,
   sessionsLoading,
   messagesLoading,
 } = useAgentChat()
+
+const previewBodyHtml = computed(() => {
+  const text = pendingActionPreview.value?.data?.contentPreview ?? ''
+  return renderNoteMarkdown(text)
+})
 
 watch(
   pendingActionPreview,
@@ -152,7 +162,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="agent-page" @dragover.prevent @drop="onDrop">
+  <div class="agent-page" @dragover.prevent @drop="onDrop" @wheel.stop>
     <aside class="agent-sidebar" :class="{ 'is-collapsed': !sidebarOpen }">
       <div class="agent-sidebar__head">
         <button
@@ -225,7 +235,8 @@ onMounted(() => {
           <div v-if="!displayMessages.length" class="agent-welcome">
             <p class="agent-welcome__title">你好，我是蕾西亚</p>
             <p class="agent-welcome__hint">
-              可以聊博客、加歌、查笔记，也可以上传图片、PDF 或 Markdown 让我一起看或发布笔记。
+              可以聊博客、加歌、查笔记，也可以上传图片、PDF 或 Markdown。
+              多任务可开启「分步执行」，或输入 <code>/plan 发布笔记并加歌</code>。
             </p>
           </div>
 
@@ -258,6 +269,8 @@ onMounted(() => {
           </div>
         </article>
         </template>
+
+        <AgentPlanSteps v-if="planSteps.length" :steps="planSteps" />
       </div>
 
       <div
@@ -275,7 +288,10 @@ onMounted(() => {
             <span>专题</span>
             <input v-model="previewTopic" type="text" class="agent-preview__input" />
           </label>
-          <pre class="agent-preview__body">{{ pendingActionPreview.data.contentPreview }}</pre>
+          <div
+            class="agent-preview__body md-content"
+            v-html="previewBodyHtml"
+          />
           <p
             v-if="pendingActionPreview.data.attachmentNames"
             class="agent-preview__files"
@@ -352,6 +368,16 @@ onMounted(() => {
           @click="onPickFiles"
         >
           📎
+        </button>
+        <button
+          type="button"
+          class="agent-composer__plan"
+          :class="{ 'is-active': planModeEnabled }"
+          title="分步执行：先列出步骤再逐项完成"
+          :disabled="isStreaming"
+          @click="togglePlanMode"
+        >
+          分步
         </button>
         <textarea
           ref="inputRef"
@@ -593,6 +619,7 @@ onMounted(() => {
   overflow-y: auto;
   padding: 1.25rem clamp(1.5rem, 5vw, 4rem) 0.75rem;
   scroll-behavior: smooth;
+  overscroll-behavior: contain;
 }
 
 .agent-messages__loading {
@@ -804,6 +831,29 @@ onMounted(() => {
   cursor: not-allowed;
 }
 
+.agent-composer__plan {
+  flex-shrink: 0;
+  height: 2.25rem;
+  padding: 0 0.55rem;
+  border: 1px solid rgba(140, 190, 255, 0.22);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 0.78rem;
+  color: var(--agent-muted);
+  cursor: pointer;
+}
+
+.agent-composer__plan.is-active {
+  border-color: rgba(142, 200, 255, 0.55);
+  background: rgba(90, 159, 212, 0.2);
+  color: var(--agent-accent);
+}
+
+.agent-composer__plan:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .agent-composer__input {
   flex: 1;
   min-width: 0;
@@ -878,9 +928,32 @@ onMounted(() => {
   border-radius: 8px;
   background: rgba(8, 16, 32, 0.45);
   font-size: 0.8rem;
-  line-height: 1.45;
-  white-space: pre-wrap;
+  line-height: 1.55;
   word-break: break-word;
+}
+
+.agent-preview__body :deep(p) {
+  margin: 0 0 0.5rem;
+}
+
+.agent-preview__body :deep(h1),
+.agent-preview__body :deep(h2),
+.agent-preview__body :deep(h3) {
+  margin: 0.35rem 0 0.4rem;
+  font-size: inherit;
+  font-weight: 700;
+}
+
+.agent-preview__body :deep(strong) {
+  font-weight: 700;
+  color: var(--agent-text);
+}
+
+.agent-preview__body :deep(code) {
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  background: rgba(140, 190, 255, 0.12);
+  font-size: 0.92em;
 }
 
 .agent-preview__files {

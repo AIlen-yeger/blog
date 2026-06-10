@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, toRef } from 'vue'
+import { computed, nextTick, onMounted, ref, toRef } from 'vue'
 import SideNav from './SideNav.vue'
 import BlogSection from './BlogSection.vue'
 import NoteCard from './NoteCard.vue'
@@ -120,14 +120,25 @@ function selectTopicFilter(id: 'all' | string) {
   selectedTopicFilter.value = id
 }
 
+const editorOpen = computed(() => noteEditorOpen.value || lifeEditorOpen.value)
+
+function closeEditors() {
+  noteEditorOpen.value = false
+  lifeEditorOpen.value = false
+}
+
 function openNoteEditor(item: NoteItem | null = null) {
+  lifeEditorOpen.value = false
   editingNote.value = item
   noteEditorOpen.value = true
+  void nextTick(() => scrollToSection('notes'))
 }
 
 function openLifeEditor(item: LifeItem | null = null) {
+  noteEditorOpen.value = false
   editingLife.value = item
   lifeEditorOpen.value = true
+  void nextTick(() => scrollToSection('life'))
 }
 
 async function onSaveProfile(data: ProfileData) {
@@ -154,7 +165,8 @@ async function onSaveProfile(data: ProfileData) {
       @return-landing="emit('returnLanding')"
     />
 
-    <main ref="mainRef" class="main-scroll">
+    <div class="main-area" :class="{ 'is-editing': editorOpen && canManage }">
+      <main ref="mainRef" class="main-scroll">
       <p v-if="loading" class="blog-alert blog-alert--loading" role="status">
         <span class="blog-alert__dot" aria-hidden="true" />
         正在从服务器加载内容…
@@ -201,8 +213,8 @@ async function onSaveProfile(data: ProfileData) {
 
       <BlogSection id="notes" title-en="N O T E S" title-zh="学习笔记">
         <p class="section-desc">
-          点击「阅读全文」在弹窗中查看完整内容。
-          <template v-if="canManage">管理员可使用左侧栏「发布文章」添加内容，或通过卡片右上角 ··· 菜单编辑、置顶或删除。</template>
+          点击「阅读全文」查看完整内容；编辑时在当前页覆盖撰写，点 × 返回列表。
+          <template v-if="canManage">可通过卡片「编辑」或左侧「发布文章」打开。</template>
         </p>
 
         <div class="topic-filter-bar">
@@ -274,10 +286,8 @@ async function onSaveProfile(data: ProfileData) {
 
       <BlogSection id="life" title-en="L I F E" title-zh="生活记录">
         <p class="section-desc">
-          记录生活片段，点击「阅读全文」查看详情。
-          <template v-if="canManage">
-            管理员可使用左侧栏「发布日记」添加内容，或通过卡片右上角 ··· 菜单编辑、置顶或删除。
-          </template>
+          记录生活片段，点击「阅读全文」查看详情；编辑时在当前页覆盖撰写。
+          <template v-if="canManage">可通过卡片「编辑」或左侧「发布日记」打开。</template>
         </p>
         <p v-if="isSearchMode" class="search-hint">
           搜索到 {{ searchLifeCount }} 条生活记录
@@ -312,7 +322,21 @@ async function onSaveProfile(data: ProfileData) {
       </BlogSection>
 
       <footer class="site-foot">Personal Learning Blog · 仅供学习记录</footer>
-    </main>
+      </main>
+
+      <template v-if="canManage">
+        <NoteEditorModal
+          :open="noteEditorOpen"
+          :editing="editingNote"
+          @close="closeEditors"
+        />
+        <LifeEditorModal
+          :open="lifeEditorOpen"
+          :editing="editingLife"
+          @close="closeEditors"
+        />
+      </template>
+    </div>
 
     <ProfileSettingsModal
       v-if="canManage"
@@ -321,19 +345,6 @@ async function onSaveProfile(data: ProfileData) {
       :on-save="onSaveProfile"
       @close="profileModalOpen = false"
     />
-
-    <template v-if="canManage">
-      <NoteEditorModal
-        :open="noteEditorOpen"
-        :editing="editingNote"
-        @close="noteEditorOpen = false"
-      />
-      <LifeEditorModal
-        :open="lifeEditorOpen"
-        :editing="editingLife"
-        @close="lifeEditorOpen = false"
-      />
-    </template>
 
   </div>
 </template>
@@ -345,9 +356,21 @@ async function onSaveProfile(data: ProfileData) {
   background: var(--color-bg-dark);
 }
 
+.main-area {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  margin-left: 200px;
+}
+
+.main-area.is-editing .main-scroll {
+  overflow: hidden;
+}
+
 .main-scroll {
   flex: 1;
-  margin-left: 200px;
+  min-width: 0;
   height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
@@ -470,8 +493,11 @@ async function onSaveProfile(data: ProfileData) {
 }
 
 @media (max-width: 768px) {
-  .main-scroll {
+  .main-area {
     margin-left: 0;
+  }
+
+  .main-scroll {
     padding: 0.85rem 0.85rem var(--mobile-content-pad-bottom, 6.75rem);
     scroll-padding-bottom: var(--mobile-content-pad-bottom, 6.75rem);
   }

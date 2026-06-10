@@ -17,7 +17,6 @@ import com.personalblog.security.AdminGuard;
 import com.personalblog.service.AgentNoteCommentService;
 import com.personalblog.service.NoteService;
 import com.personalblog.service.TopicService;
-import com.personalblog.util.AgentContentHash;
 import com.personalblog.util.AgentReplySupport;
 import com.personalblog.util.ExcerptUtil;
 import com.personalblog.util.IdGenerator;
@@ -105,13 +104,11 @@ public class NoteServiceImpl implements NoteService {
             throw new BusinessException(ErrorCode.NOTE_NOT_FOUND);
         }
         validateWriteRequest(request, false);
-        String hashBefore = AgentContentHash.sha256NoteContent(entity.getTitle(), entity.getContent());
         applyWrite(entity, request);
         ensureStatus(entity);
-        String hashAfter = AgentContentHash.sha256NoteContent(entity.getTitle(), entity.getContent());
-        boolean contentChanged = !hashBefore.equals(hashAfter);
         noteMapper.update(entity);
-        if (ContentStatus.PUBLISHED.equals(entity.getStatus()) && contentChanged) {
+        if (Boolean.TRUE.equals(request.getRegenerateAgentReply())
+                && ContentStatus.PUBLISHED.equals(entity.getStatus())) {
             agentNoteCommentService.enqueueAfterNoteCreated(entity, request.getAgentSessionId());
         }
         return toDto(entity);

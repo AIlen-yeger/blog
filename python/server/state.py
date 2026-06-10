@@ -29,4 +29,5 @@ class AgentState(TypedDict, total=False):
     note_title: str
     job_id: str
     attachments: list[dict]
+    execution_mode: str
     messages: Annotated[list[AnyMessage], add_messages]

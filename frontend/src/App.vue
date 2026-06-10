@@ -90,13 +90,15 @@ const showBlog = computed(() => inBlog.value || pendingBlog.value)
 watch(
   () =>
     [
+      agentPageActive.value,
       preferLanding.value,
       showBlog.value,
       pendingBlog.value,
       animating.value,
       enteringBlog.value,
     ] as const,
-  ([prefer, show, pending, anim, entering]) => {
+  ([onAgent, prefer, show, pending, anim, entering]) => {
+    if (onAgent) return
     if (prefer) {
       enterLandingUrl()
       return
@@ -219,7 +221,9 @@ function exitGuestPreview() {
 }
 
 function onWheel(e: WheelEvent) {
-  if (inBlog.value || showLogin.value || animating.value || !isPC()) return
+  if (agentPageActive.value || inBlog.value || showLogin.value || animating.value || !isPC()) {
+    return
+  }
   if (e.deltaY > 25) {
     enterPreviewDown()
   } else if (e.deltaY < -25) {
@@ -233,7 +237,9 @@ function onTouchStart(e: TouchEvent) {
 }
 
 function onTouchEnd(e: TouchEvent) {
-  if (inBlog.value || showLogin.value || animating.value || isPC()) return
+  if (agentPageActive.value || inBlog.value || showLogin.value || animating.value || isPC()) {
+    return
+  }
   const endY = e.changedTouches[0]?.clientY ?? 0
   const deltaY = endY - touchStartY
 

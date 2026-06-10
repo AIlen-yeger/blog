@@ -11,4 +11,6 @@ public class AgentAttachmentDto {
     private String url;
     /** image | document | text */
     private String kind;
+    /** 内联文本（kind=text 且无 url 时） */
+    private String text;
 }

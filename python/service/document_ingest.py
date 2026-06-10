@@ -15,6 +15,11 @@ logger = logging.getLogger(__name__)
 MAX_BODY_CHARS = 80_000
 EXCERPT_CHARS = 200
 
+_MD_BOLD_RE = re.compile(r"\*\*(.+?)\*\*")
+_MD_ITALIC_RE = re.compile(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)")
+_MD_INLINE_CODE_RE = re.compile(r"`([^`]+)`")
+_MD_HEADING_RE = re.compile(r"^#{1,6}\s+")
+
 
 @dataclass
 class ParsedDocument:
@@ -24,6 +29,42 @@ class ParsedDocument:
     source_filename: str
     mime: str
     char_count: int
+
+
+def _strip_markdown_inline(text: str) -> str:
+    """标题等字段：去掉 **加粗**、*斜体*、`代码` 标记，保留可读文字。"""
+    if not text:
+        return ""
+    out = _MD_INLINE_CODE_RE.sub(r"\1", text)
+    out = _MD_BOLD_RE.sub(r"\1", out)
+    out = _MD_ITALIC_RE.sub(r"\1", out)
+    return out.strip()
+
+
+def _plain_excerpt(body: str) -> str:
+    plain = _strip_markdown_inline(body)
+    plain = _MD_HEADING_RE.sub("", plain)
+    plain = re.sub(r"\s+", " ", plain).strip()
+    if len(plain) <= EXCERPT_CHARS:
+        return plain
+    return plain[:EXCERPT_CHARS] + "…"
+
+
+def _drop_leading_title_line(body: str, title: str) -> str:
+    """正文首行若为与标题一致的 # 标题，去掉避免发布重复。"""
+    lines = body.splitlines()
+    if not lines:
+        return body
+    first = lines[0].strip()
+    m = re.match(r"^#{1,6}\s+(.+)$", first)
+    if not m:
+        return body
+    heading = _strip_markdown_inline(m.group(1).strip())
+    title_clean = _strip_markdown_inline(title.strip())
+    if heading == title_clean:
+        rest = "\n".join(lines[1:]).lstrip("\n")
+        return rest if rest else body
+    return body
 
 
 def _clean_text(text: str) -> str:
@@ -40,8 +81,8 @@ def _title_from_markdown(body: str, fallback: str) -> str:
     for line in body.splitlines():
         m = re.match(r"^#\s+(.+)$", line.strip())
         if m:
-            return m.group(1).strip()[:255]
-    return fallback
+            return _strip_markdown_inline(m.group(1).strip())[:255]
+    return _strip_markdown_inline(_title_from_filename(fallback))[:255]
 
 
 def _title_from_filename(name: str) -> str:
@@ -55,16 +96,48 @@ def _truncate(body: str) -> str:
     return body[:MAX_BODY_CHARS] + "\n\n…（内容已截断）"
 
 
-def _fetch_bytes(url: str) -> bytes:
-    req = urllib.request.Request(url, headers={"User-Agent": "blog-agent/1.0"})
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        return resp.read()
+def _resolve_fetch_url(url: str) -> str:
+    raw = (url or "").strip()
+    if not raw:
+        raise ValueError("empty url")
+    if raw.startswith("http://") or raw.startswith("https://"):
+        return raw
+    from utils.qq.qq_music_tools import blog_api_base
+
+    base = blog_api_base().rstrip("/")
+    if raw.startswith("/v1/"):
+        return f"{base}{raw[3:]}"
+    if raw.startswith("/"):
+        return f"{base}{raw}"
+    return f"{base}/{raw.lstrip('/')}"
+
+
+def _fetch_bytes(url: str, *, access_token: str = "") -> bytes:
+    fetch_url = _resolve_fetch_url(url)
+    headers = {"User-Agent": "blog-agent/1.0"}
+    token = (access_token or "").strip()
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    req = urllib.request.Request(fetch_url, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return resp.read()
+    except urllib.error.HTTPError as exc:
+        logger.warning(
+            "[document] fetch failed url=%s resolved=%s status=%s reason=%s",
+            url,
+            fetch_url,
+            exc.code,
+            exc.reason,
+        )
+        raise
 
 
 def parse_text_content(raw: str, *, filename: str, mime: str = "text/plain") -> ParsedDocument:
     body = _truncate(_clean_text(raw))
     title = _title_from_markdown(body, _title_from_filename(filename))
-    excerpt = body[:EXCERPT_CHARS] + ("…" if len(body) > EXCERPT_CHARS else "")
+    body = _drop_leading_title_line(body, title)
+    excerpt = _plain_excerpt(body)
     return ParsedDocument(
         title=title,
         body=body,
@@ -132,15 +205,17 @@ def parse_attachment(*, url: str, name: str, mime: str = "", kind: str = "") -> 
     mime_l = (mime or "").lower()
     kind_l = (kind or "").lower()
 
-    if kind_l == "text" or mime_l.startswith("text/"):
-        # 已由前端内联文本时直接 parse_text_content
-        raise ValueError("text attachment should use parse_text_content")
+    # 有 URL 时一律拉取解析；内联 text 由 publish_note_route 走 parse_text_content
+    if kind_l == "image" or mime_l.startswith("image/"):
+        raise ValueError(f"图片附件不支持文档解析：{filename}")
 
     try:
         data = _fetch_bytes(url)
     except urllib.error.URLError as exc:
         logger.warning("[document] fetch failed url=%s err=%s", url, exc.reason)
         raise RuntimeError(f"无法读取附件：{exc.reason}") from exc
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(f"无法读取附件：HTTP {exc.code}") from exc
 
     if lower.endswith(".pdf") or mime_l == "application/pdf":
         return parse_pdf_bytes(data, filename=filename)
@@ -163,7 +238,7 @@ def merge_parsed_documents(docs: list[ParsedDocument]) -> ParsedDocument:
     body = _truncate(
         _clean_text("\n\n---\n\n".join(f"## {d.source_filename}\n\n{d.body}" for d in docs))
     )
-    excerpt = body[:EXCERPT_CHARS] + ("…" if len(body) > EXCERPT_CHARS else "")
+    excerpt = _plain_excerpt(body)
     return ParsedDocument(
         title=title,
         body=body,

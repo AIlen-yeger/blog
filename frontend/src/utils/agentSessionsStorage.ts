@@ -144,6 +144,15 @@ export function setActiveSessionId(id: string) {
   }
 }
 
+/** 登录/登出时丢弃访客本地 active session，避免与后端会话混用 */
+export function clearActiveSessionId() {
+  try {
+    localStorage.removeItem(ACTIVE_KEY)
+  } catch {
+    /* ignore */
+  }
+}
+
 export function getActiveSession(): AgentChatSession | null {
   const sessions = loadRawSessions()
   const activeId = getActiveSessionId()

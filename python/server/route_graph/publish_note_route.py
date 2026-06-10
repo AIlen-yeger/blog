@@ -41,17 +41,28 @@ def _parse_attachments(attachments: list[dict]) -> list[ParsedDocument]:
         kind = str(att.get("kind") or "").lower()
         name = str(att.get("name") or "document")
         mime = str(att.get("mime") or "")
-        url = str(att.get("url") or "")
-        text_inline = str(att.get("text") or att.get("content") or "")
-        if kind == "text" or (text_inline and not url):
+        url = str(att.get("url") or "").strip()
+        text_inline = str(att.get("text") or att.get("content") or "").strip()
+
+        # 仅内联、无 URL：直接解析文本
+        if text_inline and not url:
             docs.append(parse_text_content(text_inline, filename=name, mime=mime or "text/plain"))
             continue
         if not url:
             continue
+
+        # 有 URL：按文档拉取（兼容 kind=text 但 Java 未透传 text 字段的情况）
+        fetch_kind = "document" if kind in ("", "text", "document") else kind
         try:
-            docs.append(parse_attachment(url=url, name=name, mime=mime, kind=kind))
+            docs.append(parse_attachment(url=url, name=name, mime=mime, kind=fetch_kind))
         except Exception as exc:
-            logger.warning("[publish_note] parse failed name=%s err=%s", name, exc)
+            logger.warning(
+                "[publish_note] parse failed name=%s kind=%s url=%s err=%s",
+                name,
+                kind,
+                url,
+                exc,
+            )
             raise
     return docs
 

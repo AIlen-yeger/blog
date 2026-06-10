@@ -4,12 +4,14 @@ import com.personalblog.common.ApiResponse;
 import com.personalblog.dto.NoteDto;
 import com.personalblog.dto.NoteWriteRequest;
 import com.personalblog.dto.PublishNoteActionRequest;
+import com.personalblog.dto.UpdateNoteActionRequest;
 import com.personalblog.service.NoteService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -38,5 +40,21 @@ public class AgentActionController {
                         : "published");
         NoteDto created = noteService.createNote(body);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(created));
+    }
+
+    /** 更新已有笔记；不触发 Agent 回复（与 PUT /notes/{id} 一致）。 */
+    @PutMapping("/update-note")
+    public ApiResponse<NoteDto> updateNote(@Valid @RequestBody UpdateNoteActionRequest request) {
+        NoteWriteRequest body = new NoteWriteRequest();
+        body.setTitle(request.getTitle().trim());
+        body.setContent(request.getContent().trim());
+        if (request.getTopicTitle() != null && !request.getTopicTitle().isBlank()) {
+            body.setTopicTitle(request.getTopicTitle().trim());
+        }
+        if (request.getStatus() != null && !request.getStatus().isBlank()) {
+            body.setStatus(request.getStatus().trim());
+        }
+        body.setRegenerateAgentReply(false);
+        return ApiResponse.ok(noteService.updateNote(request.getNoteId().trim(), body));
     }
 }

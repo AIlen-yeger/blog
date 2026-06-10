@@ -67,19 +67,20 @@ class Lorebook:
             entries=entries,
         )
 
-    def select(
-            self,
-            message: str,
-            *,
-            channel: str,
-            extra_text: str = "",
-    ) -> str:
-        """返回可拼进 system 的 lore 块（已截断）。"""
+    def _pick_entries(
+        self,
+        message: str,
+        *,
+        channel: str,
+        extra_text: str = "",
+    ) -> list[LoreEntry]:
         hay = f"{message}\n{extra_text}".lower()
         ch = (channel or "web").strip().lower()
         picked: list[LoreEntry] = []
 
         for e in self.entries:
+            if not e.enabled:
+                continue
             if e.channel and e.channel != ch:
                 continue
             if e.constant:
@@ -89,6 +90,27 @@ class Lorebook:
                 picked.append(e)
 
         picked.sort(key=lambda x: x.priority, reverse=True)
+        return picked
+
+    def select_matched_ids(
+        self,
+        message: str,
+        *,
+        channel: str,
+        extra_text: str = "",
+    ) -> list[str]:
+        """与 select 相同筛选逻辑，返回 entry id 列表（评测用）。"""
+        return [e.id for e in self._pick_entries(message, channel=channel, extra_text=extra_text)]
+
+    def select(
+            self,
+            message: str,
+            *,
+            channel: str,
+            extra_text: str = "",
+    ) -> str:
+        """返回可拼进 system 的 lore 块（已截断）。"""
+        picked = self._pick_entries(message, channel=channel, extra_text=extra_text)
 
         parts: list[str] = []
         used = 0

@@ -17,7 +17,15 @@ from server.route_graph.comment_route import run_note_comment
 from server.aicoin_access import aicoin_allowed_for_state
 from server.route_graph.aicoin_route import run_aicoin_react
 from server.route_graph.music_route import run_music_react
-from server.route_graph.orchestrator_graph import run_orchestrator, should_orchestrate
+from server.route_graph.orchestrator_graph import (
+    effective_orchestrator_mode,
+    plan_tasks,
+    resolve_execution_mode,
+    run_orchestrator_step,
+    should_delegate_chat,
+    should_emit_plan_ui,
+    should_use_orchestrator,
+)
 from server.route_graph.publish_note_route import run_publish_note_preview
 from server.state import AgentState
 from utils.judge_intent.quick_judge import should_skip_memory_pipeline
@@ -115,6 +123,7 @@ class AgentEntry:
         user_role: str = "",
         friend_qq: str = "",
         attachments: list | None = None,
+        execution_mode: str = "auto",
     ) -> AgentReplyResult:
         ch = (channel or "web").strip().lower()
         tid = trace_id or new_trace_id()
@@ -133,6 +142,9 @@ class AgentEntry:
             "note_id": (note_id or "").strip(),
             "note_title": (note_title or "").strip(),
             "attachments": list(attachments or []),
+            "execution_mode": resolve_execution_mode(
+                {"execution_mode": (execution_mode or "auto").strip().lower()}
+            ),
         }
 
         bind_trace(trace_id=tid, session_id=session_id, user_id=user_id)
@@ -141,14 +153,20 @@ class AgentEntry:
         #测试/调试强制路由，跳过 judge
         forced = canonical_intent(force_intent) if (force_intent or "").strip() else ""
 
-        if forced == "orchestrate" or (not forced and should_orchestrate(state)):
-            orch = run_orchestrator(state)
-            if not orch.get("delegate_chat"):
+        use_orchestrator = forced == "orchestrate" or (
+            not forced and should_use_orchestrator(state)
+        )
+        if use_orchestrator:
+            orch_mode = effective_orchestrator_mode(
+                state, force_orchestrate=(forced == "orchestrate")
+            )
+            tasks = plan_tasks(state)
+            if not should_delegate_chat(tasks, orch_mode):
                 return AgentReplyResult(
                     intent="orchestrate",
                     output_mode="stream",
                     channel=ch,
-                    _body_stream=self._stream_orchestrator(orch),
+                    _body_stream=self._stream_orchestrator_live(state, tasks, orch_mode),
                 )
 
         if forced:
@@ -365,17 +383,101 @@ class AgentEntry:
             yield _format_sse({"code": 50000, "message": f"笔记预览失败：{exc}"})
             yield _sse_done()
 
-    def _stream_orchestrator(self, orch: dict) -> Iterator[str]:
+    def _stream_orchestrator_live(
+        self,
+        state: AgentState,
+        tasks: list[dict],
+        mode: str,
+    ) -> Iterator[str]:
+        bind_trace_from_state(state, intent="orchestrate")
         try:
-            yield from self._emit_preview_stream(
-                intent="orchestrate",
-                message=orch.get("final_answer") or "",
-                preview=orch.get("preview"),
-                action=orch.get("action") or "",
-            )
-        except Exception as exc:
+            if should_emit_plan_ui(tasks, mode):
+                yield _format_sse(
+                    {
+                        "type": "plan",
+                        "steps": [
+                            {
+                                "id": t["id"],
+                                "intent": t["intent"],
+                                "title": t["title"],
+                                "status": "pending",
+                            }
+                            for t in tasks
+                        ],
+                    }
+                )
+
+            agent_state: AgentState = {
+                "question": state.get("question") or "",
+                "session_id": state.get("session_id") or "",
+                "user_id": int(state.get("user_id") or 0),
+                "limit": int(state.get("limit") or _DEFAULT_HISTORY_LIMIT),
+                "access_token": state.get("access_token") or "",
+                "channel": state.get("channel") or "web",
+                "user_name": state.get("user_name") or "",
+                "account": state.get("account") or "",
+                "user_role": state.get("user_role") or "",
+                "trace_id": state.get("trace_id") or "",
+                "attachments": state.get("attachments") or [],
+                "execution_mode": mode,
+            }
+
+            parts: list[str] = []
+            pending_preview: dict | None = None
+            pending_action = ""
+
+            for task in tasks:
+                step_id = str(task.get("id") or "")
+                if step_id:
+                    yield _format_sse(
+                        {"type": "plan_step", "stepId": step_id, "status": "running"}
+                    )
+                try:
+                    result = run_orchestrator_step(agent_state, task)
+                    if result.get("preview"):
+                        pending_preview = result.get("preview")
+                        pending_action = str(result.get("action") or "publish_note")
+                    parts.append(str(result.get("text") or ""))
+                    if step_id:
+                        yield _format_sse(
+                            {
+                                "type": "plan_step",
+                                "stepId": step_id,
+                                "status": "done",
+                                "summary": str(result.get("summary") or ""),
+                            }
+                        )
+                except Exception:
+                    logger.exception(
+                        "[agent] orchestrator step failed intent=%s",
+                        task.get("intent"),
+                    )
+                    parts.append("该步骤处理失败，请稍后重试。")
+                    if step_id:
+                        yield _format_sse(
+                            {
+                                "type": "plan_step",
+                                "stepId": step_id,
+                                "status": "failed",
+                                "summary": "处理失败",
+                            }
+                        )
+
+            body = "\n\n".join(p for p in parts if p).strip() or "处理完成。"
+            for i in range(0, len(body), _STREAM_CHUNK_CHARS):
+                yield _format_sse({"type": "delta", "content": body[i : i + _STREAM_CHUNK_CHARS]})
+            if pending_preview and pending_action:
+                yield _format_sse(
+                    {
+                        "type": "action_preview",
+                        "action": pending_action,
+                        "data": pending_preview,
+                    }
+                )
+            yield _sse_done()
+        except Exception:
             logger.exception("[agent] orchestrator stream failed")
-            yield _format_sse({"code": 50000, "message": f"编排失败：{exc}"})
+            yield _format_sse({"code": 50000, "message": "编排暂时不可用，请稍后重试"})
             yield _sse_done()
 
     def _emit_preview_stream(

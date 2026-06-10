@@ -22,4 +22,7 @@ public class AgentChatRequest {
     private int limit = 5;
 
     private List<AgentAttachmentDto> attachments = new ArrayList<>();
+
+    /** auto | plan | fast */
+    private String executionMode = "auto";
 }

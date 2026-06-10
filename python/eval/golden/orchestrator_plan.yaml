@@ -1,0 +1,101 @@
+cases:
+  - id: plan_publish_and_music
+    kind: plan
+    question: "帮我把附件发布笔记，顺便加这首歌 https://y.qq.com/n/xxx"
+    attachments:
+      - {kind: document, name: draft.md, url: "http://x/a.md"}
+    expect_intents: [publish_note, music]
+
+  - id: plan_publish_only
+    kind: plan
+    question: "发布笔记到博客"
+    attachments:
+      - {kind: document, name: note.md, url: "http://x/note.md"}
+    expect_intents: [publish_note]
+
+  - id: plan_music_link_only
+    kind: plan
+    question: "加这首歌 https://y.qq.com/n/ryqq/song/1"
+    attachments: []
+    expect_intents: [music]
+
+  - id: plan_add_song_keyword
+    kind: plan
+    question: "添加歌曲到歌单"
+    attachments: []
+    expect_intents: [music]
+
+  - id: plan_chat_only
+    kind: plan
+    question: "今天天气怎么样"
+    attachments: []
+    expect_intents: []
+
+  - id: orch_attachment_only
+    kind: should_orchestrate
+    question: "帮我看看"
+    attachments:
+      - {kind: document, name: a.md}
+    expect: true
+
+  - id: orch_multi_intent_word
+    kind: should_orchestrate
+    question: "发布笔记顺便加歌"
+    attachments: []
+    expect: true
+
+  - id: orch_publish_and_music_text
+    kind: should_orchestrate
+    question: "发布笔记并加这首 qq.com 音乐"
+    attachments: []
+    expect: true
+
+  - id: orch_chat_only
+    kind: should_orchestrate
+    question: "你好"
+    attachments: []
+    expect: false
+
+  - id: use_orch_auto_attachment
+    kind: should_orchestrate
+    question: "整理一下"
+    attachments:
+      - {kind: document, name: b.md}
+    expect: true
+
+  - id: use_orch_fast_skip
+    kind: should_use_orchestrator
+    question: "发布笔记并加歌"
+    attachments:
+      - {kind: document, name: a.md}
+    execution_mode: fast
+    expect: false
+
+  - id: use_orch_plan_force
+    kind: should_use_orchestrator
+    question: "你好"
+    attachments: []
+    execution_mode: plan
+    expect: true
+
+  - id: ui_plan_single
+    kind: should_emit_plan_ui
+    steps:
+      - {id: "1", intent: chat, title: "补充说明"}
+    mode: plan
+    expect: true
+
+  - id: ui_auto_single_no
+    kind: should_emit_plan_ui
+    steps:
+      - {id: "1", intent: chat, title: "补充说明"}
+    mode: auto
+    expect: false
+
+  - id: ui_auto_two_steps
+    kind: should_emit_plan_ui
+    steps:
+      - {id: "1", intent: publish_note, title: "整理笔记"}
+      - {id: "2", intent: music, title: "添加歌曲"}
+    mode: auto
+    expect: true

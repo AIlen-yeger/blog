@@ -4,7 +4,18 @@ import { getAuthToken, hasValidSession } from '@/composables/useSession'
 import {
   buildAgentChatPayload,
   type AgentAttachmentPayload,
+  type ExecutionMode,
 } from '@/utils/agentPayload'
+
+export type PlanStepStatus = 'pending' | 'running' | 'done' | 'failed'
+
+export interface PlanStep {
+  id: string
+  intent: string
+  title: string
+  status: PlanStepStatus
+  summary?: string
+}
 
 export interface ChatTurn {
   role: 'user' | 'assistant'
@@ -55,6 +66,8 @@ export interface PublishNotePreviewData {
 export interface AgentChatStreamOptions {
   onMeta?: (meta: { intent?: string }) => void
   onActionPreview?: (preview: { action: string; data: PublishNotePreviewData }) => void
+  onPlan?: (steps: PlanStep[]) => void
+  onPlanStep?: (update: { stepId: string; status: PlanStepStatus; summary?: string }) => void
 }
 
 function handleSsePayload(
@@ -64,6 +77,8 @@ function handleSsePayload(
 ) {
   const onMeta = options?.onMeta
   const onActionPreview = options?.onActionPreview
+  const onPlan = options?.onPlan
+  const onPlanStep = options?.onPlanStep
   if (!payload || typeof payload !== 'object') return
   const row = payload as Record<string, unknown>
   if (typeof row.code === 'number' && row.code !== 0) {
@@ -81,6 +96,26 @@ function handleSsePayload(
     if (action && data && typeof data.title === 'string') {
       onActionPreview?.({ action, data })
     }
+    return
+  }
+  if (type === 'plan' && Array.isArray(row.steps)) {
+    const steps = (row.steps as Record<string, unknown>[])
+      .map((s) => ({
+        id: String(s.id ?? ''),
+        intent: String(s.intent ?? ''),
+        title: String(s.title ?? ''),
+        status: (String(s.status ?? 'pending') as PlanStepStatus) || 'pending',
+        summary: typeof s.summary === 'string' ? s.summary : undefined,
+      }))
+      .filter((s) => s.id && s.title)
+    if (steps.length) onPlan?.(steps)
+    return
+  }
+  if (type === 'plan_step') {
+    const stepId = typeof row.stepId === 'string' ? row.stepId : String(row.stepId ?? '')
+    const status = String(row.status ?? 'running') as PlanStepStatus
+    const summary = typeof row.summary === 'string' ? row.summary : undefined
+    if (stepId) onPlanStep?.({ stepId, status, summary })
     return
   }
   const piece = extractPiece(payload)
@@ -135,7 +170,7 @@ function extractPiece(payload: unknown): string {
     throw new Error(String(row.message ?? 'Agent 返回错误'))
   }
   const type = String(row.type ?? '')
-  if (type === 'meta') return ''
+  if (type === 'meta' || type === 'plan' || type === 'plan_step' || type === 'action_preview') return ''
   const piece = row.content ?? row.delta ?? row.text ?? ''
   return typeof piece === 'string' ? piece : ''
 }
@@ -143,6 +178,7 @@ function extractPiece(payload: unknown): string {
 export interface AgentChatStreamContext extends AgentChatStreamOptions {
   sessionId?: string
   attachments?: AgentAttachmentPayload[]
+  executionMode?: ExecutionMode
 }
 
 export async function streamAgentChat(
@@ -181,7 +217,12 @@ export async function streamAgentChat(
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(
-      buildAgentChatPayload(question, options?.sessionId, options?.attachments),
+      buildAgentChatPayload(
+        question,
+        options?.sessionId,
+        options?.attachments,
+        options?.executionMode,
+      ),
     ),
     signal,
   })

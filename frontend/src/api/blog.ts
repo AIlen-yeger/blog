@@ -122,7 +122,12 @@ export async function createNoteApi(
 
 export async function updateNoteApi(
   id: string,
-  body: Partial<NoteItem> & { topicTitle?: string; agentSessionId?: string },
+  body: Partial<NoteItem> & {
+    topicTitle?: string
+    agentSessionId?: string
+    /** 默认 false；仅显式 true 时后端才会重新生成 Agent 回复 */
+    regenerateAgentReply?: boolean
+  },
 ): Promise<NoteItem> {
   return put<NoteItem>(`/notes/${id}`, body)
 }

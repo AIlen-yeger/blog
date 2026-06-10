@@ -1,0 +1,40 @@
+cases:
+  - id: recall_coffee_pref
+    query: "用户喜欢喝什么"
+    expect_text_substr: "手冲咖啡"
+    top_k: 5
+
+  - id: recall_pet_name
+    query: "宠物叫什么"
+    expect_text_substr: "布丁"
+    top_k: 5
+
+  - id: recall_work_topic
+    query: "最近在做什么项目"
+    expect_text_substr: "博客 Agent"
+    top_k: 5
+
+  - id: recall_tag_hobby
+    query: "业余爱好"
+    expect_tags: [hobby]
+    top_k: 5
+
+  - id: recall_tag_work
+    query: "工作内容"
+    expect_tags: [work]
+    top_k: 5
+
+  - id: recall_city
+    query: "住在哪个城市"
+    expect_text_substr: "上海"
+    top_k: 3
+
+  - id: recall_music_taste
+    query: "喜欢什么音乐"
+    expect_text_substr: "电子乐"
+    top_k: 5
+
+  - id: recall_coffee_and_work
+    query: "咖啡和编程项目"
+    expect_text_substr: "手冲咖啡"
+    top_k: 5

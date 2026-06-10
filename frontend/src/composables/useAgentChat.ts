@@ -4,6 +4,8 @@ import { hasValidSession } from '@/composables/useSession'
 import {
   streamAgentChat,
   type ChatTurn,
+  type PlanStep,
+  type PlanStepStatus,
   type PublishNotePreviewData,
 } from '@/api/agentChat'
 import { publishNoteAction } from '@/api/agentActions'
@@ -15,7 +17,11 @@ import {
   type AgentSessionRecord,
 } from '@/api/agentSessions'
 import { uploadContentImage, uploadDocument } from '@/api/blog'
-import type { AgentAttachmentPayload } from '@/utils/agentPayload'
+import {
+  stripPlanPrefix,
+  type AgentAttachmentPayload,
+  type ExecutionMode,
+} from '@/utils/agentPayload'
 import {
   AGENT_SESSION_NOT_FOUND,
   ensureAgentSessionId,
@@ -71,6 +77,19 @@ const loginRequired = ref(false)
 const pendingAttachments = ref<PendingAttachment[]>([])
 const pendingActionPreview = ref<PendingActionPreview | null>(null)
 const publishNoteLoading = ref(false)
+const planSteps = ref<PlanStep[]>([])
+
+const PLAN_MODE_KEY = 'kohaku-agent-plan-mode'
+
+function loadPlanModeEnabled(): boolean {
+  try {
+    return localStorage.getItem(PLAN_MODE_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
+const planModeEnabled = ref(loadPlanModeEnabled())
 const sidebarOpen = ref(
   typeof window !== 'undefined' ? window.innerWidth >= 768 : true,
 )
@@ -242,13 +261,16 @@ function deriveTitle(text: string, currentTitle: string) {
   return trimmed.length > 24 ? `${trimmed.slice(0, 24)}…` : trimmed
 }
 
-const TEXT_FILE_RE = /\.(txt|md|markdown|json|csv|log|xml|yaml|yml|js|ts|py|java|html|css)$/i
+const TEXT_FILE_RE = /\.(txt|json|csv|log|xml|yaml|yml|js|ts|py|java|html|css)$/i
+const MARKDOWN_FILE_RE = /\.(md|markdown)$/i
 const DOCUMENT_FILE_RE = /\.(pdf|docx?)$/i
 
 async function prepareAttachment(file: File): Promise<PendingAttachment> {
   const isImage = file.type.startsWith('image/')
+  const isMarkdown = MARKDOWN_FILE_RE.test(file.name)
   const isDocument =
     DOCUMENT_FILE_RE.test(file.name) ||
+    isMarkdown ||
     file.type === 'application/pdf' ||
     file.type.includes('wordprocessingml') ||
     file.type === 'application/msword'
@@ -358,8 +380,33 @@ async function buildAttachmentMeta(
   return { meta, payload, extra: parts.join('') }
 }
 
+function togglePlanMode() {
+  planModeEnabled.value = !planModeEnabled.value
+  try {
+    localStorage.setItem(PLAN_MODE_KEY, String(planModeEnabled.value))
+  } catch {
+    /* ignore */
+  }
+}
+
+function updatePlanStep(update: { stepId: string; status: PlanStepStatus; summary?: string }) {
+  const idx = planSteps.value.findIndex((s) => s.id === update.stepId)
+  if (idx < 0) return
+  const next = [...planSteps.value]
+  next[idx] = {
+    ...next[idx],
+    status: update.status,
+    summary: update.summary ?? next[idx].summary,
+  }
+  planSteps.value = next
+}
+
 async function sendMessage(options?: AgentChatSendOptions) {
-  const text = input.value.trim()
+  const rawText = input.value.trim()
+  const { question: strippedText, forcePlan } = stripPlanPrefix(rawText)
+  const text = strippedText || rawText
+  const executionMode: ExecutionMode =
+    planModeEnabled.value || forcePlan ? 'plan' : 'auto'
   const hasAttachments = pendingAttachments.value.length > 0
   if ((!text && !hasAttachments) || isStreaming.value) return
 
@@ -392,6 +439,7 @@ async function sendMessage(options?: AgentChatSendOptions) {
   let attachmentPayload: AgentAttachmentPayload[] = []
   let content = text
   pendingActionPreview.value = null
+  planSteps.value = []
   try {
     if (hasAttachments) {
       const built = await buildAttachmentMeta([...pendingAttachments.value])
@@ -446,11 +494,18 @@ async function sendMessage(options?: AgentChatSendOptions) {
       {
         sessionId: session.sessionId,
         attachments: attachmentPayload.length ? attachmentPayload : undefined,
+        executionMode,
         onMeta: (meta) => {
           if (meta.intent) agentIntent = meta.intent
         },
         onActionPreview: (preview) => {
           pendingActionPreview.value = preview
+        },
+        onPlan: (steps) => {
+          planSteps.value = steps
+        },
+        onPlanStep: (update) => {
+          updatePlanStep(update)
         },
       },
     )
@@ -553,14 +608,19 @@ async function confirmPublishNote(edits?: { title?: string; topicTitle?: string 
     })
     pendingActionPreview.value = null
     if (session) {
-      session.messages.push({
-        id: genId('a'),
-        role: 'assistant',
-        content: `笔记已发布：《${note.title}》`,
-        createdAt: Date.now(),
-      })
-      session.updatedAt = Date.now()
+      const sessionId = session.sessionId
+      const successMsg = `笔记已发布：《${note.title}》`
       await refreshSessions()
+      const target = sessions.value.find((s) => s.sessionId === sessionId)
+      if (target) {
+        target.messages.push({
+          id: genId('a'),
+          role: 'assistant',
+          content: successMsg,
+          createdAt: Date.now(),
+        })
+        target.updatedAt = Date.now()
+      }
     }
   } catch (e) {
     error.value = toUserErrorMessage(e, '发布笔记失败')
@@ -585,6 +645,8 @@ export function useAgentChat() {
     pendingAttachments,
     pendingActionPreview,
     publishNoteLoading,
+    planSteps,
+    planModeEnabled,
     sidebarOpen,
     selectSession,
     startNewSession,
@@ -595,6 +657,7 @@ export function useAgentChat() {
     removeAttachment,
     dismissActionPreview,
     confirmPublishNote,
+    togglePlanMode,
     clearError,
     toggleSidebar,
     refreshSessions,

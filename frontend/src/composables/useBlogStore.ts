@@ -408,9 +408,12 @@ export function useBlogStore() {
   ) {
     if (payload.id) {
       if (!useMockApi()) {
-        const updated = await blogApi.updateNoteApi(payload.id, {
-          ...payload,
-          agentSessionId: getAgentSessionId(),
+        const { id, agentSessionId: _ignored, ...rest } = payload as typeof payload & {
+          agentSessionId?: string
+        }
+        const updated = await blogApi.updateNoteApi(id, {
+          ...rest,
+          regenerateAgentReply: false,
         })
         const idx = state.notes.findIndex((n) => n.id === payload.id)
         if (idx >= 0) state.notes[idx] = updated

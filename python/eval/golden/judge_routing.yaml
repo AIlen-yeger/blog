@@ -1,0 +1,100 @@
+cases:
+  - id: music_qq_link
+    question: "帮我加这首歌 https://y.qq.com/n/ryqq/song/123"
+    expect_intent: music
+
+  - id: music_songid
+    question: "songid=102065750"
+    expect_intent: music
+
+  - id: music_add_song
+    question: "帮我把这首歌加歌"
+    expect_intent: music
+
+  - id: music_listen_report
+    question: "看看我最近听歌排行"
+    expect_intent: music
+
+  - id: music_listen_data
+    question: "分析一下我的听歌数据"
+    expect_intent: music
+
+  - id: music_qq_music
+    question: "QQ音乐里这首歌的创作背景是什么"
+    expect_intent: music
+
+  - id: music_query_song
+    question: "查一下我最近听了什么音乐"
+    expect_intent: music
+
+  - id: music_topic_analysis
+    question: "帮我分析歌曲情绪循环"
+    expect_intent: music
+
+  - id: publish_note_explicit
+    question: "帮我把这篇发布笔记"
+    expect_intent: publish_note
+
+  - id: publish_note_blog
+    question: "发到博客，标题就叫测试"
+    expect_intent: publish_note
+
+  - id: publish_note_upload
+    question: "上传的是笔记，请发布"
+    expect_intent: publish_note
+
+  - id: commit_user_reply
+    question: "给这篇笔记写一条 agent回复"
+    expect_intent: commit_user
+
+  - id: commit_user_comment
+    question: "笔记下面帮我评论一下"
+    expect_intent: commit_user
+
+  - id: aicoin_btc
+    question: "比特币现在多少钱"
+    expect_intent: aicoin
+
+  - id: aicoin_price
+    question: "看看币价走势"
+    expect_intent: aicoin
+
+  - id: aicoin_entanglement
+    question: "纠缠之缘今天行情怎么样"
+    expect_intent: aicoin
+
+  - id: aicoin_dca
+    question: "定投策略还合适吗"
+    expect_intent: aicoin
+
+  - id: aicoin_eth
+    question: "ETH 资金费率多少"
+    expect_intent: aicoin
+
+  - id: aicoin_topic_price
+    question: "这个币价格涨了吗"
+    expect_intent: aicoin
+
+  - id: aicoin_fear_greed
+    question: "恐惧贪婪指数是多少"
+    expect_intent: aicoin
+
+  - id: chat_weather
+    question: "今天天气怎么样"
+    expect_intent: chat
+
+  - id: chat_greeting
+    question: "你好呀"
+    expect_intent: chat
+
+  - id: chat_random
+    question: "你觉得人生有意义吗"
+    expect_intent: chat
+
+  - id: chat_empty_fallback
+    question: "   "
+    expect_intent: chat
+
+  - id: music_background
+    question: "这首歌的制作背景讲讲"
+    expect_intent: music

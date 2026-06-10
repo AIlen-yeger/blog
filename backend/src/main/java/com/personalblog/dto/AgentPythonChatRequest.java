@@ -24,4 +24,5 @@ public class AgentPythonChatRequest {
     private int limit;
     private String accessToken;
     private List<AgentAttachmentDto> attachments = new ArrayList<>();
+    private String executionMode = "auto";
 }

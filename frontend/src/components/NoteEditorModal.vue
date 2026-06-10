@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import type { NoteItem } from '@/data/mockContent'
 import ContentImageUpload from './ContentImageUpload.vue'
+import EditorDrawer from './EditorDrawer.vue'
 import { useBlogStore } from '@/composables/useBlogStore'
 import { toUserErrorMessage } from '@/utils/userErrorMessage'
 
@@ -21,6 +22,13 @@ const excerpt = ref('')
 const tag = ref('')
 const topicInput = ref('')
 const topicListId = 'note-topic-datalist'
+const content = ref('')
+const initialImageUrls = ref<string[]>([])
+const imageUploadRef = ref<InstanceType<typeof ContentImageUpload> | null>(null)
+const submitting = ref(false)
+const submitError = ref('')
+
+const drawerTitle = ref('发布文章')
 
 function topicTitleById(id: string): string {
   return topics.value.find((t) => t.id === id)?.title ?? id
@@ -35,17 +43,13 @@ function resolveTopicPayload(): { topicId?: string; topicTitle?: string } {
   if (matched) return { topicId: matched.id }
   return { topicTitle: input }
 }
-const content = ref('')
-const initialImageUrls = ref<string[]>([])
-const imageUploadRef = ref<InstanceType<typeof ContentImageUpload> | null>(null)
-const submitting = ref(false)
-const submitError = ref('')
 
 watch(
   () => [props.open, props.editing] as const,
   ([open, item]) => {
     if (!open) return
     submitError.value = ''
+    drawerTitle.value = item ? '编辑文章' : '发布文章'
     if (item) {
       title.value = item.title
       excerpt.value = item.excerpt
@@ -90,142 +94,100 @@ async function submit(publishStatus: 'published' | 'draft') {
 </script>
 
 <template>
-  <Teleport to="body">
-    <Transition name="fade">
-      <div v-if="open" class="backdrop">
-        <div class="modal" role="dialog">
-          <h2>{{ editing ? '编辑文章' : '发布文章' }}</h2>
-          <form class="form" @submit.prevent="submit('published')">
-            <label>标题</label>
-            <input v-model="title" required placeholder="笔记标题" :disabled="submitting" />
-            <label>摘要</label>
-            <input v-model="excerpt" placeholder="简短描述" :disabled="submitting" />
-            <div class="row">
-              <div class="field">
-                <label>标签</label>
-                <input v-model="tag" placeholder="如：前端" :disabled="submitting" />
-              </div>
-              <div class="field">
-                <label for="note-topic-input">专题</label>
-                <input
-                  id="note-topic-input"
-                  v-model="topicInput"
-                  :list="topicListId"
-                  placeholder="选择已有或输入新专题"
-                  required
-                  :disabled="submitting"
-                />
-                <datalist :id="topicListId">
-                  <option v-for="t in topics" :key="t.id" :value="t.title" />
-                </datalist>
-              </div>
-            </div>
-            <label>正文</label>
-            <textarea
-              v-model="content"
-              rows="8"
-              placeholder="详细内容…"
-              :disabled="submitting"
-            />
-            <ContentImageUpload
-              ref="imageUploadRef"
-              :initial-urls="initialImageUrls"
-            />
-            <p v-if="submitError" class="submit-err" role="alert">{{ submitError }}</p>
-            <div class="actions">
-              <button
-                type="button"
-                class="btn ghost"
-                :disabled="submitting"
-                @click="emit('close')"
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                class="btn ghost"
-                :disabled="submitting"
-                @click="submit('draft')"
-              >
-                {{ submitting ? '保存中…' : '存为草稿' }}
-              </button>
-              <button type="submit" class="btn primary" :disabled="submitting">
-                {{ submitting ? '发布中…' : editing ? '保存并发布' : '发布' }}
-              </button>
-            </div>
-          </form>
+  <EditorDrawer :open="open" :title="drawerTitle" @close="emit('close')">
+    <form class="form" @submit.prevent="submit('published')">
+      <label>标题</label>
+      <input v-model="title" required placeholder="笔记标题" :disabled="submitting" />
+      <label>摘要</label>
+      <input v-model="excerpt" placeholder="简短描述（可选）" :disabled="submitting" />
+      <div class="row">
+        <div class="field">
+          <label>标签</label>
+          <input v-model="tag" placeholder="如：前端" :disabled="submitting" />
+        </div>
+        <div class="field">
+          <label for="note-topic-input">专题</label>
+          <input
+            id="note-topic-input"
+            v-model="topicInput"
+            :list="topicListId"
+            placeholder="选择或输入专题"
+            required
+            :disabled="submitting"
+          />
+          <datalist :id="topicListId">
+            <option v-for="t in topics" :key="t.id" :value="t.title" />
+          </datalist>
         </div>
       </div>
-    </Transition>
-  </Teleport>
+      <label>正文</label>
+      <textarea
+        v-model="content"
+        class="content-area"
+        placeholder="详细内容…"
+        :disabled="submitting"
+      />
+      <ContentImageUpload ref="imageUploadRef" :initial-urls="initialImageUrls" />
+      <p v-if="submitError" class="submit-err" role="alert">{{ submitError }}</p>
+      <div class="actions">
+        <button
+          type="button"
+          class="btn ghost"
+          :disabled="submitting"
+          @click="submit('draft')"
+        >
+          {{ submitting ? '保存中…' : '存为草稿' }}
+        </button>
+        <button type="submit" class="btn primary" :disabled="submitting">
+          {{ submitting ? '发布中…' : editing ? '保存并发布' : '发布' }}
+        </button>
+      </div>
+    </form>
+  </EditorDrawer>
 </template>
 
 <style scoped>
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-.backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 200;
-  background: rgba(15, 25, 45, 0.55);
-  display: grid;
-  place-items: center;
-  padding: 1rem;
-  backdrop-filter: blur(6px);
-}
-.modal {
-  width: min(92vw, 560px);
-  max-height: 90vh;
-  overflow-y: auto;
-  background: var(--color-surface);
-  border-radius: var(--radius-card);
-  padding: 1.5rem 1.6rem;
-  box-shadow: var(--shadow-card);
-}
-h2 {
-  margin-bottom: 1rem;
-  color: var(--color-text);
-  font-size: 1.2rem;
-}
 .form {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.35rem;
+  min-height: 100%;
 }
 label {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: var(--color-text-muted);
   margin-top: 0.35rem;
 }
 input,
-select,
 textarea {
-  padding: 0.65rem 0.85rem;
+  padding: 0.6rem 0.75rem;
   border: 1px solid rgba(59, 130, 246, 0.2);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--color-surface-elevated);
   outline: none;
+  font-size: 0.9rem;
 }
 input:focus,
-select:focus,
 textarea:focus {
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.16);
+}
+.content-area {
+  flex: 1;
+  min-height: min(50vh, 420px);
+  resize: vertical;
+  line-height: 1.65;
+  font-family: inherit;
 }
 .row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
+  gap: 0.65rem;
 }
 .field {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 .submit-err {
   margin: 0.35rem 0 0;
@@ -236,14 +198,19 @@ textarea:focus {
   display: flex;
   justify-content: flex-end;
   gap: 0.5rem;
-  margin-top: 1rem;
+  margin-top: auto;
+  padding-top: 0.85rem;
+  position: sticky;
+  bottom: 0;
+  background: linear-gradient(to top, var(--color-surface) 70%, transparent);
 }
 .btn {
-  padding: 0.6rem 1.2rem;
-  border-radius: 12px;
+  padding: 0.55rem 1rem;
+  border-radius: 10px;
   border: none;
   cursor: pointer;
   font-weight: 600;
+  font-size: 0.88rem;
 }
 .btn:disabled {
   opacity: 0.65;
@@ -257,5 +224,10 @@ textarea:focus {
   background: transparent;
   color: var(--color-accent-dark);
   border: 1px solid rgba(59, 130, 246, 0.3);
+}
+@media (max-width: 768px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
