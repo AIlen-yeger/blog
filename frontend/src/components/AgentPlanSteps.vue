@@ -1,9 +1,14 @@
 <script setup lang="ts">
 import type { PlanStep } from '@/api/agentChat'
 
-defineProps<{
-  steps: PlanStep[]
-}>()
+withDefaults(
+  defineProps<{
+    steps: PlanStep[]
+    /** 嵌在 Agent 回复气泡内/上方时收紧外边距 */
+    embedded?: boolean
+  }>(),
+  { embedded: false },
+)
 
 function statusIcon(status: PlanStep['status']) {
   switch (status) {
@@ -20,7 +25,7 @@ function statusIcon(status: PlanStep['status']) {
 </script>
 
 <template>
-  <div v-if="steps.length" class="agent-plan">
+  <div v-if="steps.length" class="agent-plan" :class="{ 'is-embedded': embedded }">
     <p class="agent-plan__label">执行步骤</p>
     <ol class="agent-plan__list">
       <li
@@ -47,6 +52,11 @@ function statusIcon(status: PlanStep['status']) {
   border: 1px solid rgba(140, 190, 255, 0.22);
   border-radius: 12px;
   background: rgba(18, 32, 56, 0.75);
+}
+
+.agent-plan.is-embedded {
+  margin: 0 0 0.65rem;
+  max-width: none;
 }
 
 .agent-plan__label {

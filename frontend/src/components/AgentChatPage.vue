@@ -79,18 +79,11 @@ function onConfirmPublish() {
   })
 }
 
-const displayMessages = computed(() => {
-  const list = [...messages.value]
-  if (isStreaming.value && streamingText.value) {
-    list.push({
-      id: '__streaming__',
-      role: 'assistant' as const,
-      content: streamingText.value,
-      createdAt: Date.now(),
-    })
-  }
-  return list
-})
+const showPlanOnLastReply = computed(
+  () => planSteps.value.length > 0 && !isStreaming.value && messages.value.length > 0,
+)
+
+const lastMessageIndex = computed(() => messages.value.length - 1)
 
 function scrollToBottom() {
   const el = messagesRef.value
@@ -98,7 +91,7 @@ function scrollToBottom() {
   el.scrollTop = el.scrollHeight
 }
 
-watch([displayMessages, isStreaming], () => {
+watch([messages, isStreaming, streamingText, planSteps], () => {
   void nextTick(scrollToBottom)
 })
 
@@ -246,7 +239,7 @@ onMounted(() => {
       <div ref="messagesRef" class="agent-messages">
         <p v-if="messagesLoading" class="agent-messages__loading">加载消息中…</p>
         <template v-else>
-          <div v-if="!displayMessages.length" class="agent-welcome">
+          <div v-if="!messages.length && !isStreaming" class="agent-welcome">
             <p class="agent-welcome__title">你好，我是蕾西亚</p>
             <p class="agent-welcome__hint">
               可以聊博客、加歌、查笔记，也可以上传图片、PDF 或 Markdown。
@@ -255,36 +248,54 @@ onMounted(() => {
           </div>
 
           <article
-            v-for="msg in displayMessages"
+            v-for="(msg, index) in messages"
             :key="msg.id"
             class="agent-msg"
             :class="msg.role"
           >
-          <div class="agent-msg__avatar" aria-hidden="true">
-            {{ msg.role === 'user' ? '你' : '蕾' }}
-          </div>
-          <div class="agent-msg__body">
-            <p class="agent-msg__role">{{ msg.role === 'user' ? '你' : '蕾西亚' }}</p>
-            <div v-if="msg.attachments?.length" class="agent-msg__attachments">
-              <template v-for="att in msg.attachments" :key="att.id">
-                <img
-                  v-if="att.type === 'image' && att.url"
-                  :src="resolveMediaUrl(att.url)"
-                  :alt="att.name"
-                  class="agent-msg__img"
-                />
-                <span
-                  v-else
-                  class="agent-msg__file-tag"
-                >📄 {{ att.name }}</span>
-              </template>
+            <div class="agent-msg__avatar" aria-hidden="true">
+              {{ msg.role === 'user' ? '你' : '蕾' }}
             </div>
-            <pre class="agent-msg__text">{{ msg.content }}</pre>
-          </div>
-        </article>
-        </template>
+            <div class="agent-msg__body">
+              <p class="agent-msg__role">{{ msg.role === 'user' ? '你' : '蕾西亚' }}</p>
+              <AgentPlanSteps
+                v-if="
+                  showPlanOnLastReply &&
+                  msg.role === 'assistant' &&
+                  index === lastMessageIndex
+                "
+                :steps="planSteps"
+                embedded
+              />
+              <div v-if="msg.attachments?.length" class="agent-msg__attachments">
+                <template v-for="att in msg.attachments" :key="att.id">
+                  <img
+                    v-if="att.type === 'image' && att.url"
+                    :src="resolveMediaUrl(att.url)"
+                    :alt="att.name"
+                    class="agent-msg__img"
+                  />
+                  <span v-else class="agent-msg__file-tag">📄 {{ att.name }}</span>
+                </template>
+              </div>
+              <pre class="agent-msg__text">{{ msg.content }}</pre>
+            </div>
+          </article>
 
-        <AgentPlanSteps v-if="planSteps.length" :steps="planSteps" />
+          <div v-if="isStreaming" class="agent-streaming-turn">
+            <AgentPlanSteps v-if="planSteps.length" :steps="planSteps" embedded />
+            <article class="agent-msg assistant is-streaming">
+              <div class="agent-msg__avatar" aria-hidden="true">蕾</div>
+              <div class="agent-msg__body">
+                <p class="agent-msg__role">蕾西亚</p>
+                <p v-if="!streamingText.trim()" class="agent-msg__pending" aria-live="polite">
+                  蕾西亚正在回复<span class="agent-msg__dots" aria-hidden="true">…</span>
+                </p>
+                <pre v-else class="agent-msg__text">{{ streamingText }}</pre>
+              </div>
+            </article>
+          </div>
+        </template>
       </div>
 
       <div
@@ -751,6 +762,48 @@ onMounted(() => {
   line-height: 1.58;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.agent-streaming-turn {
+  width: 100%;
+  max-width: min(46%, 560px);
+  margin-right: auto;
+  margin-left: 0;
+  margin-bottom: 1.25rem;
+}
+
+.agent-streaming-turn .agent-msg {
+  margin-bottom: 0;
+  max-width: none;
+  width: 100%;
+}
+
+.agent-msg.is-streaming .agent-msg__body {
+  border-color: rgba(140, 190, 255, 0.22);
+}
+
+.agent-msg__pending {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.58;
+  color: rgba(186, 210, 240, 0.82);
+  font-style: italic;
+}
+
+.agent-msg__dots {
+  display: inline-block;
+  width: 1.2em;
+  text-align: left;
+  animation: agent-typing-dots 1.2s steps(4, end) infinite;
+}
+
+@keyframes agent-typing-dots {
+  0% {
+    clip-path: inset(0 100% 0 0);
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+  }
 }
 
 .agent-msg__attachments {
