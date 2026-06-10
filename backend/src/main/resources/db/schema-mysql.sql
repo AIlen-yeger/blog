@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS profile (
     focus_json   TEXT,
     avatar_url   VARCHAR(512) NOT NULL DEFAULT '',
     site_owner   TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '1=站点着陆页公开展示',
+    agent_reply_owner_only TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1=Agent 回复仅管理员可见',
     CONSTRAINT fk_profile_user FOREIGN KEY (user_id) REFERENCES users (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

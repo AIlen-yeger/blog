@@ -12,6 +12,7 @@ import com.personalblog.mapper.LifeMapper;
 import com.personalblog.mapper.NoteMapper;
 import com.personalblog.security.AdminGuard;
 import com.personalblog.service.ContentSearchService;
+import com.personalblog.service.ProfileService;
 import com.personalblog.util.AgentReplySupport;
 import com.personalblog.util.JsonUtil;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ public class ContentSearchServiceImpl implements ContentSearchService {
     private final ContentViewCache contentViewCache;
     private final AdminGuard adminGuard;
     private final AgentReplyProperties agentReplyProperties;
+    private final ProfileService profileService;
 
     @Override
     public SearchResultDto search(String keyword, int limit) {
@@ -79,9 +81,17 @@ public class ContentSearchServiceImpl implements ContentSearchService {
         dto.setViewCount(contentViewCache.getDisplayCount("note", entity.getId(), entity.getViewCount()));
         dto.setPinned(entity.isPinned());
         dto.setStatus(entity.getStatus() != null ? entity.getStatus() : ContentStatus.PUBLISHED);
-        dto.setAgentReply(AgentReplySupport.presentForNote(agentReplyProperties, entity.getAgentReply()));
+        dto.setAgentReply(
+                AgentReplySupport.presentForNote(
+                        agentReplyProperties,
+                        entity.getAgentReply(),
+                        adminGuard.isCurrentAdmin(),
+                        profileService.isAgentReplyOwnerOnly()));
         dto.setAgentReplyStatus(
-                entity.getAgentReplyStatus() != null ? entity.getAgentReplyStatus() : "none");
+                AgentReplySupport.presentNoteStatus(
+                        entity.getAgentReplyStatus(),
+                        adminGuard.isCurrentAdmin(),
+                        profileService.isAgentReplyOwnerOnly()));
         return dto;
     }
 
@@ -97,7 +107,12 @@ public class ContentSearchServiceImpl implements ContentSearchService {
         dto.setViewCount(contentViewCache.getDisplayCount("life", entity.getId(), entity.getViewCount()));
         dto.setPinned(entity.isPinned());
         dto.setStatus(entity.getStatus() != null ? entity.getStatus() : ContentStatus.PUBLISHED);
-        dto.setAgentReply(AgentReplySupport.presentForLife(agentReplyProperties, entity.getAgentReply()));
+        dto.setAgentReply(
+                AgentReplySupport.presentForLife(
+                        agentReplyProperties,
+                        entity.getAgentReply(),
+                        adminGuard.isCurrentAdmin(),
+                        profileService.isAgentReplyOwnerOnly()));
         return dto;
     }
 

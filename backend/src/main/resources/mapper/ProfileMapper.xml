@@ -12,10 +12,11 @@
         <result column="focus_json" property="focusJson"/>
         <result column="avatar_url" property="avatarUrl"/>
         <result column="site_owner" property="siteOwner"/>
+        <result column="agent_reply_owner_only" property="agentReplyOwnerOnly"/>
     </resultMap>
 
     <sql id="ProfileColumns">
-        id, user_id, name, subtitle, bio, focus_json, avatar_url, site_owner
+        id, user_id, name, subtitle, bio, focus_json, avatar_url, site_owner, agent_reply_owner_only
     </sql>
 
     <select id="selectById" resultMap="ProfileMap">
@@ -35,8 +36,8 @@
     </select>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO profile (user_id, name, subtitle, bio, focus_json, avatar_url, site_owner)
-        VALUES (#{userId}, #{name}, #{subtitle}, #{bio}, #{focusJson}, #{avatarUrl}, #{siteOwner})
+        INSERT INTO profile (user_id, name, subtitle, bio, focus_json, avatar_url, site_owner, agent_reply_owner_only)
+        VALUES (#{userId}, #{name}, #{subtitle}, #{bio}, #{focusJson}, #{avatarUrl}, #{siteOwner}, #{agentReplyOwnerOnly})
     </insert>
 
     <update id="update">
@@ -46,7 +47,8 @@
             bio = #{bio},
             focus_json = #{focusJson},
             avatar_url = #{avatarUrl},
-            site_owner = #{siteOwner}
+            site_owner = #{siteOwner},
+            agent_reply_owner_only = #{agentReplyOwnerOnly}
         WHERE id = #{id}
     </update>
 </mapper>

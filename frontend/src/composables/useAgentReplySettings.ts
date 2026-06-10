@@ -1,5 +1,7 @@
 import { computed, reactive, watch } from 'vue'
 import type { AgentReplyContentKind, AgentReplySettings } from '@/types/agentReply'
+import { fetchAgentReplySettings, updateAgentReplyOwnerOnly } from '@/api/blog'
+import { useMockApi } from '@/api/http'
 import { useSession } from '@/composables/useSession'
 
 const STORAGE_KEY = 'blog:agent-reply-settings'
@@ -44,6 +46,7 @@ function loadSettings(): AgentReplySettings {
 }
 
 const state = reactive<AgentReplySettings>(loadSettings())
+let serverSynced = false
 
 watch(
   state,
@@ -52,6 +55,27 @@ watch(
   },
   { deep: true },
 )
+
+function applyServerSettings(row: Partial<AgentReplySettings>) {
+  if (typeof row.noteEnabled === 'boolean') state.noteEnabled = row.noteEnabled
+  if (typeof row.lifeEnabled === 'boolean') state.lifeEnabled = row.lifeEnabled
+  if (typeof row.previewMaxChars === 'number' && row.previewMaxChars >= 20) {
+    state.previewMaxChars = row.previewMaxChars
+  }
+  if (typeof row.ownerOnlyVisible === 'boolean') state.ownerOnlyVisible = row.ownerOnlyVisible
+}
+
+/** 从服务端同步全局开关（含「仅个人可见」） */
+export async function syncAgentReplySettingsFromServer(): Promise<void> {
+  if (useMockApi()) return
+  try {
+    const row = await fetchAgentReplySettings()
+    applyServerSettings(row)
+    serverSynced = true
+  } catch (e) {
+    console.warn('[agent-reply] sync settings failed', e)
+  }
+}
 
 export function useAgentReplySettings() {
   const { isAdmin } = useSession()
@@ -89,8 +113,16 @@ export function useAgentReplySettings() {
     state.previewMaxChars = Math.min(500, Math.max(20, Math.round(v)))
   }
 
-  function setOwnerOnlyVisible(v: boolean) {
+  async function setOwnerOnlyVisible(v: boolean) {
     state.ownerOnlyVisible = v
+    if (useMockApi() || !isAdmin.value) return
+    try {
+      const row = await updateAgentReplyOwnerOnly(v)
+      applyServerSettings(row)
+    } catch (e) {
+      console.warn('[agent-reply] save owner-only failed', e)
+      throw e
+    }
   }
 
   function resetToEnvDefaults() {
@@ -107,6 +139,7 @@ export function useAgentReplySettings() {
     lifeEnabled: computed(() => state.lifeEnabled),
     previewMaxChars: computed(() => state.previewMaxChars),
     ownerOnlyVisible: computed(() => state.ownerOnlyVisible),
+    serverSynced: computed(() => serverSynced),
     isEnabledFor,
     canViewAgentReply,
     shouldShowReply,
@@ -117,5 +150,6 @@ export function useAgentReplySettings() {
     setOwnerOnlyVisible,
     resetToEnvDefaults,
     envDefaults: envDefaultAgentReplySettings,
+    syncFromServer: syncAgentReplySettingsFromServer,
   }
 }

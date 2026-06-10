@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useAgentReplySettings } from '@/composables/useAgentReplySettings'
 
 const {
@@ -9,13 +10,24 @@ const {
   setPreviewMaxChars,
   resetToEnvDefaults,
 } = useAgentReplySettings()
+
+const ownerOnlyError = ref('')
+
+async function onOwnerOnlyChange(checked: boolean) {
+  ownerOnlyError.value = ''
+  try {
+    await setOwnerOnlyVisible(checked)
+  } catch {
+    ownerOnlyError.value = '保存失败，请稍后重试'
+  }
+}
 </script>
 
 <template>
   <section class="agent-reply-settings" aria-labelledby="agent-reply-settings-title">
     <h3 id="agent-reply-settings-title" class="section-title">蕾西亚 自动回复</h3>
     <p class="section-desc">
-      笔记或生活记录发布后，由蕾西亚生成回复。可开关展示、限制预览字数；设置保存在本浏览器。
+      笔记或生活记录发布后，由蕾西亚生成回复。可开关展示、限制预览字数；「仅个人可见」会保存到服务器，访客无法看到回复。
     </p>
 
     <label class="switch-row">
@@ -44,9 +56,11 @@ const {
       <input
         type="checkbox"
         :checked="settings.ownerOnlyVisible"
-        @change="setOwnerOnlyVisible(($event.target as HTMLInputElement).checked)"
+        @change="onOwnerOnlyChange(($event.target as HTMLInputElement).checked)"
       />
     </label>
+
+    <p v-if="ownerOnlyError" class="owner-only-err">{{ ownerOnlyError }}</p>
 
     <label class="number-row">
       <span class="switch-label">卡片预览字数上限</span>
@@ -118,6 +132,12 @@ const {
   border-radius: 8px;
   border: 1px solid rgba(139, 92, 246, 0.25);
   font-family: inherit;
+}
+
+.owner-only-err {
+  margin: -0.25rem 0 0.65rem;
+  font-size: 0.78rem;
+  color: #b91c1c;
 }
 
 .reset-btn {

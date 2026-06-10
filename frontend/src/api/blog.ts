@@ -1,3 +1,4 @@
+import type { AgentReplySettings } from '@/types/agentReply'
 import { ApiError, get, post, put, del } from '@/api/http'
 import type {
   ArchiveMonthItem,
@@ -200,4 +201,12 @@ export async function fetchTagCloud(): Promise<TagCountItem[]> {
 
 export async function fetchArchiveMonths(): Promise<ArchiveMonthItem[]> {
   return get<ArchiveMonthItem[]>('/meta/archive-months')
+}
+
+export async function fetchAgentReplySettings(): Promise<AgentReplySettings> {
+  return get<AgentReplySettings>('/meta/agent-reply-settings')
+}
+
+export async function updateAgentReplyOwnerOnly(ownerOnlyVisible: boolean): Promise<AgentReplySettings> {
+  return put<AgentReplySettings>('/meta/agent-reply-settings', { ownerOnlyVisible })
 }

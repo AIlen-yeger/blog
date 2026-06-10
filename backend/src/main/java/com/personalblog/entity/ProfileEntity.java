@@ -17,4 +17,6 @@ public class ProfileEntity {
     private String avatarUrl;
     /** 是否在站点着陆页公开展示（个人博客通常仅一位 site owner） */
     private boolean siteOwner;
+    /** Agent 回复是否仅管理员可见（站点级偏好，存于 site owner 资料） */
+    private boolean agentReplyOwnerOnly;
 }

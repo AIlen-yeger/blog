@@ -16,6 +16,7 @@ import com.personalblog.mapper.TopicMapper;
 import com.personalblog.security.AdminGuard;
 import com.personalblog.service.AgentNoteCommentService;
 import com.personalblog.service.NoteService;
+import com.personalblog.service.ProfileService;
 import com.personalblog.service.TopicService;
 import com.personalblog.util.AgentReplySupport;
 import com.personalblog.util.ExcerptUtil;
@@ -42,6 +43,7 @@ public class NoteServiceImpl implements NoteService {
     private final AdminGuard adminGuard;
     private final AgentReplyProperties agentReplyProperties;
     private final AgentNoteCommentService agentNoteCommentService;
+    private final ProfileService profileService;
 
     @Override
     public PageResult<NoteDto> listNotes(
@@ -264,9 +266,17 @@ public class NoteServiceImpl implements NoteService {
         dto.setViewCount(contentViewCache.getDisplayCount("note", entity.getId(), entity.getViewCount()));
         dto.setPinned(entity.isPinned());
         dto.setStatus(entity.getStatus() != null ? entity.getStatus() : ContentStatus.PUBLISHED);
-        dto.setAgentReply(AgentReplySupport.presentForNote(agentReplyProperties, entity.getAgentReply()));
+        dto.setAgentReply(
+                AgentReplySupport.presentForNote(
+                        agentReplyProperties,
+                        entity.getAgentReply(),
+                        adminGuard.isCurrentAdmin(),
+                        profileService.isAgentReplyOwnerOnly()));
         dto.setAgentReplyStatus(
-                entity.getAgentReplyStatus() != null ? entity.getAgentReplyStatus() : "none");
+                AgentReplySupport.presentNoteStatus(
+                        entity.getAgentReplyStatus(),
+                        adminGuard.isCurrentAdmin(),
+                        profileService.isAgentReplyOwnerOnly()));
         return dto;
     }
 

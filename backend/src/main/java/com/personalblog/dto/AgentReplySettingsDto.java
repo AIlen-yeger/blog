@@ -11,4 +11,6 @@ public class AgentReplySettingsDto {
     private boolean lifeEnabled;
     /** 卡片预览最大字符数 */
     private int previewMaxChars;
+    /** 为 true 时仅管理员可见 Agent 回复（访客 API 不返回正文） */
+    private boolean ownerOnlyVisible;
 }

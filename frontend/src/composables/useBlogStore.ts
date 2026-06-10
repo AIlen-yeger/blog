@@ -24,6 +24,7 @@ import { useMockApi } from '@/api/http'
 import * as blogApi from '@/api/blog'
 import { getAgentSessionId } from '@/utils/agentSession'
 import type { ContentListParams } from '@/api/blog'
+import { useAgentReplySettings } from '@/composables/useAgentReplySettings'
 
 const STORAGE_KEY = 'personal-blog-data'
 
@@ -110,12 +111,28 @@ function hydrateLocal() {
   if (!saved) persistLocal()
 }
 
-function normalizeNote(n: NoteItem): NoteItem {
+function scrubAgentReplyForViewer<T extends NoteItem | LifeItem>(
+  item: T,
+  kind: 'note' | 'life',
+): T {
+  const { canViewAgentReply } = useAgentReplySettings()
+  if (canViewAgentReply(kind)) return item
   return {
-    ...n,
-    pinned: Boolean(n.pinned),
-    status: (n.status ?? 'published') as ContentPublishStatus,
+    ...item,
+    agentReply: null,
+    ...(kind === 'note' ? { agentReplyStatus: 'none' as const } : {}),
   }
+}
+
+function normalizeNote(n: NoteItem): NoteItem {
+  return scrubAgentReplyForViewer(
+    {
+      ...n,
+      pinned: Boolean(n.pinned),
+      status: (n.status ?? 'published') as ContentPublishStatus,
+    },
+    'note',
+  )
 }
 
 export function patchNoteInStore(note: NoteItem) {
@@ -144,11 +161,14 @@ export function isNoteFresh(noteId: string): boolean {
 }
 
 function normalizeLife(l: LifeItem): LifeItem {
-  return {
-    ...l,
-    pinned: Boolean(l.pinned),
-    status: (l.status ?? 'published') as ContentPublishStatus,
-  }
+  return scrubAgentReplyForViewer(
+    {
+      ...l,
+      pinned: Boolean(l.pinned),
+      status: (l.status ?? 'published') as ContentPublishStatus,
+    },
+    'life',
+  )
 }
 
 function listParamsFromFilters(): ContentListParams | undefined {

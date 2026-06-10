@@ -13,6 +13,7 @@ import com.personalblog.mapper.ContentViewMapper;
 import com.personalblog.mapper.LifeMapper;
 import com.personalblog.security.AdminGuard;
 import com.personalblog.service.LifeService;
+import com.personalblog.service.ProfileService;
 import com.personalblog.util.AgentReplySupport;
 import com.personalblog.util.ExcerptUtil;
 import com.personalblog.util.IdGenerator;
@@ -35,6 +36,7 @@ public class LifeServiceImpl implements LifeService {
     private final ContentViewCache contentViewCache;
     private final AdminGuard adminGuard;
     private final AgentReplyProperties agentReplyProperties;
+    private final ProfileService profileService;
 
     @Override
     public PageResult<LifeDto> listLife(
@@ -198,7 +200,12 @@ public class LifeServiceImpl implements LifeService {
         dto.setViewCount(contentViewCache.getDisplayCount("life", entity.getId(), entity.getViewCount()));
         dto.setPinned(entity.isPinned());
         dto.setStatus(entity.getStatus() != null ? entity.getStatus() : ContentStatus.PUBLISHED);
-        dto.setAgentReply(AgentReplySupport.presentForLife(agentReplyProperties, entity.getAgentReply()));
+        dto.setAgentReply(
+                AgentReplySupport.presentForLife(
+                        agentReplyProperties,
+                        entity.getAgentReply(),
+                        adminGuard.isCurrentAdmin(),
+                        profileService.isAgentReplyOwnerOnly()));
         return dto;
     }
 }

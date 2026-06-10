@@ -130,6 +130,30 @@ public class ProfileServiceImpl implements ProfileService {
         createDefaultProfile(user);
     }
 
+    @Override
+    public boolean isAgentReplyOwnerOnly() {
+        ProfileEntity siteOwner = profileMapper.selectSiteOwner();
+        if (siteOwner != null) {
+            return siteOwner.isAgentReplyOwnerOnly();
+        }
+        UserEntity admin = userMapper.selectFirstByRole(UserRole.admin.name());
+        if (admin == null) {
+            return false;
+        }
+        ProfileEntity profile = profileMapper.selectByUserId(admin.getId());
+        return profile != null && profile.isAgentReplyOwnerOnly();
+    }
+
+    @Override
+    @Transactional
+    public void setAgentReplyOwnerOnly(boolean ownerOnlyVisible) {
+        adminGuard.requireAdmin();
+        UserEntity user = requireCurrentUser();
+        ProfileEntity entity = getOrCreateProfileForUser(user);
+        entity.setAgentReplyOwnerOnly(ownerOnlyVisible);
+        profileMapper.update(entity);
+    }
+
     private UserEntity requireCurrentUser() {
         AuthUserPrincipal principal = adminGuard.requireAuthenticated();
         UserEntity user = userMapper.selectByEmail(principal.getEmail());

@@ -12,6 +12,7 @@ import {
   reloadBlogData,
   resetBlogStore,
 } from '@/composables/useBlogStore'
+import { syncAgentReplySettingsFromServer } from '@/composables/useAgentReplySettings'
 import { initSessionFromStorage } from '@/composables/useSession'
 import { triggerDailyCheckIn } from '@/composables/useDailyCheckIn'
 import { clearMusicPlayback } from '@/utils/musicPlaybackStorage'
@@ -311,13 +312,15 @@ function handleAuthLogout() {
   resetBlogStore()
 }
 
-onMounted(() => {
+onMounted(async () => {
   if (typeof window !== 'undefined' && /[?&]home=/.test(window.location.search)) {
     const url = new URL(window.location.href)
     url.searchParams.delete('home')
     const clean = url.pathname + (url.search || '') + url.hash
     window.history.replaceState(null, '', clean || '/')
   }
+
+  await syncAgentReplySettingsFromServer()
 
   const urlBlog = isBlogHash()
 

@@ -25,4 +25,10 @@ public interface ProfileService {
 
     /** 注册或首次访问时为用户创建默认资料 */
     void ensureProfileForUser(UserEntity user);
+
+    /** 站点是否开启「Agent 回复仅管理员可见」 */
+    boolean isAgentReplyOwnerOnly();
+
+    /** 管理员更新站点级 Agent 回复可见性 */
+    void setAgentReplyOwnerOnly(boolean ownerOnlyVisible);
 }
