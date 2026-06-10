@@ -10,6 +10,17 @@ import type {
   TopicItem,
 } from '@/data/mockContent'
 
+export type {
+  ArchiveMonthItem,
+  LifeItem,
+  NoteItem,
+  ProfileData,
+  SearchResult,
+  TagCountItem,
+  TimelineItem,
+  TopicItem,
+} from '@/data/mockContent'
+
 export interface PageResult<T> {
   list: T[]
   total: number

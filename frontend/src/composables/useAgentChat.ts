@@ -32,7 +32,7 @@ import {
   refreshMusicTracksAfterAgentAdd,
   replyIndicatesMusicPlaylistSaved,
 } from '@/composables/useUserMusicTracks'
-import type { ChatAttachmentMeta, ChatMessage, AgentChatSession } from '@/utils/agentSessionsStorage'
+import type { ChatAttachmentMeta, AgentChatSession } from '@/utils/agentSessionsStorage'
 import {
   createLocalAgentSession,
   deleteLocalAgentSession,
@@ -418,7 +418,7 @@ async function sendMessage(options?: AgentChatSendOptions) {
     return
   }
 
-  let session = activeSession.value
+  let session: AgentChatSession | null = activeSession.value
   if (!session) {
     if (hasValidSession()) {
       const sessionId = await ensureAgentSessionId()

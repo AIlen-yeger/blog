@@ -407,11 +407,12 @@ export function useBlogStore() {
     },
   ) {
     if (payload.id) {
+      const noteId = payload.id
       if (!useMockApi()) {
-        const { id, agentSessionId: _ignored, ...rest } = payload as typeof payload & {
+        const { id: _id, agentSessionId: _ignored, ...rest } = payload as typeof payload & {
           agentSessionId?: string
         }
-        const updated = await blogApi.updateNoteApi(id, {
+        const updated = await blogApi.updateNoteApi(noteId, {
           ...rest,
           regenerateAgentReply: false,
         })
