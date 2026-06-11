@@ -105,12 +105,18 @@ public class NoteServiceImpl implements NoteService {
         if (entity == null) {
             throw new BusinessException(ErrorCode.NOTE_NOT_FOUND);
         }
+        String previousStatus =
+                entity.getStatus() != null && !entity.getStatus().isBlank()
+                        ? ContentStatus.normalize(entity.getStatus())
+                        : ContentStatus.PUBLISHED;
         validateWriteRequest(request, false);
         applyWrite(entity, request);
         ensureStatus(entity);
         noteMapper.update(entity);
-        if (Boolean.TRUE.equals(request.getRegenerateAgentReply())
-                && ContentStatus.PUBLISHED.equals(entity.getStatus())) {
+        boolean nowPublished = ContentStatus.PUBLISHED.equals(entity.getStatus());
+        boolean draftToPublished = ContentStatus.DRAFT.equals(previousStatus) && nowPublished;
+        if (nowPublished
+                && (Boolean.TRUE.equals(request.getRegenerateAgentReply()) || draftToPublished)) {
             agentNoteCommentService.enqueueAfterNoteCreated(entity, request.getAgentSessionId());
         }
         return toDto(entity);

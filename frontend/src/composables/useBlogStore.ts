@@ -452,17 +452,34 @@ export function useBlogStore() {
   ) {
     if (payload.id) {
       const noteId = payload.id
+      const existing = state.notes.find((n) => n.id === noteId)
+      const nextStatus = (payload.status ?? existing?.status ?? 'published') as ContentPublishStatus
+      const isPublishing = nextStatus === 'published'
+      const wasDraft = existing?.status === 'draft'
       if (!useMockApi()) {
         const { id: _id, agentSessionId: _ignored, ...rest } = payload as typeof payload & {
           agentSessionId?: string
         }
         const updated = await blogApi.updateNoteApi(noteId, {
           ...rest,
-          regenerateAgentReply: false,
+          status: nextStatus,
+          regenerateAgentReply: isPublishing && wasDraft,
+          ...(isPublishing && wasDraft ? { agentSessionId: getAgentSessionId() } : {}),
+        })
+        const normalized = normalizeNote({
+          ...updated,
+          agentReplyStatus:
+            updated.agentReplyStatus ||
+            (isPublishing && !updated.agentReply?.trim() ? 'pending' : updated.agentReplyStatus),
         })
         const idx = state.notes.findIndex((n) => n.id === payload.id)
-        if (idx >= 0) state.notes[idx] = updated
+        if (idx >= 0) state.notes[idx] = normalized
+        else if (isPublishing) state.notes.unshift(normalized)
         state.topics = await blogApi.fetchTopics()
+        if (isPublishing && (wasDraft || !(updated.agentReply || '').trim())) {
+          const { watchNoteAgentReply } = await import('@/composables/useNoteAgentReplyPoll')
+          watchNoteAgentReply(noteId, { scrollToCard: wasDraft })
+        }
         return payload.id
       }
       const idx = state.notes.findIndex((n) => n.id === payload.id)
