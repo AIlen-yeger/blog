@@ -86,6 +86,7 @@ const publishNoteLoading = ref(false)
 const planSteps = ref<PlanStep[]>([])
 
 const PLAN_MODE_KEY = 'kohaku-agent-plan-mode'
+const WEB_SEARCH_KEY = 'kohaku-agent-web-search'
 
 function loadPlanModeEnabled(): boolean {
   try {
@@ -95,7 +96,18 @@ function loadPlanModeEnabled(): boolean {
   }
 }
 
+function loadWebSearchEnabled(): boolean {
+  try {
+    return localStorage.getItem(WEB_SEARCH_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
 const planModeEnabled = ref(loadPlanModeEnabled())
+const webSearchEnabled = ref(loadWebSearchEnabled())
+export type SearchStatus = 'idle' | 'searching' | 'done'
+const searchStatus = ref<SearchStatus>('idle')
 const sidebarOpen = ref(
   typeof window !== 'undefined' ? window.innerWidth >= 768 : true,
 )
@@ -457,6 +469,15 @@ function togglePlanMode() {
   }
 }
 
+function toggleWebSearch() {
+  webSearchEnabled.value = !webSearchEnabled.value
+  try {
+    localStorage.setItem(WEB_SEARCH_KEY, String(webSearchEnabled.value))
+  } catch {
+    /* ignore */
+  }
+}
+
 function updatePlanStep(update: { stepId: string; status: PlanStepStatus; summary?: string }) {
   const idx = planSteps.value.findIndex((s) => s.id === update.stepId)
   if (idx < 0) return
@@ -508,6 +529,7 @@ async function sendMessage(options?: AgentChatSendOptions) {
   let content = text
   pendingActionPreview.value = null
   planSteps.value = []
+  searchStatus.value = 'idle'
   try {
     if (hasAttachments) {
       const built = await buildAttachmentMeta([...pendingAttachments.value])
@@ -563,6 +585,7 @@ async function sendMessage(options?: AgentChatSendOptions) {
         sessionId: session.sessionId,
         attachments: attachmentPayload.length ? attachmentPayload : undefined,
         executionMode,
+        enableWebSearch: webSearchEnabled.value,
         onMeta: (meta) => {
           if (meta.intent) agentIntent = meta.intent
         },
@@ -574,6 +597,9 @@ async function sendMessage(options?: AgentChatSendOptions) {
         },
         onPlanStep: (update) => {
           updatePlanStep(update)
+        },
+        onSearchStatus: (update) => {
+          searchStatus.value = update.status
         },
       },
     )
@@ -613,6 +639,7 @@ async function sendMessage(options?: AgentChatSendOptions) {
   } finally {
     isStreaming.value = false
     streamingText.value = ''
+    searchStatus.value = 'idle'
     abortCtrl = null
   }
 }
@@ -637,6 +664,7 @@ function stopStreaming() {
   }
   isStreaming.value = false
   streamingText.value = ''
+  searchStatus.value = 'idle'
 }
 
 function toggleSidebar() {
@@ -720,6 +748,8 @@ export function useAgentChat() {
     publishNoteLoading,
     planSteps,
     planModeEnabled,
+    webSearchEnabled,
+    searchStatus,
     sidebarOpen,
     selectSession,
     startNewSession,
@@ -732,6 +762,7 @@ export function useAgentChat() {
     dismissActionPreview,
     confirmPublishNote,
     togglePlanMode,
+    toggleWebSearch,
     clearError,
     toggleSidebar,
     refreshSessions,

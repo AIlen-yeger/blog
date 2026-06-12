@@ -62,7 +62,8 @@ public class AgentController {
                     request.getLimit(),
                     resolveBearerToken(httpRequest),
                     request.getAttachments() != null ? request.getAttachments() : java.util.List.of(),
-                    normalizeExecutionMode(request.getExecutionMode())
+                    normalizeExecutionMode(request.getExecutionMode()),
+                    request.isEnableWebSearch()
             );
 
             StreamingResponseBody body = outputStream -> {

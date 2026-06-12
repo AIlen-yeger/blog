@@ -24,6 +24,7 @@ const tag = ref('')
 const topicInput = ref('')
 const topicListId = 'note-topic-datalist'
 const content = ref('')
+const ownerOnly = ref(false)
 const initialImageUrls = ref<string[]>([])
 const imageUploadRef = ref<InstanceType<typeof ContentImageUpload> | null>(null)
 const contentRef = ref<HTMLTextAreaElement | null>(null)
@@ -58,6 +59,7 @@ watch(
       tag.value = item.tag
       topicInput.value = topicTitleById(item.topicId)
       content.value = item.content
+      ownerOnly.value = Boolean(item.ownerOnly)
       initialImageUrls.value = [...(item.images ?? [])]
     } else {
       title.value = ''
@@ -65,6 +67,7 @@ watch(
       tag.value = '前端'
       topicInput.value = topics.value[0]?.title ?? ''
       content.value = ''
+      ownerOnly.value = false
       initialImageUrls.value = []
     }
   },
@@ -104,6 +107,7 @@ async function submit(publishStatus: 'published' | 'draft') {
       content: content.value.trim(),
       images,
       status: publishStatus,
+      ownerOnly: ownerOnly.value,
     })
     emit('close')
   } catch (err) {
@@ -149,6 +153,11 @@ async function submit(publishStatus: 'published' | 'draft') {
         placeholder="详细内容…支持 Markdown；可用 ![说明](图片地址) 插入图片"
         :disabled="submitting"
       />
+      <label class="owner-only-row">
+        <input v-model="ownerOnly" type="checkbox" :disabled="submitting" />
+        <span>仅自己可见</span>
+        <small>访客与预览模式下不可见，仅登录管理员可见</small>
+      </label>
       <ContentImageUpload
         ref="imageUploadRef"
         :initial-urls="initialImageUrls"
@@ -215,6 +224,27 @@ textarea:focus {
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+.owner-only-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  margin-top: 0.5rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  border: 1px solid rgba(59, 130, 246, 0.18);
+  background: rgba(59, 130, 246, 0.06);
+  font-size: 0.85rem;
+}
+.owner-only-row input {
+  width: auto;
+  margin: 0;
+}
+.owner-only-row small {
+  flex: 1 1 100%;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
 }
 .submit-err {
   margin: 0.35rem 0 0;

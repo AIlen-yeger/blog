@@ -52,6 +52,7 @@ function onPin() {
         <div class="head-tags">
           <span v-if="item.pinned" class="pin-badge">置顶</span>
           <span v-if="item.status === 'draft'" class="draft-badge">草稿</span>
+          <span v-if="item.ownerOnly" class="private-badge">仅自己</span>
           <span class="tag">{{ item.tag }}</span>
         </div>
         <CardActionMenu
@@ -132,6 +133,14 @@ function onPin() {
   border-radius: 6px;
   background: var(--color-draft-bg);
   color: var(--color-draft-text);
+}
+.private-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.12rem 0.45rem;
+  border-radius: 6px;
+  background: rgba(124, 58, 237, 0.12);
+  color: #6d28d9;
 }
 .tag {
   font-size: 0.72rem;

@@ -25,4 +25,5 @@ public class AgentPythonChatRequest {
     private String accessToken;
     private List<AgentAttachmentDto> attachments = new ArrayList<>();
     private String executionMode = "auto";
+    private boolean enableWebSearch = false;
 }

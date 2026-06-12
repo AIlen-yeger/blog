@@ -19,6 +19,7 @@ import com.personalblog.service.NoteService;
 import com.personalblog.service.ProfileService;
 import com.personalblog.service.TopicService;
 import com.personalblog.util.AgentReplySupport;
+import com.personalblog.util.ContentVisibilitySupport;
 import com.personalblog.util.ExcerptUtil;
 import com.personalblog.util.IdGenerator;
 import com.personalblog.util.JsonUtil;
@@ -66,9 +67,11 @@ public class NoteServiceImpl implements NoteService {
         String monthFilter = blankToNull(yearMonth);
         String sortKey = sort != null ? sort : "date_desc";
 
-        long total = noteMapper.countList(topicFilter, keywordFilter, statusFilter, tagFilter, monthFilter);
+        long total = noteMapper.countList(
+                topicFilter, keywordFilter, statusFilter, tagFilter, monthFilter, hideOwnerOnly());
         List<NoteDto> list = noteMapper.selectList(
-                        topicFilter, keywordFilter, statusFilter, tagFilter, monthFilter, sortKey, offset, safeSize)
+                        topicFilter, keywordFilter, statusFilter, tagFilter, monthFilter, sortKey, offset, safeSize,
+                        hideOwnerOnly())
                 .stream().map(this::toDto).toList();
 
         return new PageResult<>(list, total, safePage, safeSize);
@@ -212,6 +215,13 @@ public class NoteServiceImpl implements NoteService {
         if (request.getStatus() != null && !request.getStatus().isBlank()) {
             entity.setStatus(ContentStatus.normalize(request.getStatus()));
         }
+        if (request.getOwnerOnly() != null) {
+            entity.setOwnerOnly(Boolean.TRUE.equals(request.getOwnerOnly()));
+        }
+    }
+
+    private boolean hideOwnerOnly() {
+        return ContentVisibilitySupport.hideOwnerOnlyFromPublic(adminGuard);
     }
 
     private String resolveListStatus(String requestedStatus) {
@@ -222,12 +232,7 @@ public class NoteServiceImpl implements NoteService {
     }
 
     private void assertReadable(NoteEntity entity) {
-        if (entity == null) {
-            throw new BusinessException(ErrorCode.NOTE_NOT_FOUND);
-        }
-        if (!adminGuard.isCurrentAdmin() && ContentStatus.DRAFT.equals(entity.getStatus())) {
-            throw new BusinessException(ErrorCode.NOTE_NOT_FOUND);
-        }
+        ContentVisibilitySupport.assertNoteReadable(entity, adminGuard);
     }
 
     private void ensureStatus(NoteEntity entity) {
@@ -272,6 +277,7 @@ public class NoteServiceImpl implements NoteService {
         dto.setViewCount(contentViewCache.getDisplayCount("note", entity.getId(), entity.getViewCount()));
         dto.setPinned(entity.isPinned());
         dto.setStatus(entity.getStatus() != null ? entity.getStatus() : ContentStatus.PUBLISHED);
+        dto.setOwnerOnly(entity.isOwnerOnly());
         dto.setAgentReply(
                 AgentReplySupport.presentForNote(
                         agentReplyProperties,

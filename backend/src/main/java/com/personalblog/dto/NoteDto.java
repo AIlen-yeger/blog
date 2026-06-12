@@ -17,6 +17,8 @@ public class NoteDto {
     private int viewCount;
     private boolean pinned;
     private String status;
+    /** 为 true 时仅管理员可见 */
+    private boolean ownerOnly;
     /** Kohaku 根据正文生成的自动回复 */
     private String agentReply;
     /** none | pending | running | done | failed */

@@ -71,6 +71,7 @@ def handle_qq_private_message_sync(friend_qq: str, text: str) -> str:
         user_role=user_role,
         friend_qq=friend_qq,
         channel="qq",
+        execution_mode="fast",
     )
     logger.info(
         "[qq_bridge] done friend=%s intent=%s role=%s account=%s",
@@ -79,4 +80,4 @@ def handle_qq_private_message_sync(friend_qq: str, text: str) -> str:
         user_role or "-",
         (account or "-")[:40],
     )
-    return (result.plain_text() or "").strip()[:4000]
+    return (result.collect_plain_text() or "").strip()[:4000]

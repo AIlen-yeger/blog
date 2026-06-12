@@ -300,7 +300,7 @@ sudo nginx -t && sudo systemctl reload nginx
 ## 10. NapCat（QQ 告警，可选）
 
 ```bash
-cd /opt/blog/python/docker/napcat
+cd /opt/blog/app/python/docker/napcat
 mkdir -p data/QQ data/config
 # 镜像使用 Docker Hub：mlikiowa/napcat-docker（ports 已绑 127.0.0.1）
 docker-compose up -d

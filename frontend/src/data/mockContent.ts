@@ -15,6 +15,8 @@ export interface NoteItem {
   /** 是否置顶（全局仅一篇） */
   pinned?: boolean
   status?: ContentPublishStatus
+  /** 为 true 时仅管理员可见 */
+  ownerOnly?: boolean
   /** 蕾西亚根据正文生成的回复（后端字段 agentReply） */
   agentReply?: string | null
   /** none | pending | running | done | failed */
@@ -50,6 +52,8 @@ export interface LifeItem {
   /** 是否置顶（生活记录全局仅一篇） */
   pinned?: boolean
   status?: ContentPublishStatus
+  /** 为 true 时仅管理员可见 */
+  ownerOnly?: boolean
   /** 蕾西亚根据正文生成的回复（后端字段 agentReply） */
   agentReply?: string | null
 }

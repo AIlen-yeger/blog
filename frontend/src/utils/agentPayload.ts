@@ -16,6 +16,7 @@ export function buildAgentChatPayload(
   sessionId?: string,
   attachments?: AgentAttachmentPayload[],
   executionMode?: ExecutionMode,
+  enableWebSearch?: boolean,
 ) {
   const limit = Number(import.meta.env.VITE_AGENT_HISTORY_LIMIT ?? 10)
 
@@ -25,6 +26,7 @@ export function buildAgentChatPayload(
     limit: Number.isFinite(limit) ? Math.min(50, Math.max(1, limit)) : 10,
     attachments: attachments?.length ? attachments : undefined,
     executionMode: executionMode ?? 'auto',
+    enableWebSearch: enableWebSearch === true,
   }
 }
 

@@ -37,6 +37,8 @@ const {
   publishNoteLoading,
   planSteps,
   planModeEnabled,
+  webSearchEnabled,
+  searchStatus,
   sidebarOpen,
   selectSession,
   startNewSession,
@@ -49,6 +51,7 @@ const {
   dismissActionPreview,
   confirmPublishNote,
   togglePlanMode,
+  toggleWebSearch,
   clearError,
   toggleSidebar,
   refreshSessions,
@@ -242,8 +245,8 @@ onMounted(() => {
           <div v-if="!messages.length && !isStreaming" class="agent-welcome">
             <p class="agent-welcome__title">你好，我是蕾西亚</p>
             <p class="agent-welcome__hint">
-              可以聊博客、加歌、查笔记，也可以上传图片、PDF 或 Markdown。
-              多任务可开启「分步执行」，或输入 <code>/plan 发布笔记并加歌</code>。
+              可以聊博客、加歌、查笔记，也可以上传附件。
+              开启「深度思考」会分步规划任务；「智能搜索」会先联网检索再回答。
             </p>
           </div>
 
@@ -283,12 +286,26 @@ onMounted(() => {
           </article>
 
           <div v-if="isStreaming" class="agent-streaming-turn">
+            <p v-if="searchStatus === 'searching'" class="agent-search-hint" aria-live="polite">
+              正在联网搜索…
+            </p>
             <AgentPlanSteps v-if="planSteps.length" :steps="planSteps" embedded />
             <article class="agent-msg assistant is-streaming">
               <div class="agent-msg__avatar" aria-hidden="true">蕾</div>
               <div class="agent-msg__body">
                 <p class="agent-msg__role">蕾西亚</p>
-                <p v-if="!streamingText.trim()" class="agent-msg__pending" aria-live="polite">
+                <p
+                  v-if="!streamingText.trim() && planModeEnabled && !planSteps.length"
+                  class="agent-msg__pending"
+                  aria-live="polite"
+                >
+                  深度思考中<span class="agent-msg__dots" aria-hidden="true">…</span>
+                </p>
+                <p
+                  v-else-if="!streamingText.trim()"
+                  class="agent-msg__pending"
+                  aria-live="polite"
+                >
                   蕾西亚正在回复<span class="agent-msg__dots" aria-hidden="true">…</span>
                 </p>
                 <pre v-else class="agent-msg__text">{{ streamingText }}</pre>
@@ -394,61 +411,83 @@ onMounted(() => {
           multiple
           @change="onFolderChange"
         />
-        <button
-          type="button"
-          class="agent-composer__attach"
-          title="上传文件"
-          :disabled="isStreaming"
-          @click="onPickFiles"
-        >
-          📎
-        </button>
-        <button
-          type="button"
-          class="agent-composer__attach"
-          title="上传文件夹（含 .md 与 images 子目录，自动匹配本地图片路径）"
-          :disabled="isStreaming"
-          @click="onPickFolder"
-        >
-          📁
-        </button>
-        <button
-          type="button"
-          class="agent-composer__plan"
-          :class="{ 'is-active': planModeEnabled }"
-          title="分步执行：先列出步骤再逐项完成"
-          :disabled="isStreaming"
-          @click="togglePlanMode"
-        >
-          分步
-        </button>
-        <textarea
-          ref="inputRef"
-          v-model="input"
-          class="agent-composer__input"
-          rows="1"
-          placeholder="输入消息，Shift+Enter 换行…"
-          :disabled="isStreaming"
-          @keydown="onKeydown"
-          @input="resizeInput"
-        />
-        <button
-          v-if="!isStreaming"
-          type="button"
-          class="agent-composer__send"
-          :disabled="!input.trim() && !pendingAttachments.length"
-          @click="onSubmit"
-        >
-          发送
-        </button>
-        <button
-          v-else
-          type="button"
-          class="agent-composer__send agent-composer__send--stop"
-          @click="stopStreaming"
-        >
-          停止
-        </button>
+        <div class="agent-composer__box">
+          <textarea
+            ref="inputRef"
+            v-model="input"
+            class="agent-composer__input"
+            rows="1"
+            placeholder="给蕾西亚发送消息"
+            :disabled="isStreaming"
+            @keydown="onKeydown"
+            @input="resizeInput"
+          />
+          <div class="agent-composer__toolbar">
+            <div class="agent-composer__modes">
+              <button
+                type="button"
+                class="agent-mode-pill"
+                :class="{ 'is-active': planModeEnabled }"
+                title="深度思考：分步规划并逐项执行复杂任务"
+                :disabled="isStreaming"
+                @click="togglePlanMode"
+              >
+                <span class="agent-mode-pill__icon" aria-hidden="true">∞</span>
+                深度思考
+              </button>
+              <button
+                type="button"
+                class="agent-mode-pill"
+                :class="{ 'is-active': webSearchEnabled }"
+                title="智能搜索：先联网检索再回答"
+                :disabled="isStreaming"
+                @click="toggleWebSearch"
+              >
+                <span class="agent-mode-pill__icon agent-mode-pill__icon--globe" aria-hidden="true">⌁</span>
+                智能搜索
+              </button>
+            </div>
+            <div class="agent-composer__actions">
+              <button
+                type="button"
+                class="agent-composer__icon-btn"
+                title="上传文件"
+                :disabled="isStreaming"
+                @click="onPickFiles"
+              >
+                📎
+              </button>
+              <button
+                type="button"
+                class="agent-composer__icon-btn"
+                title="上传文件夹"
+                :disabled="isStreaming"
+                @click="onPickFolder"
+              >
+                📁
+              </button>
+              <button
+                v-if="!isStreaming"
+                type="button"
+                class="agent-composer__send"
+                :disabled="!input.trim() && !pendingAttachments.length"
+                title="发送"
+                @click="onSubmit"
+              >
+                ↑
+              </button>
+              <button
+                v-else
+                type="button"
+                class="agent-composer__send agent-composer__send--stop"
+                title="停止"
+                @click="stopStreaming"
+              >
+                ■
+              </button>
+            </div>
+          </div>
+        </div>
       </footer>
     </div>
 
@@ -660,9 +699,17 @@ onMounted(() => {
 .agent-messages {
   flex: 1;
   overflow-y: auto;
-  padding: 1.25rem clamp(1.5rem, 5vw, 4rem) 0.75rem;
+  padding: 1.25rem clamp(1rem, 4vw, 2rem) 0.75rem;
   scroll-behavior: smooth;
   overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.agent-messages > * {
+  width: 100%;
+  max-width: 820px;
 }
 
 .agent-messages__loading {
@@ -700,7 +747,7 @@ onMounted(() => {
   display: flex;
   gap: 0.65rem;
   width: 100%;
-  max-width: min(46%, 560px);
+  max-width: 100%;
   margin-bottom: 1.25rem;
 }
 
@@ -713,6 +760,7 @@ onMounted(() => {
   flex-direction: row-reverse;
   margin-left: auto;
   margin-right: 0;
+  max-width: min(78%, 640px);
 }
 
 .agent-msg__avatar {
@@ -744,8 +792,13 @@ onMounted(() => {
 }
 
 .agent-msg.user .agent-msg__body {
-  background: rgba(60, 120, 200, 0.18);
-  border-color: rgba(140, 190, 255, 0.2);
+  background: linear-gradient(135deg, rgba(56, 120, 210, 0.92), rgba(42, 98, 180, 0.88));
+  border-color: rgba(120, 180, 255, 0.35);
+  color: rgba(245, 250, 255, 0.98);
+}
+
+.agent-msg.user .agent-msg__role {
+  color: rgba(220, 235, 255, 0.75);
 }
 
 .agent-msg__role {
@@ -766,10 +819,17 @@ onMounted(() => {
 
 .agent-streaming-turn {
   width: 100%;
-  max-width: min(46%, 560px);
+  max-width: 100%;
   margin-right: auto;
   margin-left: 0;
   margin-bottom: 1.25rem;
+}
+
+.agent-search-hint {
+  margin: 0 0 0.65rem 2.65rem;
+  font-size: 0.78rem;
+  color: rgba(160, 210, 255, 0.85);
+  font-style: italic;
 }
 
 .agent-streaming-turn .agent-msg {
@@ -889,76 +949,149 @@ onMounted(() => {
 
 .agent-composer {
   display: flex;
-  align-items: flex-end;
-  gap: 0.45rem;
-  padding: 0.75rem 1rem 1rem;
+  justify-content: center;
+  padding: 0.75rem clamp(1rem, 4vw, 2rem) 1.25rem;
   border-top: 1px solid rgba(140, 190, 255, 0.12);
   background: rgba(14, 24, 42, 0.85);
+}
+
+.agent-composer__box {
+  width: 100%;
+  max-width: 820px;
+  border: 1px solid rgba(140, 190, 255, 0.22);
+  border-radius: 16px;
+  background: rgba(8, 16, 32, 0.55);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.agent-composer__box:focus-within {
+  border-color: rgba(140, 200, 255, 0.45);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18), 0 0 0 2px rgba(100, 170, 255, 0.12);
 }
 
 .agent-composer__file-input {
   display: none;
 }
 
-.agent-composer__attach {
-  flex-shrink: 0;
-  width: 2.25rem;
-  height: 2.25rem;
-  border: 1px solid rgba(140, 190, 255, 0.22);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.05);
-  font-size: 1rem;
-  cursor: pointer;
-}
-
-.agent-composer__attach:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.agent-composer__plan {
-  flex-shrink: 0;
-  height: 2.25rem;
-  padding: 0 0.55rem;
-  border: 1px solid rgba(140, 190, 255, 0.22);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.05);
-  font-size: 0.78rem;
-  color: var(--agent-muted);
-  cursor: pointer;
-}
-
-.agent-composer__plan.is-active {
-  border-color: rgba(142, 200, 255, 0.55);
-  background: rgba(90, 159, 212, 0.2);
-  color: var(--agent-accent);
-}
-
-.agent-composer__plan:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
 .agent-composer__input {
-  flex: 1;
-  min-width: 0;
-  min-height: 2.25rem;
+  display: block;
+  width: 100%;
+  min-height: 3rem;
   max-height: 160px;
-  padding: 0.55rem 0.75rem;
-  border: 1px solid rgba(140, 190, 255, 0.22);
-  border-radius: 12px;
-  background: rgba(8, 16, 32, 0.5);
+  padding: 0.85rem 1rem 0.35rem;
+  border: none;
+  background: transparent;
   color: var(--agent-text);
   font-family: inherit;
-  font-size: 0.88rem;
-  line-height: 1.45;
+  font-size: 0.92rem;
+  line-height: 1.5;
   resize: none;
   outline: none;
 }
 
-.agent-composer__input:focus {
-  border-color: rgba(140, 200, 255, 0.45);
-  box-shadow: 0 0 0 2px rgba(100, 170, 255, 0.12);
+.agent-composer__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.45rem 0.55rem 0.55rem;
+}
+
+.agent-composer__modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.agent-mode-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 2rem;
+  padding: 0 0.65rem;
+  border: 1px solid rgba(140, 190, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--agent-muted);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.agent-mode-pill__icon {
+  font-size: 0.85rem;
+  line-height: 1;
+  opacity: 0.85;
+}
+
+.agent-mode-pill__icon--globe {
+  font-size: 0.95rem;
+}
+
+.agent-mode-pill.is-active {
+  border-color: rgba(142, 200, 255, 0.55);
+  background: rgba(90, 159, 212, 0.18);
+  color: var(--agent-accent);
+}
+
+.agent-mode-pill:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.agent-composer__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.agent-composer__icon-btn {
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  font-size: 1rem;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.agent-composer__icon-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.agent-composer__icon-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.agent-composer__send {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid rgba(140, 200, 255, 0.35);
+  border-radius: 999px;
+  background: linear-gradient(165deg, rgba(100, 170, 240, 0.95), rgba(60, 120, 200, 0.92));
+  color: #fff;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.agent-composer__send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.agent-composer__send--stop {
+  background: linear-gradient(165deg, rgba(230, 120, 120, 0.95), rgba(190, 70, 70, 0.92));
+  border-color: rgba(255, 160, 160, 0.35);
+  font-size: 0.72rem;
 }
 
 .agent-preview {
@@ -1091,33 +1224,6 @@ onMounted(() => {
   cursor: not-allowed;
 }
 
-.agent-composer__send {
-  flex-shrink: 0;
-  min-width: 3.5rem;
-  height: 2.25rem;
-  padding: 0 0.85rem;
-  border: 1px solid rgba(140, 200, 255, 0.35);
-  border-radius: 10px;
-  background: linear-gradient(165deg, rgba(100, 170, 240, 0.95), rgba(60, 120, 200, 0.92));
-  color: #fff;
-  font-size: 0.82rem;
-  cursor: pointer;
-}
-
-.agent-composer__send:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.agent-composer__send--stop {
-  background: linear-gradient(165deg, rgba(230, 120, 120, 0.95), rgba(190, 70, 70, 0.92));
-  border-color: rgba(255, 160, 160, 0.35);
-}
-
-.agent-sidebar-backdrop {
-  display: none;
-}
-
 @media (max-width: 767px) {
   .agent-sidebar {
     position: fixed;
@@ -1154,5 +1260,19 @@ onMounted(() => {
     padding-left: 0.75rem;
     padding-right: 0.75rem;
   }
+
+  .agent-composer {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  .agent-mode-pill {
+    font-size: 0.72rem;
+    padding: 0 0.5rem;
+  }
+}
+
+.agent-sidebar-backdrop {
+  display: none;
 }
 </style>

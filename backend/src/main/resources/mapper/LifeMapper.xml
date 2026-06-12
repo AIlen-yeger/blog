@@ -14,11 +14,12 @@
         <result column="view_count" property="viewCount"/>
         <result column="pinned" property="pinned"/>
         <result column="status" property="status"/>
+        <result column="owner_only" property="ownerOnly"/>
         <result column="agent_reply" property="agentReply"/>
     </resultMap>
 
     <sql id="LifeColumns">
-        id, title, excerpt, tag, content, record_date, images_json, view_count, pinned, status, agent_reply
+        id, title, excerpt, tag, content, record_date, images_json, view_count, pinned, status, owner_only, agent_reply
     </sql>
 
     <sql id="listWhere">
@@ -36,6 +37,9 @@
                 AND (LOWER(title) LIKE CONCAT('%', LOWER(#{keyword}), '%')
                 OR LOWER(excerpt) LIKE CONCAT('%', LOWER(#{keyword}), '%')
                 OR LOWER(content) LIKE CONCAT('%', LOWER(#{keyword}), '%'))
+            </if>
+            <if test="hideOwnerOnly">
+                AND owner_only = 0
             </if>
         </where>
     </sql>
@@ -78,6 +82,9 @@
             <if test="status != null and status != ''">
                 AND status = #{status}
             </if>
+            <if test="hideOwnerOnly">
+                AND owner_only = 0
+            </if>
         </where>
         GROUP BY tag
         ORDER BY count DESC, tag ASC
@@ -89,6 +96,9 @@
             <if test="status != null and status != ''">
                 AND status = #{status}
             </if>
+            <if test="hideOwnerOnly">
+                AND owner_only = 0
+            </if>
             AND record_date IS NOT NULL AND record_date != ''
         </where>
         GROUP BY LEFT(record_date, 7)
@@ -96,8 +106,8 @@
     </select>
 
     <insert id="insert">
-        INSERT INTO life_records (id, title, excerpt, tag, content, record_date, images_json, view_count, pinned, status, agent_reply)
-        VALUES (#{id}, #{title}, #{excerpt}, #{tag}, #{content}, #{date}, #{imagesJson}, 0, 0, #{status}, #{agentReply})
+        INSERT INTO life_records (id, title, excerpt, tag, content, record_date, images_json, view_count, pinned, status, owner_only, agent_reply)
+        VALUES (#{id}, #{title}, #{excerpt}, #{tag}, #{content}, #{date}, #{imagesJson}, 0, 0, #{status}, #{ownerOnly}, #{agentReply})
     </insert>
 
     <update id="update">
@@ -109,6 +119,7 @@
             record_date = #{date},
             images_json = #{imagesJson},
             status = #{status},
+            owner_only = #{ownerOnly},
             agent_reply = #{agentReply}
         WHERE id = #{id}
     </update>

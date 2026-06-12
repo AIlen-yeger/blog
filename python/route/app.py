@@ -36,6 +36,10 @@ class ChatRequest(BaseModel):
     user_role: str = Field(default="", validation_alias=AliasChoices("user_role", "userRole"))
     attachments: list[dict[str, Any]] = Field(default_factory=list)
     execution_mode: str = Field(default="auto", validation_alias=AliasChoices("execution_mode", "executionMode"))
+    enable_web_search: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("enable_web_search", "enableWebSearch"),
+    )
 
 
 def _parse_attachments(raw: dict[str, Any]) -> list[dict[str, Any]]:
@@ -64,6 +68,23 @@ def _parse_attachments(raw: dict[str, Any]) -> list[dict[str, Any]]:
 def _parse_execution_mode(raw: dict[str, Any]) -> str:
     mode = _pick_str(raw, "execution_mode", "executionMode").lower() or "auto"
     return mode if mode in ("auto", "plan", "fast") else "auto"
+
+
+def _pick_bool(raw: dict[str, Any], *keys: str) -> bool:
+    for key in keys:
+        value = raw.get(key)
+        if value is None:
+            continue
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return value != 0
+        text = str(value).strip().lower()
+        if text in ("1", "true", "yes", "on"):
+            return True
+        if text in ("0", "false", "no", "off"):
+            return False
+    return False
 
 
 def _pick_str(raw: dict[str, Any], *keys: str) -> str:
@@ -121,6 +142,7 @@ def _parse_chat_request(raw: object) -> ChatRequest | JSONResponse:
         user_role=_pick_str(raw, "user_role", "userRole"),
         attachments=_parse_attachments(raw),
         execution_mode=_parse_execution_mode(raw),
+        enable_web_search=_pick_bool(raw, "enable_web_search", "enableWebSearch"),
     )
 
 
@@ -229,8 +251,36 @@ async def llm_chat(request: Request):
                 user_id=body.user_id,
             )
             try:
+                question = body.question
+                if body.enable_web_search:
+                    yield (
+                        "data: "
+                        + json.dumps({"type": "search_status", "status": "searching"}, ensure_ascii=False)
+                        + "\n\n"
+                    )
+                    from utils.mcp.web_search import sogou_search_sync
+
+                    results = sogou_search_sync(question, num_results=5)
+                    yield (
+                        "data: "
+                        + json.dumps(
+                            {
+                                "type": "search_status",
+                                "status": "done",
+                                "hasResults": bool(results),
+                            },
+                            ensure_ascii=False,
+                        )
+                        + "\n\n"
+                    )
+                    if results:
+                        question = (
+                            f"{question}\n\n[联网检索结果]\n{results}\n\n"
+                            "请结合以上检索结果回答，必要时说明信息来源。"
+                        )
+
                 result = get_agent_entry().run(
-                    question=body.question,
+                    question=question,
                     session_id=body.session_id,
                     user_id=body.user_id,
                     limit=body.limit,

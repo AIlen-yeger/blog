@@ -15,6 +15,7 @@ import com.personalblog.security.AdminGuard;
 import com.personalblog.service.LifeService;
 import com.personalblog.service.ProfileService;
 import com.personalblog.util.AgentReplySupport;
+import com.personalblog.util.ContentVisibilitySupport;
 import com.personalblog.util.ExcerptUtil;
 import com.personalblog.util.IdGenerator;
 import com.personalblog.util.JsonUtil;
@@ -56,9 +57,10 @@ public class LifeServiceImpl implements LifeService {
         String tagFilter = blankToNull(tag);
         String monthFilter = blankToNull(yearMonth);
 
-        long total = lifeMapper.countList(keywordFilter, statusFilter, tagFilter, monthFilter);
+        long total = lifeMapper.countList(keywordFilter, statusFilter, tagFilter, monthFilter, hideOwnerOnly());
         List<LifeDto> list = lifeMapper.selectList(
-                        keywordFilter, statusFilter, tagFilter, monthFilter, sortKey, offset, safeSize)
+                        keywordFilter, statusFilter, tagFilter, monthFilter, sortKey, offset, safeSize,
+                        hideOwnerOnly())
                 .stream().map(this::toDto).toList();
 
         return new PageResult<>(list, total, safePage, safeSize);
@@ -146,6 +148,13 @@ public class LifeServiceImpl implements LifeService {
         if (request.getStatus() != null && !request.getStatus().isBlank()) {
             entity.setStatus(ContentStatus.normalize(request.getStatus()));
         }
+        if (request.getOwnerOnly() != null) {
+            entity.setOwnerOnly(Boolean.TRUE.equals(request.getOwnerOnly()));
+        }
+    }
+
+    private boolean hideOwnerOnly() {
+        return ContentVisibilitySupport.hideOwnerOnlyFromPublic(adminGuard);
     }
 
     private String resolveListStatus(String requestedStatus) {
@@ -200,6 +209,7 @@ public class LifeServiceImpl implements LifeService {
         dto.setViewCount(contentViewCache.getDisplayCount("life", entity.getId(), entity.getViewCount()));
         dto.setPinned(entity.isPinned());
         dto.setStatus(entity.getStatus() != null ? entity.getStatus() : ContentStatus.PUBLISHED);
+        dto.setOwnerOnly(entity.isOwnerOnly());
         dto.setAgentReply(
                 AgentReplySupport.presentForLife(
                         agentReplyProperties,

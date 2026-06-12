@@ -25,4 +25,7 @@ public class AgentChatRequest {
 
     /** auto | plan | fast */
     private String executionMode = "auto";
+
+    /** 开启后 Agent 会先联网检索再回答 */
+    private boolean enableWebSearch = false;
 }

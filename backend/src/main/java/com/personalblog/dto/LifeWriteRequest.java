@@ -13,4 +13,6 @@ public class LifeWriteRequest {
     private List<String> images;
     /** published | draft */
     private String status;
+    /** 为 true 时仅管理员（站点本人）可见 */
+    private Boolean ownerOnly;
 }

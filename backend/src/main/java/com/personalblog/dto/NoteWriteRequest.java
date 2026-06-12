@@ -16,6 +16,8 @@ public class NoteWriteRequest {
     private List<String> images;
     /** published | draft，默认 published */
     private String status;
+    /** 为 true 时仅管理员（站点本人）可见 */
+    private Boolean ownerOnly;
     /** 桌宠会话 ID，用于拉近期聊天上下文生成 Kohaku 笔记回复（仅 create 时生效） */
     private String agentSessionId;
     /**

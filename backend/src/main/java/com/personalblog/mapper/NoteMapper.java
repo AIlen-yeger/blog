@@ -22,7 +22,8 @@ public interface NoteMapper {
             @Param("keyword") String keyword,
             @Param("status") String status,
             @Param("tag") String tag,
-            @Param("yearMonth") String yearMonth);
+            @Param("yearMonth") String yearMonth,
+            @Param("hideOwnerOnly") boolean hideOwnerOnly);
 
     List<NoteEntity> selectList(
             @Param("topicId") String topicId,
@@ -32,11 +33,14 @@ public interface NoteMapper {
             @Param("yearMonth") String yearMonth,
             @Param("sort") String sort,
             @Param("offset") int offset,
-            @Param("limit") int limit);
+            @Param("limit") int limit,
+            @Param("hideOwnerOnly") boolean hideOwnerOnly);
 
-    List<TagCountDto> selectTagCounts(@Param("status") String status);
+    List<TagCountDto> selectTagCounts(
+            @Param("status") String status, @Param("hideOwnerOnly") boolean hideOwnerOnly);
 
-    List<ArchiveMonthDto> selectArchiveMonths(@Param("status") String status);
+    List<ArchiveMonthDto> selectArchiveMonths(
+            @Param("status") String status, @Param("hideOwnerOnly") boolean hideOwnerOnly);
 
     int insert(NoteEntity note);
 

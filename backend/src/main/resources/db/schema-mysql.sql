@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS notes (
     view_count   INT          NOT NULL DEFAULT 0,
     pinned       TINYINT(1)   NOT NULL DEFAULT 0,
     status              VARCHAR(16)  NOT NULL DEFAULT 'published',
+    owner_only          TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '1=仅管理员可见',
     agent_reply_status  VARCHAR(16)  NOT NULL DEFAULT 'none' COMMENT 'none|pending|running|done|failed',
     agent_reply         MEDIUMTEXT   NULL COMMENT 'Kohaku 自动回复全文',
     agent_reply_job_id  VARCHAR(64)  NULL COMMENT '关联 content_agent_comment_job.job_id',
@@ -93,6 +94,7 @@ CREATE TABLE IF NOT EXISTS life_records (
     view_count   INT          NOT NULL DEFAULT 0,
     pinned       TINYINT(1)   NOT NULL DEFAULT 0,
     status       VARCHAR(16)  NOT NULL DEFAULT 'published',
+    owner_only   TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '1=仅管理员可见',
     agent_reply  MEDIUMTEXT   NULL COMMENT 'Kohaku 自动回复全文',
     KEY idx_life_date (record_date),
     KEY idx_life_status (status)

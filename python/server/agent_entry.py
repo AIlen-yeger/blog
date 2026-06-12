@@ -84,6 +84,33 @@ class AgentReplyResult:
             f"intent={self.intent} channel={self.channel} 为流式结果，请用 iter_sse()"
         )
 
+    def collect_plain_text(self) -> str:
+        """同步场景（QQ poller 等）：一次性消费流式 SSE 并拼接正文。"""
+        if self.text is not None:
+            return (self.text or "").strip()
+        parts: list[str] = []
+        for chunk in self.iter_sse():
+            line = chunk.strip()
+            if not line.startswith("data:"):
+                continue
+            payload = line[5:].strip()
+            if payload == "[DONE]":
+                break
+            try:
+                obj = json.loads(payload)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(obj, dict):
+                continue
+            kind = obj.get("type")
+            if kind in ("message", "delta"):
+                content = obj.get("content")
+                if content:
+                    parts.append(str(content))
+            elif obj.get("message") and kind not in ("plan", "plan_step", "meta", "action_preview"):
+                parts.append(str(obj.get("message")))
+        return "".join(parts).strip()
+
     def iter_sse(self) -> Iterator[str]:
         yield _format_sse({"type": "meta", "intent": self.intent})
         if self.output_mode == "once":

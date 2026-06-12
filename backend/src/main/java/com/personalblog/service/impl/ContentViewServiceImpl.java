@@ -13,6 +13,7 @@ import com.personalblog.mapper.NoteMapper;
 import com.personalblog.security.AuthUserPrincipal;
 import com.personalblog.service.ContentViewService;
 import com.personalblog.util.ClientIpResolver;
+import com.personalblog.util.ContentVisibilitySupport;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -46,21 +47,11 @@ public class ContentViewServiceImpl implements ContentViewService {
     }
 
     private void assertViewable(NoteEntity entity) {
-        if (entity == null) {
-            throw new BusinessException(ErrorCode.NOTE_NOT_FOUND);
-        }
-        if (!adminGuard.isCurrentAdmin() && ContentStatus.DRAFT.equals(entity.getStatus())) {
-            throw new BusinessException(ErrorCode.NOTE_NOT_FOUND);
-        }
+        ContentVisibilitySupport.assertNoteReadable(entity, adminGuard);
     }
 
     private void assertViewable(LifeEntity entity) {
-        if (entity == null) {
-            throw new BusinessException(ErrorCode.LIFE_NOT_FOUND);
-        }
-        if (!adminGuard.isCurrentAdmin() && ContentStatus.DRAFT.equals(entity.getStatus())) {
-            throw new BusinessException(ErrorCode.LIFE_NOT_FOUND);
-        }
+        ContentVisibilitySupport.assertLifeReadable(entity, adminGuard);
     }
 
     private ViewRecordResultDto recordView(String contentType, String contentId, HttpServletRequest request) {

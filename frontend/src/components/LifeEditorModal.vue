@@ -21,6 +21,7 @@ const title = ref('')
 const excerpt = ref('')
 const tag = ref('')
 const content = ref('')
+const ownerOnly = ref(false)
 const initialImageUrls = ref<string[]>([])
 const imageUploadRef = ref<InstanceType<typeof ContentImageUpload> | null>(null)
 const submitting = ref(false)
@@ -38,12 +39,14 @@ watch(
       excerpt.value = item.excerpt
       tag.value = item.tag
       content.value = item.content
+      ownerOnly.value = Boolean(item.ownerOnly)
       initialImageUrls.value = [...(item.images ?? [])]
     } else {
       title.value = ''
       excerpt.value = ''
       tag.value = '生活'
       content.value = ''
+      ownerOnly.value = false
       initialImageUrls.value = []
     }
   },
@@ -63,6 +66,7 @@ async function submit(publishStatus: 'published' | 'draft') {
       content: content.value.trim(),
       images,
       status: publishStatus,
+      ownerOnly: ownerOnly.value,
     })
     emit('close')
   } catch (err) {
@@ -89,6 +93,11 @@ async function submit(publishStatus: 'published' | 'draft') {
         placeholder="详细内容…"
         :disabled="submitting"
       />
+      <label class="owner-only-row">
+        <input v-model="ownerOnly" type="checkbox" :disabled="submitting" />
+        <span>仅自己可见</span>
+        <small>访客与预览模式下不可见，仅登录管理员可见</small>
+      </label>
       <ContentImageUpload ref="imageUploadRef" :initial-urls="initialImageUrls" />
       <p v-if="submitError" class="submit-err" role="alert">{{ submitError }}</p>
       <div class="actions">
@@ -140,6 +149,27 @@ textarea:focus {
   resize: vertical;
   line-height: 1.65;
   font-family: inherit;
+}
+.owner-only-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  margin-top: 0.5rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  border: 1px solid rgba(59, 130, 246, 0.18);
+  background: rgba(59, 130, 246, 0.06);
+  font-size: 0.85rem;
+}
+.owner-only-row input {
+  width: auto;
+  margin: 0;
+}
+.owner-only-row small {
+  flex: 1 1 100%;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
 }
 .submit-err {
   margin: 0.35rem 0 0;

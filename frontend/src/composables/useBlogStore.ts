@@ -145,7 +145,7 @@ function filterContentForViewer<T extends NoteItem | LifeItem>(
     kind === 'note' ? normalizeNote(item as NoteItem) : normalizeLife(item as LifeItem),
   ) as T[]
   if (isManageView.value) return normalized
-  return normalized.filter((item) => item.status !== 'draft')
+  return normalized.filter((item) => item.status !== 'draft' && !item.ownerOnly)
 }
 
 export function patchNoteInStore(note: NoteItem) {
@@ -196,7 +196,7 @@ function filterMockNotes(notes: NoteItem[]) {
   const { isManageView } = useContentViewer()
   let list = [...notes]
   if (!isManageView.value) {
-    list = list.filter((n) => n.status !== 'draft')
+    list = list.filter((n) => n.status !== 'draft' && !n.ownerOnly)
   }
   const kw = contentFilters.keyword?.trim().toLowerCase()
   if (kw) {
@@ -219,7 +219,7 @@ function filterMockLife(items: LifeItem[]) {
   const { isManageView } = useContentViewer()
   let list = [...items]
   if (!isManageView.value) {
-    list = list.filter((l) => l.status !== 'draft')
+    list = list.filter((l) => l.status !== 'draft' && !l.ownerOnly)
   }
   const kw = contentFilters.keyword?.trim().toLowerCase()
   if (kw) {
@@ -505,6 +505,7 @@ export function useBlogStore() {
         content: payload.content,
         images: payload.images ?? [],
         status: payload.status,
+        ownerOnly: payload.ownerOnly,
         agentSessionId: getAgentSessionId(),
       })
       const isPublished = (payload.status ?? 'published') === 'published'
@@ -534,6 +535,7 @@ export function useBlogStore() {
       images: payload.images ? [...payload.images] : [],
       date: payload.date ?? todayISO(),
       status: payload.status ?? 'published',
+      ownerOnly: payload.ownerOnly,
     }
     state.notes.unshift(note)
     return id
@@ -573,6 +575,7 @@ export function useBlogStore() {
         content: payload.content,
         images: payload.images ?? [],
         status: payload.status,
+        ownerOnly: payload.ownerOnly,
       })
       state.life.unshift(created)
       return created.id
@@ -587,6 +590,7 @@ export function useBlogStore() {
       images: payload.images ? [...payload.images] : [],
       date: payload.date ?? todayISO(),
       status: payload.status ?? 'published',
+      ownerOnly: payload.ownerOnly,
     }
     state.life.unshift(item)
     return id

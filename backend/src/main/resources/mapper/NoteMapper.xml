@@ -15,13 +15,14 @@
         <result column="view_count" property="viewCount"/>
         <result column="pinned" property="pinned"/>
         <result column="status" property="status"/>
+        <result column="owner_only" property="ownerOnly"/>
         <result column="agent_reply" property="agentReply"/>
         <result column="agent_reply_status" property="agentReplyStatus"/>
         <result column="agent_reply_job_id" property="agentReplyJobId"/>
     </resultMap>
 
     <sql id="NoteColumns">
-        id, title, excerpt, tag, topic_id, content, record_date, images_json, view_count, pinned, status,
+        id, title, excerpt, tag, topic_id, content, record_date, images_json, view_count, pinned, status, owner_only,
         agent_reply, agent_reply_status, agent_reply_job_id
     </sql>
 
@@ -43,6 +44,9 @@
                 AND (LOWER(title) LIKE CONCAT('%', LOWER(#{keyword}), '%')
                 OR LOWER(excerpt) LIKE CONCAT('%', LOWER(#{keyword}), '%')
                 OR LOWER(content) LIKE CONCAT('%', LOWER(#{keyword}), '%'))
+            </if>
+            <if test="hideOwnerOnly">
+                AND owner_only = 0
             </if>
         </where>
     </sql>
@@ -89,6 +93,9 @@
             <if test="status != null and status != ''">
                 AND status = #{status}
             </if>
+            <if test="hideOwnerOnly">
+                AND owner_only = 0
+            </if>
         </where>
         GROUP BY tag
         ORDER BY count DESC, tag ASC
@@ -100,6 +107,9 @@
             <if test="status != null and status != ''">
                 AND status = #{status}
             </if>
+            <if test="hideOwnerOnly">
+                AND owner_only = 0
+            </if>
             AND record_date IS NOT NULL AND record_date != ''
         </where>
         GROUP BY LEFT(record_date, 7)
@@ -107,8 +117,8 @@
     </select>
 
     <insert id="insert">
-        INSERT INTO notes (id, title, excerpt, tag, topic_id, content, record_date, images_json, view_count, pinned, status, agent_reply)
-        VALUES (#{id}, #{title}, #{excerpt}, #{tag}, #{topicId}, #{content}, #{date}, #{imagesJson}, 0, 0, #{status}, #{agentReply})
+        INSERT INTO notes (id, title, excerpt, tag, topic_id, content, record_date, images_json, view_count, pinned, status, owner_only, agent_reply)
+        VALUES (#{id}, #{title}, #{excerpt}, #{tag}, #{topicId}, #{content}, #{date}, #{imagesJson}, 0, 0, #{status}, #{ownerOnly}, #{agentReply})
     </insert>
 
     <update id="update">
@@ -120,7 +130,8 @@
             content = #{content},
             record_date = #{date},
             images_json = #{imagesJson},
-            status = #{status}
+            status = #{status},
+            owner_only = #{ownerOnly}
         WHERE id = #{id}
     </update>
 

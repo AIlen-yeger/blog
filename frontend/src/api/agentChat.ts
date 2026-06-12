@@ -37,7 +37,15 @@ async function mockStreamReply(
   userText: string,
   onChunk: (piece: string) => void,
   signal?: AbortSignal,
+  options?: AgentChatStreamOptions & { enableWebSearch?: boolean },
 ) {
+  if (options?.enableWebSearch) {
+    options.onSearchStatus?.({ status: 'searching' })
+    await delay(400)
+    if (signal?.aborted) return
+    options.onSearchStatus?.({ status: 'done', hasResults: true })
+  }
+
   const isRich =
     /搜索|检索|查询|资料|笔记|总结|分析|列表|推荐/.test(userText) ||
     userText.length > 40
@@ -68,6 +76,7 @@ export interface AgentChatStreamOptions {
   onActionPreview?: (preview: { action: string; data: PublishNotePreviewData }) => void
   onPlan?: (steps: PlanStep[]) => void
   onPlanStep?: (update: { stepId: string; status: PlanStepStatus; summary?: string }) => void
+  onSearchStatus?: (update: { status: 'searching' | 'done'; hasResults?: boolean }) => void
 }
 
 function handleSsePayload(
@@ -79,6 +88,7 @@ function handleSsePayload(
   const onActionPreview = options?.onActionPreview
   const onPlan = options?.onPlan
   const onPlanStep = options?.onPlanStep
+  const onSearchStatus = options?.onSearchStatus
   if (!payload || typeof payload !== 'object') return
   const row = payload as Record<string, unknown>
   if (typeof row.code === 'number' && row.code !== 0) {
@@ -116,6 +126,16 @@ function handleSsePayload(
     const status = String(row.status ?? 'running') as PlanStepStatus
     const summary = typeof row.summary === 'string' ? row.summary : undefined
     if (stepId) onPlanStep?.({ stepId, status, summary })
+    return
+  }
+  if (type === 'search_status') {
+    const status = String(row.status ?? '')
+    if (status === 'searching' || status === 'done') {
+      onSearchStatus?.({
+        status,
+        hasResults: typeof row.hasResults === 'boolean' ? row.hasResults : undefined,
+      })
+    }
     return
   }
   const piece = extractPiece(payload)
@@ -170,7 +190,7 @@ function extractPiece(payload: unknown): string {
     throw new Error(String(row.message ?? 'Agent 返回错误'))
   }
   const type = String(row.type ?? '')
-  if (type === 'meta' || type === 'plan' || type === 'plan_step' || type === 'action_preview') return ''
+  if (type === 'meta' || type === 'plan' || type === 'plan_step' || type === 'action_preview' || type === 'search_status') return ''
   const piece = row.content ?? row.delta ?? row.text ?? ''
   return typeof piece === 'string' ? piece : ''
 }
@@ -179,6 +199,7 @@ export interface AgentChatStreamContext extends AgentChatStreamOptions {
   sessionId?: string
   attachments?: AgentAttachmentPayload[]
   executionMode?: ExecutionMode
+  enableWebSearch?: boolean
 }
 
 export async function streamAgentChat(
@@ -191,7 +212,7 @@ export async function streamAgentChat(
   const question = lastUser?.content?.trim() ?? ''
 
   if (useMockAgent()) {
-    await mockStreamReply(question, onChunk, signal)
+    await mockStreamReply(question, onChunk, signal, options)
     return
   }
 
@@ -222,6 +243,7 @@ export async function streamAgentChat(
         options?.sessionId,
         options?.attachments,
         options?.executionMode,
+        options?.enableWebSearch,
       ),
     ),
     signal,

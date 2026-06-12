@@ -7,6 +7,7 @@ import com.personalblog.mapper.LifeMapper;
 import com.personalblog.mapper.NoteMapper;
 import com.personalblog.security.AdminGuard;
 import com.personalblog.service.ContentMetaService;
+import com.personalblog.util.ContentVisibilitySupport;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -27,11 +28,12 @@ public class ContentMetaServiceImpl implements ContentMetaService {
     @Override
     public List<TagCountDto> listTags() {
         String statusFilter = adminGuard.isCurrentAdmin() ? null : ContentStatus.PUBLISHED;
+        boolean hideOwnerOnly = ContentVisibilitySupport.hideOwnerOnlyFromPublic(adminGuard);
         Map<String, Long> merged = new LinkedHashMap<>();
-        for (TagCountDto row : noteMapper.selectTagCounts(statusFilter)) {
+        for (TagCountDto row : noteMapper.selectTagCounts(statusFilter, hideOwnerOnly)) {
             merged.merge(row.getTag(), row.getCount(), Long::sum);
         }
-        for (TagCountDto row : lifeMapper.selectTagCounts(statusFilter)) {
+        for (TagCountDto row : lifeMapper.selectTagCounts(statusFilter, hideOwnerOnly)) {
             merged.merge(row.getTag(), row.getCount(), Long::sum);
         }
         return merged.entrySet().stream()
@@ -44,11 +46,12 @@ public class ContentMetaServiceImpl implements ContentMetaService {
     @Override
     public List<ArchiveMonthDto> listArchiveMonths() {
         String statusFilter = adminGuard.isCurrentAdmin() ? null : ContentStatus.PUBLISHED;
+        boolean hideOwnerOnly = ContentVisibilitySupport.hideOwnerOnlyFromPublic(adminGuard);
         Map<String, Long> merged = new LinkedHashMap<>();
-        for (ArchiveMonthDto row : noteMapper.selectArchiveMonths(statusFilter)) {
+        for (ArchiveMonthDto row : noteMapper.selectArchiveMonths(statusFilter, hideOwnerOnly)) {
             merged.merge(row.getMonth(), row.getCount(), Long::sum);
         }
-        for (ArchiveMonthDto row : lifeMapper.selectArchiveMonths(statusFilter)) {
+        for (ArchiveMonthDto row : lifeMapper.selectArchiveMonths(statusFilter, hideOwnerOnly)) {
             merged.merge(row.getMonth(), row.getCount(), Long::sum);
         }
         List<ArchiveMonthDto> list = new ArrayList<>();

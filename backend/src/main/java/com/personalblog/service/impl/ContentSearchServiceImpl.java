@@ -14,6 +14,7 @@ import com.personalblog.security.AdminGuard;
 import com.personalblog.service.ContentSearchService;
 import com.personalblog.service.ProfileService;
 import com.personalblog.util.AgentReplySupport;
+import com.personalblog.util.ContentVisibilitySupport;
 import com.personalblog.util.JsonUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -44,18 +45,19 @@ public class ContentSearchServiceImpl implements ContentSearchService {
         }
 
         String statusFilter = adminGuard.isCurrentAdmin() ? null : ContentStatus.PUBLISHED;
+        boolean hideOwnerOnly = ContentVisibilitySupport.hideOwnerOnlyFromPublic(adminGuard);
         int safeLimit = Math.min(50, Math.max(1, limit));
 
-        long noteTotal = noteMapper.countList(null, kw, statusFilter, null, null);
-        long lifeTotal = lifeMapper.countList(kw, statusFilter, null, null);
+        long noteTotal = noteMapper.countList(null, kw, statusFilter, null, null, hideOwnerOnly);
+        long lifeTotal = lifeMapper.countList(kw, statusFilter, null, null, hideOwnerOnly);
 
         List<NoteDto> notes = noteMapper
-                .selectList(null, kw, statusFilter, null, null, "date_desc", 0, safeLimit)
+                .selectList(null, kw, statusFilter, null, null, "date_desc", 0, safeLimit, hideOwnerOnly)
                 .stream()
                 .map(this::toNoteDto)
                 .toList();
         List<LifeDto> life = lifeMapper
-                .selectList(kw, statusFilter, null, null, "date_desc", 0, safeLimit)
+                .selectList(kw, statusFilter, null, null, "date_desc", 0, safeLimit, hideOwnerOnly)
                 .stream()
                 .map(this::toLifeDto)
                 .toList();
@@ -81,6 +83,7 @@ public class ContentSearchServiceImpl implements ContentSearchService {
         dto.setViewCount(contentViewCache.getDisplayCount("note", entity.getId(), entity.getViewCount()));
         dto.setPinned(entity.isPinned());
         dto.setStatus(entity.getStatus() != null ? entity.getStatus() : ContentStatus.PUBLISHED);
+        dto.setOwnerOnly(entity.isOwnerOnly());
         dto.setAgentReply(
                 AgentReplySupport.presentForNote(
                         agentReplyProperties,
@@ -107,6 +110,7 @@ public class ContentSearchServiceImpl implements ContentSearchService {
         dto.setViewCount(contentViewCache.getDisplayCount("life", entity.getId(), entity.getViewCount()));
         dto.setPinned(entity.isPinned());
         dto.setStatus(entity.getStatus() != null ? entity.getStatus() : ContentStatus.PUBLISHED);
+        dto.setOwnerOnly(entity.isOwnerOnly());
         dto.setAgentReply(
                 AgentReplySupport.presentForLife(
                         agentReplyProperties,
